@@ -38,12 +38,20 @@ export default async function AgenciaLayout({
             </span>
             <span className="text-lg font-semibold">Agência · Super-visão</span>
           </Link>
-          <Link
-            href="/dashboard"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Meu painel →
-          </Link>
+          <nav className="flex items-center gap-4 text-sm">
+            <Link
+              href="/agencia/membros"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Membros
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Meu painel →
+            </Link>
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
