@@ -63,9 +63,14 @@ function LoginPageInner() {
 
     if (inviteToken) {
       router.push(`/join/${encodeURIComponent(inviteToken)}`);
-    } else {
-      router.push("/dashboard");
+      return;
     }
+
+    // Agency operators land on the super-vision console instead of their
+    // own dashboard. `is_agencia()` reads auth.uid() server-side; a
+    // failure here is non-fatal — fall back to the normal dashboard.
+    const { data: isAgencia } = await supabase.rpc("is_agencia");
+    router.push(isAgencia === true ? "/agencia" : "/dashboard");
   };
 
   return (
