@@ -318,9 +318,19 @@ export interface AgencyOverview {
   attention: AgencyAttention[]
 }
 
-const AGENCY_WINDOW_DAYS = 30
 const INACTIVE_DAYS = 14
 const RANKING_LIMIT = 5
+
+/** Allowed metric windows (days) for the period selector. */
+export const METRIC_WINDOWS = [7, 30, 90] as const
+export type MetricWindow = (typeof METRIC_WINDOWS)[number]
+
+export function parseMetricWindow(value: string | undefined): MetricWindow {
+  const n = Number(value)
+  return (METRIC_WINDOWS as readonly number[]).includes(n)
+    ? (n as MetricWindow)
+    : 30
+}
 
 /**
  * Agency-wide roll-up for the /agencia home band: totals come from
@@ -332,13 +342,19 @@ const RANKING_LIMIT = 5
  */
 export async function getAgencyOverview(
   admin: SupabaseClient,
+  windowDays: number = 30,
 ): Promise<AgencyOverview> {
   const now = Date.now()
-  const since30 = new Date(now - AGENCY_WINDOW_DAYS * DAY_MS).toISOString()
+  const sinceWindow = new Date(now - windowDays * DAY_MS).toISOString()
   const since14 = new Date(now - INACTIVE_DAYS * DAY_MS).toISOString()
+  // Fetch messages far enough back to keep the 14-day inactivity check
+  // correct even when the metric window is shorter (e.g. 7 days).
+  const sinceFetch = new Date(
+    now - Math.max(windowDays, INACTIVE_DAYS) * DAY_MS,
+  ).toISOString()
 
   const dayKeys: string[] = []
-  for (let i = AGENCY_WINDOW_DAYS - 1; i >= 0; i--) {
+  for (let i = windowDays - 1; i >= 0; i--) {
     dayKeys.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10))
   }
 
@@ -348,11 +364,11 @@ export async function getAgencyOverview(
       .from('deals')
       .select('value')
       .eq('status', 'won')
-      .gte('updated_at', since30),
+      .gte('updated_at', sinceWindow),
     admin
       .from('messages')
       .select('sender_type, created_at, conversations!inner(account_id)')
-      .gte('created_at', since30),
+      .gte('created_at', sinceFetch),
     admin
       .from('conversations')
       .select('account_id, status, assigned_agent_id')
@@ -393,10 +409,14 @@ export async function getAgencyOverview(
     }
 
     if (accountId) {
-      msgCountByAccount.set(
-        accountId,
-        (msgCountByAccount.get(accountId) ?? 0) + 1,
-      )
+      // Ranking counts messages within the selected window; inactivity
+      // uses the fixed 14-day threshold.
+      if (m.created_at >= sinceWindow) {
+        msgCountByAccount.set(
+          accountId,
+          (msgCountByAccount.get(accountId) ?? 0) + 1,
+        )
+      }
       if (m.created_at >= since14) activeIn14.add(accountId)
     }
   }
@@ -476,25 +496,25 @@ export interface AccountMetrics {
   dailyMessages: { day: string; incoming: number; outgoing: number }[]
 }
 
-const METRICS_WINDOW_DAYS = 30
-const CHART_DAYS = 14
 const DAY_MS = 86_400_000
 
 /**
- * Rolled-up analysis KPIs for a single account over a 30-day window,
- * plus a 14-day message-volume series. `messages` has no account_id,
- * so it's filtered through an inner join on its parent conversation.
- * Day bucketing uses UTC — good enough for a supervision overview.
+ * Rolled-up analysis KPIs for a single account over the selected window,
+ * plus a matching daily message-volume series. `messages` has no
+ * account_id, so it's filtered through an inner join on its parent
+ * conversation. Day bucketing uses UTC — good enough for a supervision
+ * overview.
  */
 export async function getAccountMetrics(
   admin: SupabaseClient,
   accountId: string,
+  windowDays: number = 30,
 ): Promise<AccountMetrics> {
   const now = Date.now()
-  const since = new Date(now - METRICS_WINDOW_DAYS * DAY_MS).toISOString()
+  const since = new Date(now - windowDays * DAY_MS).toISOString()
 
   const dayKeys: string[] = []
-  for (let i = CHART_DAYS - 1; i >= 0; i--) {
+  for (let i = windowDays - 1; i >= 0; i--) {
     dayKeys.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10))
   }
 
@@ -541,7 +561,7 @@ export async function getAccountMetrics(
   const wonDeals = (dealsRes.data ?? []).filter((d) => d.status === 'won')
 
   return {
-    windowDays: METRICS_WINDOW_DAYS,
+    windowDays,
     newContacts: contactsRes.count ?? 0,
     newConversations: convRes.count ?? 0,
     incomingMessages,
@@ -867,6 +887,134 @@ export async function getAccountBoard(
   })
 
   return { stages }
+}
+
+// ============================================================
+// Access audit log (migration 038).
+// ============================================================
+
+export type AgenciaAction =
+  | 'view_account'
+  | 'view_conversation'
+  | 'export_contacts'
+
+/**
+ * Record a privileged access. Fire-and-forget from the caller's point of
+ * view — it never throws, so a missing audit table (migration 038 not yet
+ * applied) or a transient error can't break the page it's logging.
+ */
+export async function logAgenciaAccess(
+  admin: SupabaseClient,
+  entry: {
+    actorUserId: string
+    action: AgenciaAction
+    accountId?: string
+    conversationId?: string
+  },
+): Promise<void> {
+  const { error } = await admin.from('agencia_auditoria').insert({
+    actor_user_id: entry.actorUserId,
+    account_id: entry.accountId ?? null,
+    conversation_id: entry.conversationId ?? null,
+    action: entry.action,
+  })
+  if (error) {
+    console.warn('[agencia audit] insert failed:', error.message)
+  }
+}
+
+export interface AuditRow {
+  id: string
+  action: string
+  createdAt: string
+  actorEmail: string | null
+  accountName: string | null
+  conversationId: string | null
+}
+
+function isMissingTable(err: { code?: string; message?: string }): boolean {
+  return (
+    err.code === '42P01' ||
+    err.code === 'PGRST205' ||
+    /schema cache|does not exist/i.test(err.message ?? '')
+  )
+}
+
+/**
+ * Paginated audit log with actor email + account name resolved. Returns
+ * `available: false` (rather than throwing) when the table doesn't exist
+ * yet, so the page can prompt to apply migration 038.
+ */
+export async function listAudit(
+  admin: SupabaseClient,
+  page = 1,
+  pageSize = 50,
+): Promise<Paged<AuditRow> & { available: boolean }> {
+  const [from, to] = pageRange(page, pageSize)
+  const { data, count, error } = await admin
+    .from('agencia_auditoria')
+    .select(
+      'id, actor_user_id, account_id, conversation_id, action, created_at',
+      { count: 'exact' },
+    )
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) {
+    if (isMissingTable(error)) {
+      return { available: false, rows: [], total: 0, page, pageSize }
+    }
+    throw error
+  }
+
+  const userIds = Array.from(
+    new Set((data ?? []).map((r) => r.actor_user_id).filter(Boolean)),
+  )
+  const accountIds = Array.from(
+    new Set(
+      (data ?? [])
+        .map((r) => r.account_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  )
+
+  const emailById = new Map<string, string | null>()
+  const accountNameById = new Map<string, string>()
+  await Promise.all([
+    userIds.length > 0
+      ? admin
+          .from('profiles')
+          .select('user_id, email')
+          .in('user_id', userIds)
+          .then(({ data: profs }) => {
+            for (const p of profs ?? []) emailById.set(p.user_id, p.email ?? null)
+          })
+      : Promise.resolve(),
+    accountIds.length > 0
+      ? admin
+          .from('accounts')
+          .select('id, name')
+          .in('id', accountIds)
+          .then(({ data: accs }) => {
+            for (const a of accs ?? []) accountNameById.set(a.id, a.name)
+          })
+      : Promise.resolve(),
+  ])
+
+  return {
+    available: true,
+    rows: (data ?? []).map((r) => ({
+      id: r.id,
+      action: r.action,
+      createdAt: r.created_at,
+      actorEmail: emailById.get(r.actor_user_id) ?? null,
+      accountName: r.account_id ? accountNameById.get(r.account_id) ?? null : null,
+      conversationId: r.conversation_id ?? null,
+    })),
+    total: count ?? 0,
+    page,
+    pageSize,
+  }
 }
 
 function tally<T>(rows: T[], key: (row: T) => string): Map<string, number> {

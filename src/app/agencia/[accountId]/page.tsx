@@ -6,43 +6,62 @@ import { requireAgencia } from '@/lib/agencia/guard'
 import {
   getAccountDetail,
   getAccountMetrics,
+  logAgenciaAccess,
+  parseMetricWindow,
   type AccountMetrics,
 } from '@/lib/agencia/queries'
+import { PeriodTabs } from '../ui'
 
 export const dynamic = 'force-dynamic'
 
 // Next 16: dynamic route params are async and must be awaited.
 export default async function AgenciaAccountPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ accountId: string }>
+  searchParams: Promise<{ dias?: string }>
 }) {
   const { accountId } = await params
-  const { admin } = await requireAgencia()
+  const windowDays = parseMetricWindow((await searchParams).dias)
+  const { admin, userId } = await requireAgencia()
   const [detail, metrics] = await Promise.all([
     getAccountDetail(admin, accountId),
-    getAccountMetrics(admin, accountId),
+    getAccountMetrics(admin, accountId, windowDays),
   ])
   if (!detail) notFound()
+
+  // Audit this privileged view (non-blocking on failure).
+  await logAgenciaAccess(admin, {
+    actorUserId: userId,
+    action: 'view_account',
+    accountId,
+  })
 
   const { account, members, stats, recentContacts, recentConversations, stages } =
     detail
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/agencia"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Todas as contas
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold">{account.name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {account.ownerEmail ?? 'sem dono'} · criada em{' '}
-          {formatDate(account.createdAt)}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Link
+            href="/agencia"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Todas as contas
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold">{account.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {account.ownerEmail ?? 'sem dono'} · criada em{' '}
+            {formatDate(account.createdAt)}
+          </p>
+        </div>
+        <PeriodTabs
+          basePath={`/agencia/${account.id}`}
+          current={windowDays}
+        />
       </div>
 
       {/* Headline stats */}

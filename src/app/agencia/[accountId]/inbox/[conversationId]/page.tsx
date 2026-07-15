@@ -3,7 +3,11 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Paperclip } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
-import { getConversationThread, type ThreadMessage } from '@/lib/agencia/queries'
+import {
+  getConversationThread,
+  logAgenciaAccess,
+  type ThreadMessage,
+} from '@/lib/agencia/queries'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,9 +17,17 @@ export default async function AgenciaConversationPage({
   params: Promise<{ accountId: string; conversationId: string }>
 }) {
   const { accountId, conversationId } = await params
-  const { admin } = await requireAgencia()
+  const { admin, userId } = await requireAgencia()
   const thread = await getConversationThread(admin, accountId, conversationId)
   if (!thread) notFound()
+
+  // Audit this privileged view of a client's conversation.
+  await logAgenciaAccess(admin, {
+    actorUserId: userId,
+    action: 'view_conversation',
+    accountId,
+    conversationId,
+  })
 
   const { conversation, contact, messages } = thread
   const title = contact?.name ?? contact?.phone ?? 'Conversa'

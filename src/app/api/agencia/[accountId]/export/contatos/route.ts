@@ -1,4 +1,5 @@
 import { requireAgencia } from '@/lib/agencia/guard'
+import { logAgenciaAccess } from '@/lib/agencia/queries'
 import { toErrorResponse } from '@/lib/auth/account'
 
 // CSV export of an account's contacts, for the agency to analyse offline
@@ -14,7 +15,13 @@ export async function GET(
 ) {
   try {
     const { accountId } = await params
-    const { admin } = await requireAgencia()
+    const { admin, userId } = await requireAgencia()
+
+    await logAgenciaAccess(admin, {
+      actorUserId: userId,
+      action: 'export_contacts',
+      accountId,
+    })
 
     const { data: account } = await admin
       .from('accounts')

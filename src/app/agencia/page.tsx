@@ -12,19 +12,26 @@ import { requireAgencia } from '@/lib/agencia/guard'
 import {
   listAccountsOverview,
   getAgencyOverview,
+  parseMetricWindow,
   type AgencyOverview,
 } from '@/lib/agencia/queries'
+import { PeriodTabs } from './ui'
 
 // Reads live account data through the service role on every request.
 export const dynamic = 'force-dynamic'
 
-export default async function AgenciaHomePage() {
+export default async function AgenciaHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dias?: string }>
+}) {
+  const windowDays = parseMetricWindow((await searchParams).dias)
   // Defence in depth: the layout already gated, but a page can execute
   // even as the layout redirects, so we re-verify and get the client.
   const { admin } = await requireAgencia()
   const [accounts, overview] = await Promise.all([
     listAccountsOverview(admin),
-    getAgencyOverview(admin),
+    getAgencyOverview(admin, windowDays),
   ])
 
   const totals = accounts.reduce(
@@ -39,11 +46,14 @@ export default async function AgenciaHomePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Visão da agência</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Panorama somado de todas as contas · últimos 30 dias
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Visão da agência</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Panorama somado de todas as contas · últimos {windowDays} dias
+          </p>
+        </div>
+        <PeriodTabs basePath="/agencia" current={windowDays} />
       </div>
 
       {/* Totais da carteira */}
@@ -65,7 +75,9 @@ export default async function AgenciaHomePage() {
       </div>
 
       {/* Volume de mensagens */}
-      <Section title="Volume de mensagens · todas as contas (30 dias)">
+      <Section
+        title={`Volume de mensagens · todas as contas (${windowDays} dias)`}
+      >
         <div className="p-4">
           <MessagesChart data={overview.dailyMessages} />
         </div>
