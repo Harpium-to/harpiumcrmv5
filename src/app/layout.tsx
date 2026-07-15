@@ -21,6 +21,14 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// Render every route per-request. Without this, statically-prerendered
+// pages (dashboard, contacts, …) bake the tab title + favicon at build
+// time (when no brand is set), so they'd show the default while the
+// dynamic /agencia pages show the brand — the inconsistency reported.
+// Forcing dynamic also sidesteps the "Supabase client at prerender"
+// build error on the auth pages.
+export const dynamic = "force-dynamic";
+
 // Dynamic so the browser tab title + favicon follow the global brand
 // (set by the agency in /agencia/marca). Falls back to the product
 // defaults when no brand is configured. A freshly uploaded logo has a
