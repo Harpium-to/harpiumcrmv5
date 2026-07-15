@@ -295,6 +295,118 @@ export async function getAccountDetail(
   }
 }
 
+export interface AgencyOverview {
+  wonDealCount30d: number
+  wonDealValue30d: number
+  /** 30-day global message volume, oldest first. */
+  dailyMessages: { day: string; incoming: number; outgoing: number }[]
+  /** Accounts ranked by message volume over the window, most first. */
+  ranking: { accountId: string; name: string; messageCount: number }[]
+  /** Accounts with no message in the last 14 days ("went quiet"). */
+  inactive: { accountId: string; name: string }[]
+}
+
+const AGENCY_WINDOW_DAYS = 30
+const INACTIVE_DAYS = 14
+const RANKING_LIMIT = 5
+
+/**
+ * Agency-wide roll-up for the /agencia home band: totals come from
+ * `listAccountsOverview` (summed in the page); this adds the
+ * cross-account message volume, the activity ranking, and the
+ * "went quiet" list — all from a single 30-day message pull (messages
+ * has no account_id, so it's joined to its parent conversation).
+ * Global scale for now; move to a SQL view/RPC if volume explodes.
+ */
+export async function getAgencyOverview(
+  admin: SupabaseClient,
+): Promise<AgencyOverview> {
+  const now = Date.now()
+  const since30 = new Date(now - AGENCY_WINDOW_DAYS * DAY_MS).toISOString()
+  const since14 = new Date(now - INACTIVE_DAYS * DAY_MS).toISOString()
+
+  const dayKeys: string[] = []
+  for (let i = AGENCY_WINDOW_DAYS - 1; i >= 0; i--) {
+    dayKeys.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10))
+  }
+
+  const [accountsRes, wonRes, msgsRes] = await Promise.all([
+    admin.from('accounts').select('id, name'),
+    admin
+      .from('deals')
+      .select('value')
+      .eq('status', 'won')
+      .gte('updated_at', since30),
+    admin
+      .from('messages')
+      .select('sender_type, created_at, conversations!inner(account_id)')
+      .gte('created_at', since30),
+  ])
+
+  if (accountsRes.error) throw accountsRes.error
+  if (wonRes.error) throw wonRes.error
+  if (msgsRes.error) throw msgsRes.error
+
+  const nameById = new Map<string, string>()
+  for (const a of accountsRes.data ?? []) nameById.set(a.id, a.name)
+
+  const daily = new Map<string, { incoming: number; outgoing: number }>()
+  for (const k of dayKeys) daily.set(k, { incoming: 0, outgoing: 0 })
+
+  const msgCountByAccount = new Map<string, number>()
+  const activeIn14 = new Set<string>()
+
+  for (const m of (msgsRes.data ?? []) as Array<{
+    sender_type: string
+    created_at: string
+    conversations: { account_id: string } | { account_id: string }[] | null
+  }>) {
+    const conv = Array.isArray(m.conversations)
+      ? m.conversations[0]
+      : m.conversations
+    const accountId = conv?.account_id
+    const inbound = m.sender_type === 'customer'
+
+    const bucket = daily.get(m.created_at.slice(0, 10))
+    if (bucket) {
+      if (inbound) bucket.incoming++
+      else bucket.outgoing++
+    }
+
+    if (accountId) {
+      msgCountByAccount.set(
+        accountId,
+        (msgCountByAccount.get(accountId) ?? 0) + 1,
+      )
+      if (m.created_at >= since14) activeIn14.add(accountId)
+    }
+  }
+
+  const ranking = [...msgCountByAccount.entries()]
+    .map(([accountId, messageCount]) => ({
+      accountId,
+      name: nameById.get(accountId) ?? '—',
+      messageCount,
+    }))
+    .sort((a, b) => b.messageCount - a.messageCount)
+    .slice(0, RANKING_LIMIT)
+
+  const inactive = (accountsRes.data ?? [])
+    .filter((a) => !activeIn14.has(a.id))
+    .map((a) => ({ accountId: a.id, name: a.name }))
+
+  return {
+    wonDealCount30d: (wonRes.data ?? []).length,
+    wonDealValue30d: (wonRes.data ?? []).reduce(
+      (sum, d) => sum + Number(d.value ?? 0),
+      0,
+    ),
+    dailyMessages: dayKeys.map((day) => ({ day, ...daily.get(day)! })),
+    ranking,
+    inactive,
+  }
+}
+
 export interface AccountMetrics {
   windowDays: number
   newContacts: number
