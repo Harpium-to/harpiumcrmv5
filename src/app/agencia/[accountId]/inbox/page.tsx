@@ -2,28 +2,55 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
-import { listAccountConversations } from '@/lib/agencia/queries'
-import { BackToAccount, Pager, parsePage } from '../parts'
+import {
+  listAccountConversations,
+  type ConversationStatusFilter,
+} from '@/lib/agencia/queries'
+import { BackToAccount, Pager, SearchForm, parsePage } from '../parts'
 
 export const dynamic = 'force-dynamic'
+
+const STATUS_TABS: { value: ConversationStatusFilter; label: string }[] = [
+  { value: 'all', label: 'Todas' },
+  { value: 'open', label: 'Abertas' },
+  { value: 'pending', label: 'Pendentes' },
+  { value: 'closed', label: 'Fechadas' },
+]
+
+function parseStatus(value: string | undefined): ConversationStatusFilter {
+  return value === 'open' || value === 'pending' || value === 'closed'
+    ? value
+    : 'all'
+}
 
 export default async function AgenciaInboxPage({
   params,
   searchParams,
 }: {
   params: Promise<{ accountId: string }>
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; q?: string; status?: string }>
 }) {
   const { accountId } = await params
-  const page = parsePage((await searchParams).page)
+  const sp = await searchParams
+  const page = parsePage(sp.page)
+  const q = sp.q?.trim() || undefined
+  const status = parseStatus(sp.status)
+
   const { admin } = await requireAgencia()
   const { rows, total, pageSize } = await listAccountConversations(
     admin,
     accountId,
-    page,
+    { page, q, status },
   )
 
   const basePath = `/agencia/${accountId}/inbox`
+  const tabHref = (s: ConversationStatusFilter) => {
+    const params = new URLSearchParams()
+    if (s !== 'all') params.set('status', s)
+    if (q) params.set('q', q)
+    const qs = params.toString()
+    return qs ? `${basePath}?${qs}` : basePath
+  }
 
   return (
     <div className="space-y-5">
@@ -36,9 +63,35 @@ export default async function AgenciaInboxPage({
         </p>
       </div>
 
+      {/* Status filter */}
+      <div className="flex flex-wrap gap-2">
+        {STATUS_TABS.map((t) => (
+          <Link
+            key={t.value}
+            href={tabHref(t.value)}
+            className={`rounded-full border px-3 py-1 text-sm ${
+              status === t.value
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
+      <SearchForm
+        action={basePath}
+        q={q}
+        placeholder="Buscar no texto da última mensagem…"
+        hidden={{ status: status === 'all' ? undefined : status }}
+      />
+
       {rows.length === 0 ? (
         <p className="rounded-xl border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
-          Nenhuma conversa.
+          {q || status !== 'all'
+            ? 'Nenhuma conversa corresponde ao filtro.'
+            : 'Nenhuma conversa.'}
         </p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -77,7 +130,13 @@ export default async function AgenciaInboxPage({
         </div>
       )}
 
-      <Pager basePath={basePath} page={page} total={total} pageSize={pageSize} />
+      <Pager
+        basePath={basePath}
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        params={{ q, status: status === 'all' ? undefined : status }}
+      />
     </div>
   )
 }

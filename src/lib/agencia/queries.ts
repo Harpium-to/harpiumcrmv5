@@ -94,6 +94,7 @@ export interface AccountContactRow {
   name: string | null
   phone: string
   email: string | null
+  company?: string | null
   createdAt: string
 }
 
@@ -660,18 +661,38 @@ function pageRange(page: number, pageSize: number): [number, number] {
   return [from, from + pageSize - 1]
 }
 
-/** Full contacts list for an account, newest first, paginated. */
+// PostgREST's `or=(...)` filter is a single parsed string, so commas /
+// parens / wildcards in the user's query would break it. Strip them.
+function sanitizeOrTerm(q: string): string {
+  return q.replace(/[,()%*\\]/g, ' ').trim()
+}
+
+export interface ContactListOpts {
+  page?: number
+  pageSize?: number
+  q?: string
+}
+
+/** Full contacts list for an account, newest first, paginated + searchable. */
 export async function listAccountContacts(
   admin: SupabaseClient,
   accountId: string,
-  page = 1,
-  pageSize = 50,
+  { page = 1, pageSize = 50, q }: ContactListOpts = {},
 ): Promise<Paged<AccountContactRow>> {
   const [from, to] = pageRange(page, pageSize)
-  const { data, count, error } = await admin
+  let query = admin
     .from('contacts')
-    .select('id, name, phone, email, created_at', { count: 'exact' })
+    .select('id, name, phone, email, company, created_at', { count: 'exact' })
     .eq('account_id', accountId)
+
+  const term = q ? sanitizeOrTerm(q) : ''
+  if (term) {
+    query = query.or(
+      `name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%,company.ilike.%${term}%`,
+    )
+  }
+
+  const { data, count, error } = await query
     .order('created_at', { ascending: false })
     .range(from, to)
   if (error) throw error
@@ -682,6 +703,7 @@ export async function listAccountContacts(
       name: c.name ?? null,
       phone: c.phone,
       email: c.email ?? null,
+      company: c.company ?? null,
       createdAt: c.created_at,
     })),
     total: count ?? 0,
@@ -690,20 +712,33 @@ export async function listAccountContacts(
   }
 }
 
-/** Full conversations list for an account, most recent first, paginated. */
+export type ConversationStatusFilter = 'all' | 'open' | 'pending' | 'closed'
+
+export interface ConversationListOpts {
+  page?: number
+  pageSize?: number
+  q?: string
+  status?: ConversationStatusFilter
+}
+
+/** Full conversations list for an account, most recent first, paginated + filterable. */
 export async function listAccountConversations(
   admin: SupabaseClient,
   accountId: string,
-  page = 1,
-  pageSize = 25,
+  { page = 1, pageSize = 25, q, status = 'all' }: ConversationListOpts = {},
 ): Promise<Paged<AccountConversationRow & { id: string }>> {
   const [from, to] = pageRange(page, pageSize)
-  const { data, count, error } = await admin
+  let query = admin
     .from('conversations')
     .select('id, contact_id, status, last_message_text, last_message_at', {
       count: 'exact',
     })
     .eq('account_id', accountId)
+
+  if (status !== 'all') query = query.eq('status', status)
+  if (q && q.trim()) query = query.ilike('last_message_text', `%${q.trim()}%`)
+
+  const { data, count, error } = await query
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .range(from, to)
   if (error) throw error
