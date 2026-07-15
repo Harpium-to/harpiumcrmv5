@@ -295,6 +295,17 @@ export async function getAccountDetail(
   }
 }
 
+export interface AgencyAttention {
+  accountId: string
+  name: string
+  /** No message in the last 14 days. */
+  inactive: boolean
+  /** Open/pending conversations with no assigned agent. */
+  backlog: number
+  /** No connected whatsapp_config. */
+  whatsappDisconnected: boolean
+}
+
 export interface AgencyOverview {
   wonDealCount30d: number
   wonDealValue30d: number
@@ -302,8 +313,8 @@ export interface AgencyOverview {
   dailyMessages: { day: string; incoming: number; outgoing: number }[]
   /** Accounts ranked by message volume over the window, most first. */
   ranking: { accountId: string; name: string; messageCount: number }[]
-  /** Accounts with no message in the last 14 days ("went quiet"). */
-  inactive: { accountId: string; name: string }[]
+  /** Accounts with at least one attention signal, most-actionable first. */
+  attention: AgencyAttention[]
 }
 
 const AGENCY_WINDOW_DAYS = 30
@@ -330,7 +341,7 @@ export async function getAgencyOverview(
     dayKeys.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10))
   }
 
-  const [accountsRes, wonRes, msgsRes] = await Promise.all([
+  const [accountsRes, wonRes, msgsRes, convRes, waRes] = await Promise.all([
     admin.from('accounts').select('id, name'),
     admin
       .from('deals')
@@ -341,11 +352,18 @@ export async function getAgencyOverview(
       .from('messages')
       .select('sender_type, created_at, conversations!inner(account_id)')
       .gte('created_at', since30),
+    admin
+      .from('conversations')
+      .select('account_id, status, assigned_agent_id')
+      .neq('status', 'closed'),
+    admin.from('whatsapp_config').select('account_id, status'),
   ])
 
   if (accountsRes.error) throw accountsRes.error
   if (wonRes.error) throw wonRes.error
   if (msgsRes.error) throw msgsRes.error
+  if (convRes.error) throw convRes.error
+  if (waRes.error) throw waRes.error
 
   const nameById = new Map<string, string>()
   for (const a of accountsRes.data ?? []) nameById.set(a.id, a.name)
@@ -391,9 +409,47 @@ export async function getAgencyOverview(
     .sort((a, b) => b.messageCount - a.messageCount)
     .slice(0, RANKING_LIMIT)
 
-  const inactive = (accountsRes.data ?? [])
-    .filter((a) => !activeIn14.has(a.id))
-    .map((a) => ({ accountId: a.id, name: a.name }))
+  // Backlog: open/pending conversations (status already filtered to
+  // non-closed) with no agent assigned, counted per account.
+  const backlogByAccount = new Map<string, number>()
+  for (const c of (convRes.data ?? []) as Array<{
+    account_id: string
+    assigned_agent_id: string | null
+  }>) {
+    if (!c.assigned_agent_id) {
+      backlogByAccount.set(
+        c.account_id,
+        (backlogByAccount.get(c.account_id) ?? 0) + 1,
+      )
+    }
+  }
+
+  // An account counts as WhatsApp-connected only if it has a config row
+  // whose status is 'connected'. Missing row or 'disconnected' → flagged.
+  const connected = new Set<string>()
+  for (const w of (waRes.data ?? []) as Array<{
+    account_id: string
+    status: string
+  }>) {
+    if (w.status === 'connected') connected.add(w.account_id)
+  }
+
+  const attention = (accountsRes.data ?? [])
+    .map((a) => ({
+      accountId: a.id,
+      name: a.name,
+      inactive: !activeIn14.has(a.id),
+      backlog: backlogByAccount.get(a.id) ?? 0,
+      whatsappDisconnected: !connected.has(a.id),
+    }))
+    .filter((a) => a.inactive || a.backlog > 0 || a.whatsappDisconnected)
+    // Most actionable first: biggest backlog, then disconnected, then quiet.
+    .sort(
+      (a, b) =>
+        b.backlog - a.backlog ||
+        Number(b.whatsappDisconnected) - Number(a.whatsappDisconnected) ||
+        Number(b.inactive) - Number(a.inactive),
+    )
 
   return {
     wonDealCount30d: (wonRes.data ?? []).length,
@@ -403,7 +459,7 @@ export async function getAgencyOverview(
     ),
     dailyMessages: dayKeys.map((day) => ({ day, ...daily.get(day)! })),
     ranking,
-    inactive,
+    attention,
   }
 }
 

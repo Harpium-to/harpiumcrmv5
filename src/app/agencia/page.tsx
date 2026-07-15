@@ -6,7 +6,6 @@ import {
   Contact,
   Coins,
   TrendingUp,
-  MoonStar,
 } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
@@ -107,27 +106,35 @@ export default async function AgenciaHomePage() {
           )}
         </Section>
 
-        {/* Precisam de atenção — sem atividade recente */}
+        {/* Precisam de atenção */}
         <Section title="Precisam de atenção">
-          {overview.inactive.length === 0 ? (
+          {overview.attention.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
               <TrendingUp className="h-4 w-4 text-emerald-500" />
-              Todas as contas tiveram atividade nos últimos 14 dias.
+              Nenhum sinal de atenção nas contas.
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {overview.inactive.map((a) => (
+              {overview.attention.map((a) => (
                 <li key={a.accountId}>
                   <Link
                     href={`/agencia/${a.accountId}`}
-                    className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/50"
+                    className="flex flex-col gap-1.5 px-4 py-3 text-sm transition-colors hover:bg-muted/50"
                   >
-                    <span className="flex items-center gap-2">
-                      <MoonStar className="h-4 w-4 text-amber-500" />
-                      <span className="font-medium">{a.name}</span>
-                    </span>
-                    <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-500">
-                      sem atividade há 14+ dias
+                    <span className="font-medium">{a.name}</span>
+                    <span className="flex flex-wrap gap-1.5">
+                      {a.backlog > 0 && (
+                        <Badge tone="red">
+                          {a.backlog} conversa{a.backlog === 1 ? '' : 's'} sem
+                          atendente
+                        </Badge>
+                      )}
+                      {a.whatsappDisconnected && (
+                        <Badge tone="blue">WhatsApp desconectado</Badge>
+                      )}
+                      {a.inactive && (
+                        <Badge tone="amber">sem atividade há 14+ dias</Badge>
+                      )}
                     </span>
                   </Link>
                 </li>
@@ -203,6 +210,27 @@ function Section({
       </h2>
       {children}
     </section>
+  )
+}
+
+function Badge({
+  tone,
+  children,
+}: {
+  tone: 'red' | 'blue' | 'amber'
+  children: React.ReactNode
+}) {
+  const tones = {
+    red: 'bg-red-500/10 text-red-500',
+    blue: 'bg-blue-500/10 text-blue-500',
+    amber: 'bg-amber-500/10 text-amber-500',
+  } as const
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs ${tones[tone]}`}
+    >
+      {children}
+    </span>
   )
 }
 
