@@ -40,6 +40,12 @@ export default async function AgenciaLayout({
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             <Link
+              href="/agencia/marca"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Marca
+            </Link>
+            <Link
               href="/agencia/auditoria"
               className="text-muted-foreground hover:text-foreground"
             >
