@@ -10,6 +10,8 @@ import {
   validateSendMessageParams,
   SendMessageError,
 } from '@/lib/whatsapp/send-message'
+import { getEvolutionConfig, isEvolutionReady } from '@/lib/evolution/config'
+import { sendEvolutionToConversation } from '@/lib/evolution/send'
 
 // The dashboard's outbound-send endpoint. It owns auth, per-user rate
 // limiting, and the two ways the UI targets a thread — an existing
@@ -165,6 +167,44 @@ export async function POST(request: Request) {
         { error: 'Conversation not found' },
         { status: 404 }
       )
+    }
+
+    // Channel routing: if this account has an enabled Evolution instance,
+    // route the send through it instead of Meta. First cut supports text
+    // only — other message types return a clear error rather than silently
+    // falling back to Meta (which may not even be configured).
+    const evoCfg = await getEvolutionConfig(supabase, accountId)
+    if (isEvolutionReady(evoCfg)) {
+      if (message_type !== 'text' || !content_text) {
+        return NextResponse.json(
+          {
+            error:
+              'O canal Evolution suporta apenas mensagens de texto por enquanto.',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const result = await sendEvolutionToConversation(
+          supabase,
+          accountId,
+          conversationId,
+          content_text
+        )
+        return NextResponse.json({
+          success: true,
+          message_id: result.messageId,
+          whatsapp_message_id: result.externalId,
+        })
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error ? err.message : 'Falha ao enviar pelo Evolution',
+          },
+          { status: 500 }
+        )
+      }
     }
 
     // Delegate to the shared send core (validates, sends to Meta with
