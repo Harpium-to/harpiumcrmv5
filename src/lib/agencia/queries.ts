@@ -644,6 +644,196 @@ export async function getConversationThread(
   }
 }
 
+// ============================================================
+// Full paginated lists + pipeline board for the deep per-account views.
+// ============================================================
+
+export interface Paged<T> {
+  rows: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function pageRange(page: number, pageSize: number): [number, number] {
+  const from = (page - 1) * pageSize
+  return [from, from + pageSize - 1]
+}
+
+/** Full contacts list for an account, newest first, paginated. */
+export async function listAccountContacts(
+  admin: SupabaseClient,
+  accountId: string,
+  page = 1,
+  pageSize = 50,
+): Promise<Paged<AccountContactRow>> {
+  const [from, to] = pageRange(page, pageSize)
+  const { data, count, error } = await admin
+    .from('contacts')
+    .select('id, name, phone, email, created_at', { count: 'exact' })
+    .eq('account_id', accountId)
+    .order('created_at', { ascending: false })
+    .range(from, to)
+  if (error) throw error
+
+  return {
+    rows: (data ?? []).map((c) => ({
+      id: c.id,
+      name: c.name ?? null,
+      phone: c.phone,
+      email: c.email ?? null,
+      createdAt: c.created_at,
+    })),
+    total: count ?? 0,
+    page,
+    pageSize,
+  }
+}
+
+/** Full conversations list for an account, most recent first, paginated. */
+export async function listAccountConversations(
+  admin: SupabaseClient,
+  accountId: string,
+  page = 1,
+  pageSize = 25,
+): Promise<Paged<AccountConversationRow & { id: string }>> {
+  const [from, to] = pageRange(page, pageSize)
+  const { data, count, error } = await admin
+    .from('conversations')
+    .select('id, contact_id, status, last_message_text, last_message_at', {
+      count: 'exact',
+    })
+    .eq('account_id', accountId)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .range(from, to)
+  if (error) throw error
+
+  const contactIds = Array.from(
+    new Set(
+      (data ?? [])
+        .map((c) => c.contact_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  )
+  const nameById = new Map<string, string | null>()
+  if (contactIds.length > 0) {
+    const { data: contacts, error: cErr } = await admin
+      .from('contacts')
+      .select('id, name, phone')
+      .in('id', contactIds)
+    if (cErr) throw cErr
+    for (const c of contacts ?? []) nameById.set(c.id, c.name ?? c.phone ?? null)
+  }
+
+  return {
+    rows: (data ?? []).map((c) => ({
+      id: c.id,
+      contactName: c.contact_id ? nameById.get(c.contact_id) ?? null : null,
+      status: c.status,
+      lastMessageText: c.last_message_text ?? null,
+      lastMessageAt: c.last_message_at ?? null,
+    })),
+    total: count ?? 0,
+    page,
+    pageSize,
+  }
+}
+
+export interface BoardDeal {
+  id: string
+  title: string
+  value: number
+  currency: string | null
+  status: string | null
+  contactName: string | null
+}
+
+export interface BoardStage {
+  id: string
+  name: string
+  pipelineName: string
+  deals: BoardDeal[]
+  total: number
+}
+
+/**
+ * Pipeline board for an account: every stage with its deals grouped
+ * into columns, for a kanban-style read-only view.
+ */
+export async function getAccountBoard(
+  admin: SupabaseClient,
+  accountId: string,
+): Promise<{ stages: BoardStage[] }> {
+  const [pipelinesRes, dealsRes] = await Promise.all([
+    admin.from('pipelines').select('id, name').eq('account_id', accountId),
+    admin
+      .from('deals')
+      .select('id, stage_id, title, value, currency, status, contact_id')
+      .eq('account_id', accountId),
+  ])
+  if (pipelinesRes.error) throw pipelinesRes.error
+  if (dealsRes.error) throw dealsRes.error
+
+  const pipelineIds = (pipelinesRes.data ?? []).map((p) => p.id)
+  if (pipelineIds.length === 0) return { stages: [] }
+
+  const { data: stageRows, error: stagesErr } = await admin
+    .from('pipeline_stages')
+    .select('id, pipeline_id, name, position')
+    .in('pipeline_id', pipelineIds)
+    .order('position', { ascending: true })
+  if (stagesErr) throw stagesErr
+
+  // Contact names for the deals, resolved in one round trip.
+  const contactIds = Array.from(
+    new Set(
+      (dealsRes.data ?? [])
+        .map((d) => d.contact_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  )
+  const nameById = new Map<string, string | null>()
+  if (contactIds.length > 0) {
+    const { data: contacts, error: cErr } = await admin
+      .from('contacts')
+      .select('id, name, phone')
+      .in('id', contactIds)
+    if (cErr) throw cErr
+    for (const c of contacts ?? []) nameById.set(c.id, c.name ?? c.phone ?? null)
+  }
+
+  const pipelineNameById = new Map<string, string>()
+  for (const p of pipelinesRes.data ?? []) pipelineNameById.set(p.id, p.name)
+
+  const dealsByStage = new Map<string, BoardDeal[]>()
+  for (const d of dealsRes.data ?? []) {
+    if (!d.stage_id) continue
+    const list = dealsByStage.get(d.stage_id) ?? []
+    list.push({
+      id: d.id,
+      title: d.title,
+      value: Number(d.value ?? 0),
+      currency: d.currency ?? null,
+      status: d.status ?? null,
+      contactName: d.contact_id ? nameById.get(d.contact_id) ?? null : null,
+    })
+    dealsByStage.set(d.stage_id, list)
+  }
+
+  const stages: BoardStage[] = (stageRows ?? []).map((s) => {
+    const deals = dealsByStage.get(s.id) ?? []
+    return {
+      id: s.id,
+      name: s.name,
+      pipelineName: pipelineNameById.get(s.pipeline_id) ?? '—',
+      deals,
+      total: deals.reduce((sum, d) => sum + d.value, 0),
+    }
+  })
+
+  return { stages }
+}
+
 function tally<T>(rows: T[], key: (row: T) => string): Map<string, number> {
   const out = new Map<string, number>()
   for (const r of rows) {

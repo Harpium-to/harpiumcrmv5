@@ -81,7 +81,10 @@ export default async function AgenciaAccountPage({
       </Section>
 
       {/* Pipeline */}
-      <Section title="Pipeline">
+      <Section
+        title="Pipeline"
+        action={{ href: `/agencia/${account.id}/pipeline`, label: 'Ver board →' }}
+      >
         {stages.length === 0 ? (
           <Empty>Nenhum estágio de pipeline configurado.</Empty>
         ) : (
@@ -109,7 +112,10 @@ export default async function AgenciaAccountPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent contacts */}
-        <Section title="Contatos recentes">
+        <Section
+          title="Contatos recentes"
+          action={{ href: `/agencia/${account.id}/contatos`, label: 'Ver todos →' }}
+        >
           {recentContacts.length === 0 ? (
             <Empty>Nenhum contato.</Empty>
           ) : (
@@ -128,7 +134,10 @@ export default async function AgenciaAccountPage({
         </Section>
 
         {/* Recent conversations (inbox) */}
-        <Section title="Inbox recente">
+        <Section
+          title="Inbox recente"
+          action={{ href: `/agencia/${account.id}/inbox`, label: 'Ver tudo →' }}
+        >
           {recentConversations.length === 0 ? (
             <Empty>Nenhuma conversa.</Empty>
           ) : (
@@ -259,16 +268,26 @@ function MessagesChart({
 
 function Section({
   title,
+  action,
   children,
 }: {
   title: string
+  action?: { href: string; label: string }
   children: React.ReactNode
 }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">
-        {title}
-      </h2>
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {action && (
+          <Link
+            href={action.href}
+            className="text-xs text-primary hover:underline"
+          >
+            {action.label}
+          </Link>
+        )}
+      </div>
       {children}
     </section>
   )
