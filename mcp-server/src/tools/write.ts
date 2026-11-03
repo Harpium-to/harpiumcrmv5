@@ -80,12 +80,30 @@ export function registerWriteTools(server: McpServer, client: WacrmClient): void
     {
       title: 'Update contact',
       description:
-        'Update an existing contact. Only the fields you pass are changed. Pass tags (an array of tag names) to replace the contact’s tags entirely.',
+        'Update an existing contact. Only the fields you pass are changed. Pass tags (an array of tag names) to replace the contact’s tags entirely. Lead qualification: temperature (cold/warm/hot), potential (0–100), segment, source, city, job_title, instagram, website.',
       inputSchema: {
         id: z.string().describe('Contact id.'),
         name: z.string().optional(),
         email: z.string().email().optional(),
         company: z.string().optional(),
+        temperature: z
+          .enum(['cold', 'warm', 'hot'])
+          .optional()
+          .describe('How ready the lead is to buy.'),
+        potential: z
+          .number()
+          .int()
+          .min(0)
+          .max(100)
+          .nullable()
+          .optional()
+          .describe('Lead score 0–100; null clears it.'),
+        segment: z.string().nullable().optional(),
+        source: z.string().nullable().optional().describe('Where the lead came from.'),
+        city: z.string().nullable().optional(),
+        job_title: z.string().nullable().optional(),
+        instagram: z.string().nullable().optional(),
+        website: z.string().nullable().optional(),
         tags: z.array(z.string()).optional().describe('Replaces the contact’s tags.'),
       },
       annotations: { title: 'Update contact', readOnlyHint: false, openWorldHint: true },

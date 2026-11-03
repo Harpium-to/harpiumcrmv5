@@ -99,10 +99,13 @@ formulário funciona no dia em que a permissão sai.
 - Publicar na Chrome Web Store (ou distribuir o `.zip` para carregar
   sem compactar — `extension/README.md` tem as instruções).
 - Comandos rápidos além de ver/criar: marcar temperatura, mudar etapa
-  do funil. **Isso exige estender o `PATCH /api/v1/contacts/[id]`**,
-  que hoje aceita só `name`, `email`, `company`. Os campos de
-  qualificação (`temperature`, `potential`, `segment`, `source`)
-  chegaram na 045 e ainda não estão na API pública.
+  do funil. **A API já aceita a primeira parte:** o
+  `PATCH /api/v1/contacts/[id]` recebe `temperature`, `potential`,
+  `segment`, `source`, `city`, `job_title`, `instagram`, `website`
+  (validação em `parseContactPatch`, `src/lib/api/v1/contacts.ts`), e
+  a ferramenta `update_contact` do MCP também. Falta o botão no painel
+  da extensão. Mudar etapa é outra coisa: é um `deal`, e não existe
+  `/api/v1/deals` ainda.
 - Ícone da extensão (`manifest.json` não declara `icons`).
 
 ### 2.5 Relatórios: tempo de primeira resposta

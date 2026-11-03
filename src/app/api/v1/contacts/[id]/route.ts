@@ -4,14 +4,18 @@
 //
 // Both are account-scoped: a contact belonging to another account
 // returns 404 (never 403 — don't reveal it exists elsewhere).
-// PATCH updates only the fields present in the body; pass `tags` (an
-// array of tag names) to replace the contact's tags.
+// PATCH updates only the fields present in the body — contact details
+// plus the lead-qualification fields from migration 045 (temperature,
+// potential, segment, source, …); pass `tags` (an array of tag names)
+// to replace the contact's tags.
 // ============================================================
 
 import { requireApiKey } from '@/lib/auth/api-context';
 import { ok, fail, toApiErrorResponse } from '@/lib/api/v1/respond';
 import {
   getContactById,
+  parseContactPatch,
+  QUALIFICATION_FIELDS,
   setContactTags,
   resolveAuditUserId,
   ContactError,
@@ -52,20 +56,9 @@ export async function PATCH(
     const existing = await getContactById(ctx.supabase, ctx.accountId, id);
     if (!existing) return fail('not_found', 'Contact not found', 404);
 
-    // Build a partial update from the provided scalar fields. A field
-    // is updated only when its key is PRESENT (so omitted fields are
-    // untouched); `null` clears it, a string sets it, and any other
-    // type is a 400 rather than a silently-ignored no-op.
-    const updates: Record<string, unknown> = {};
-    for (const field of ['name', 'email', 'company'] as const) {
-      if (!(field in body)) continue;
-      const value = body[field];
-      if (value === null || typeof value === 'string') {
-        updates[field] = value;
-      } else {
-        return fail('bad_request', `'${field}' must be a string or null`, 400);
-      }
-    }
+    const patch = parseContactPatch(body);
+    if (!patch.ok) return fail('bad_request', patch.message, 400);
+    const { updates } = patch;
 
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
@@ -75,6 +68,16 @@ export async function PATCH(
         .eq('id', id)
         .eq('account_id', ctx.accountId);
       if (error) {
+        // PGRST204: PostgREST doesn't know the column — the deployment
+        // hasn't applied migration 045. Say so instead of a bare 500.
+        const missing = QUALIFICATION_FIELDS.filter((f) => f in updates);
+        if (error.code === 'PGRST204' && missing.length > 0) {
+          return fail(
+            'bad_request',
+            `Not available on this deployment yet: ${missing.join(', ')}`,
+            400
+          );
+        }
         console.error('[api/v1/contacts] update error:', error);
         return fail('internal', 'Failed to update contact', 500);
       }

@@ -16,6 +16,10 @@ import { sanitizePhoneForMeta, isValidE164 } from '@/lib/whatsapp/phone-utils';
 /** Row select that embeds the contact's tags for serialization. */
 export const CONTACT_SELECT = '*, contact_tags(tags(*))';
 
+/** `contacts.temperature` CHECK values (migration 045). */
+export const CONTACT_TEMPERATURES = ['cold', 'warm', 'hot'] as const;
+export type ContactTemperature = (typeof CONTACT_TEMPERATURES)[number];
+
 export interface ApiContact {
   id: string;
   phone: string;
@@ -23,6 +27,17 @@ export interface ApiContact {
   email: string | null;
   company: string | null;
   avatar_url: string | null;
+  // Lead qualification (migration 045). `null` on a deployment that
+  // hasn't applied it yet — `CONTACT_SELECT` is `*`, so the columns
+  // appear on their own once it runs.
+  temperature: ContactTemperature | null;
+  potential: number | null;
+  segment: string | null;
+  source: string | null;
+  city: string | null;
+  job_title: string | null;
+  instagram: string | null;
+  website: string | null;
   tags: { id: string; name: string; color: string }[];
   created_at: string;
   updated_at: string;
@@ -50,6 +65,14 @@ export function serializeContact(row: Record<string, unknown>): ApiContact {
     email: (row.email as string | null) ?? null,
     company: (row.company as string | null) ?? null,
     avatar_url: (row.avatar_url as string | null) ?? null,
+    temperature: (row.temperature as ContactTemperature | null) ?? null,
+    potential: (row.potential as number | null) ?? null,
+    segment: (row.segment as string | null) ?? null,
+    source: (row.source as string | null) ?? null,
+    city: (row.city as string | null) ?? null,
+    job_title: (row.job_title as string | null) ?? null,
+    instagram: (row.instagram as string | null) ?? null,
+    website: (row.website as string | null) ?? null,
     tags: joins
       .map((j) => j.tags)
       .filter((t): t is NonNullable<RawTagJoin['tags']> => t != null)
@@ -57,6 +80,81 @@ export function serializeContact(row: Record<string, unknown>): ApiContact {
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
+}
+
+/** Free-text columns `PATCH` accepts: `null` clears, a string sets. */
+const PATCH_TEXT_FIELDS = [
+  'name',
+  'email',
+  'company',
+  'segment',
+  'source',
+  'city',
+  'job_title',
+  'instagram',
+  'website',
+] as const;
+
+/** Columns migration 045 adds — a missing-column error names one. */
+export const QUALIFICATION_FIELDS = [
+  'temperature',
+  'potential',
+  'segment',
+  'source',
+  'city',
+  'job_title',
+  'instagram',
+  'website',
+] as const;
+
+export type ContactPatch =
+  | { ok: true; updates: Record<string, unknown> }
+  | { ok: false; message: string };
+
+/**
+ * Turn a `PATCH` body into a column update. A field is updated only
+ * when its key is PRESENT (omitted fields are untouched), and a value
+ * of the wrong type is an error rather than a silently-ignored no-op.
+ * Validation mirrors the table's CHECKs so a bad value is a 400 with
+ * a readable message instead of a constraint violation surfacing as a
+ * 500.
+ */
+export function parseContactPatch(body: Record<string, unknown>): ContactPatch {
+  const updates: Record<string, unknown> = {};
+
+  for (const field of PATCH_TEXT_FIELDS) {
+    if (!(field in body)) continue;
+    const value = body[field];
+    if (value !== null && typeof value !== 'string') {
+      return { ok: false, message: `'${field}' must be a string or null` };
+    }
+    updates[field] = value;
+  }
+
+  if ('temperature' in body) {
+    // NOT NULL in the table — there's no "clear", only another value.
+    const value = body.temperature;
+    if (!CONTACT_TEMPERATURES.includes(value as ContactTemperature)) {
+      return {
+        ok: false,
+        message: `'temperature' must be one of ${CONTACT_TEMPERATURES.join(', ')}`,
+      };
+    }
+    updates.temperature = value;
+  }
+
+  if ('potential' in body) {
+    const value = body.potential;
+    const valid =
+      value === null ||
+      (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100);
+    if (!valid) {
+      return { ok: false, message: `'potential' must be an integer from 0 to 100, or null` };
+    }
+    updates.potential = value;
+  }
+
+  return { ok: true, updates };
 }
 
 /**

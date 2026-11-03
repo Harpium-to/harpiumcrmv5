@@ -176,6 +176,9 @@ or phone) and `?tag=<tagId>`.
     {
       "id": "…", "phone": "+14155550123", "name": "Jane Doe",
       "email": null, "company": "Acme", "avatar_url": null,
+      "temperature": "warm", "potential": 70, "segment": "Clínica",
+      "source": "instagram", "city": null, "job_title": null,
+      "instagram": null, "website": null,
       "tags": [{ "id": "…", "name": "vip", "color": "#3b82f6" }],
       "created_at": "…", "updated_at": "…"
     }
@@ -196,9 +199,27 @@ list rows above).
 ### `GET` / `PATCH /api/v1/contacts/{id}`
 
 Read or update one contact. Scopes: `contacts:read` / `contacts:write`.
-`PATCH` updates only the fields you send (`name`, `email`, `company`);
-pass `tags` (an array of tag names) to replace the contact's tags. A
-contact in another account returns `404`.
+`PATCH` updates only the fields you send; pass `tags` (an array of tag
+names) to replace the contact's tags. A contact in another account
+returns `404`.
+
+| Field | Accepts |
+|---|---|
+| `name`, `email`, `company` | string, or `null` to clear |
+| `segment`, `source`, `city`, `job_title`, `instagram`, `website` | string, or `null` to clear |
+| `temperature` | `"cold"`, `"warm"` or `"hot"` (cannot be cleared) |
+| `potential` | integer `0`–`100`, or `null` |
+
+A value of the wrong type or out of range is a `400`. The qualification
+fields (`temperature` onward) need migration `045`; until it runs they
+read as `null` and writing one returns `400` naming the field.
+
+```bash
+curl -X PATCH https://your-app/api/v1/contacts/<id> \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "temperature": "hot", "potential": 80, "source": "instagram" }'
+```
 
 ### `GET /api/v1/conversations`
 
