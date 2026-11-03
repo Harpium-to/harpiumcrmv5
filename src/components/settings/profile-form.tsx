@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Loader2, Upload, Trash2, Mail, CircleAlert } from 'lucide-react';
 
 import { createClient } from '@/lib/supabase/client';
+import { removeReplacedAvatar, removeUploadedAvatar } from '@/lib/storage/avatars';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,6 +116,7 @@ export function ProfileForm() {
     setSaving(true);
     try {
       let nextAvatarUrl: string | null = profile.avatar_url ?? null;
+      let uploadedPath: string | null = null;
 
       // Upload a newly-staged image, if any.
       if (pendingAvatar) {
@@ -131,6 +133,7 @@ export function ProfileForm() {
         if (uploadError) {
           throw new Error(t('uploadFailed', { message: uploadError.message }));
         }
+        uploadedPath = path;
         const {
           data: { publicUrl },
         } = supabase.storage.from('avatars').getPublicUrl(path);
@@ -148,8 +151,14 @@ export function ProfileForm() {
         })
         .eq('user_id', user.id);
       if (updateError) {
+        // The new file never made it onto the profile; don't leave it behind.
+        if (uploadedPath) void removeUploadedAvatar(supabase, uploadedPath);
         throw new Error(t('saveFailed', { message: updateError.message }));
       }
+      // Only now that the row points elsewhere is the old file unused.
+      void removeReplacedAvatar(supabase, profile.avatar_url, nextAvatarUrl, {
+        userId: user.id,
+      });
 
       // Email change goes through Supabase Auth, which emails a
       // confirmation to both the old and new addresses. We don't
@@ -184,7 +193,7 @@ export function ProfileForm() {
           : t('profileSaved'),
       );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -270,7 +279,7 @@ export function ProfileForm() {
               id="profile-full-name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Ada Lovelace"
+              placeholder="Maria Silva"
               maxLength={120}
               disabled={saving}
               required

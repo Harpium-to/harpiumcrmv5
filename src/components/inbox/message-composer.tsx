@@ -269,15 +269,15 @@ export function MessageComposer({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (data.code === "ai_not_configured") {
-          toast.error("AI isn't set up yet — enable it in Settings → AI Assistant.");
+          toast.error("A IA ainda não está configurada — ative em Agentes › Configuração.");
         } else {
-          toast.error(data.error ?? "Couldn't draft a reply.");
+          toast.error(data.error ?? "Não consegui escrever uma resposta.");
         }
         return;
       }
       const draftText = typeof data.draft === "string" ? data.draft.trim() : "";
       if (!draftText) {
-        toast.error("The assistant didn't return a reply.");
+        toast.error("O assistente não devolveu uma resposta.");
         return;
       }
       setText(draftText);
@@ -292,7 +292,7 @@ export function MessageComposer({
         }
       });
     } catch {
-      toast.error("Couldn't reach the AI assistant.");
+      toast.error("Não consegui falar com o assistente de IA.");
     } finally {
       setDrafting(false);
     }
@@ -403,7 +403,7 @@ export function MessageComposer({
         removeStaged(draftRef.current?.path);
         setDraft({ kind, mediaUrl: publicUrl, path, filename: file.name, caption: "" });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Upload failed.");
+        toast.error(err instanceof Error ? err.message : "Falha no envio do arquivo.");
       } finally {
         setBusy(false);
       }
@@ -431,7 +431,7 @@ export function MessageComposer({
       });
       if (file.size === 0) return; // cancelled / empty take
       if (file.size > MEDIA_MAX_BYTES_BY_KIND.audio) {
-        toast.error("Recording is too long (over 16 MB).");
+        toast.error("A gravação ficou longa demais (mais de 16 MB).");
         return;
       }
       setBusy(true);
@@ -440,7 +440,7 @@ export function MessageComposer({
         removeStaged(draftRef.current?.path);
         setDraft({ kind: "audio", mediaUrl: publicUrl, path, filename: file.name, caption: "" });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Upload failed.");
+        toast.error(err instanceof Error ? err.message : "Falha no envio do arquivo.");
       } finally {
         setBusy(false);
       }
@@ -451,7 +451,7 @@ export function MessageComposer({
   const startRecording = useCallback(async () => {
     if (inputsDisabled || busy || recording) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === "undefined") {
-      toast.error("Voice recording isn't supported in this browser.");
+      toast.error("Este navegador não permite gravar áudio.");
       return;
     }
     try {
@@ -478,7 +478,7 @@ export function MessageComposer({
     } catch {
       void recorderRef.current?.stop().catch(() => {});
       recorderRef.current = null;
-      toast.error("Microphone access denied or unavailable.");
+      toast.error("Acesso ao microfone negado ou indisponível.");
     }
   }, [inputsDisabled, busy, recording, finalizeRecording]);
 

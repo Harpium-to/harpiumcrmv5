@@ -664,7 +664,7 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
     setSaving(true)
     try {
       const payload = {
-        name: state.name || "Untitled automation",
+        name: state.name || "Automação sem nome",
         description: state.description || null,
         trigger_type: state.trigger_type,
         trigger_config: state.trigger_config,
@@ -851,7 +851,7 @@ function TriggerCard({
             {type === "tag_added" && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Tag
+                  Etiqueta
                 </label>
                 <TagSelect
                   value={(config.tag_id as string) ?? ""}
@@ -866,7 +866,7 @@ function TriggerCard({
                   {t("schedule")}
                 </label>
                 <Input
-                  placeholder="Cron expression or HH:mm"
+                  placeholder="Expressão cron ou HH:mm"
                   value={(config.schedule as string) ?? ""}
                   onChange={(e) =>
                     onConfigChange({ ...config, schedule: e.target.value })
@@ -1133,7 +1133,7 @@ function StepRenderer({
                     variant="ghost"
                     size="icon"
                     disabled={index === 0}
-                    aria-label="Move up"
+                    aria-label="Mover para cima"
                     onClick={() => props.moveStepAt(path, -1)}
                   >
                     <ArrowUp className="h-4 w-4" />
@@ -1142,7 +1142,7 @@ function StepRenderer({
                     variant="ghost"
                     size="icon"
                     disabled={index === total - 1}
-                    aria-label="Move down"
+                    aria-label="Mover para baixo"
                     onClick={() => props.moveStepAt(path, 1)}
                   >
                     <ArrowDown className="h-4 w-4" />
@@ -1483,7 +1483,7 @@ function StepEditor({
     case "close_conversation":
       return (
         <p className="text-xs text-muted-foreground">
-          {t("config.closeConversationHint", { defaultValue: "Sets the conversation status to \"closed\". No configuration needed." })}
+          {t("config.closeConversationHint", { defaultValue: "Muda o status da conversa para \"fechada\". Não precisa configurar nada." })}
         </p>
       )
     default:
@@ -1509,18 +1509,18 @@ function FieldBlock({
 function previewFor(step: BuilderStep): string {
   switch (step.step_type) {
     case "send_message":
-      return (step.step_config.text as string) || "no text yet"
+      return (step.step_config.text as string) || "sem texto ainda"
     case "send_buttons":
     case "send_list":
-      return interactivePayloadPreviewText(asInteractive(step.step_config)) || "no body yet"
+      return interactivePayloadPreviewText(asInteractive(step.step_config)) || "sem corpo ainda"
     case "send_template":
-      return (step.step_config.template_name as string) || "pick a template"
+      return (step.step_config.template_name as string) || "escolha um modelo"
     case "wait":
       return `${step.step_config.amount ?? "?"} ${step.step_config.unit ?? ""}`
     case "condition":
-      return `when ${step.step_config.subject ?? "?"}`
+      return `quando ${step.step_config.subject ?? "?"}`
     case "send_webhook":
-      return (step.step_config.url as string) || "no url"
+      return (step.step_config.url as string) || "sem URL"
     default:
       return ""
   }

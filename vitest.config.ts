@@ -6,7 +6,14 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      // The Chrome extension ships separately but its riskiest logic —
+      // working out which chat is open from someone else's DOM — runs
+      // in the same test command as everything else.
+      "extension/**/*.test.js",
+    ],
     // Dummy secrets — encryption.ts / webhook-signature.ts read these
     // at module load. Tests never hit a real Meta/Supabase service, so
     // any 32-byte hex / non-empty string will do; keep them lexically

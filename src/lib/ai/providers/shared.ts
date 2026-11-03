@@ -39,13 +39,13 @@ export function normalizeUsage(raw: {
 /** Map a fetch rejection (timeout / DNS / offline) to a typed AiError. */
 export function toNetworkError(err: unknown): AiError {
   if (err instanceof DOMException && err.name === 'TimeoutError') {
-    return new AiError('The AI provider took too long to respond.', {
+    return new AiError('O provedor de IA demorou demais para responder.', {
       code: 'timeout',
       status: 504,
     })
   }
   const msg = err instanceof Error ? err.message : String(err)
-  return new AiError(`Could not reach the AI provider: ${msg}`, {
+  return new AiError(`Não consegui falar com o provedor de IA: ${msg}`, {
     code: 'network_error',
     status: 502,
   })
@@ -85,7 +85,7 @@ export async function providerHttpError(
   return new AiError(detail ? `${base}: ${detail}` : base, {
     code,
     // Surface an auth failure as 401 so the settings "Test key" button
-    // can show "invalid key"; everything else is an upstream 502.
+    // can show "chave inválida"; everything else is an upstream 502.
     status: code === 'invalid_key' ? 401 : 502,
   })
 }

@@ -14,6 +14,7 @@
  */
 
 export const THEME_IDS = [
+  "sand",
   "violet",
   "emerald",
   "cobalt",
@@ -23,9 +24,17 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+export const DEFAULT_THEME: ThemeId = "sand";
 
-export const STORAGE_KEY = "wacrm.theme";
+/**
+ * Namespaced `v2` because the redesign re-scoped what an accent
+ * *means*: it now drives the neutral surfaces too, not just the
+ * primary colour. Anyone carrying a saved `wacrm.theme` from the old
+ * palette would otherwise open the new build pinned to Violet and
+ * never see the default skin. Bumping the key retires those values
+ * and lands everyone on Sand once; their next pick persists normally.
+ */
+export const STORAGE_KEY = "wacrm.theme.v2";
 
 /**
  * MODE — the light/dark dimension, orthogonal to the accent theme.
@@ -45,7 +54,7 @@ export type Mode = (typeof MODES)[number];
 
 export const DEFAULT_MODE: Mode = "dark";
 
-export const MODE_STORAGE_KEY = "wacrm.mode";
+export const MODE_STORAGE_KEY = "wacrm.mode.v2";
 
 export function isMode(value: unknown): value is Mode {
   return (
@@ -68,33 +77,39 @@ export interface ThemeMeta {
 
 export const THEMES: ReadonlyArray<ThemeMeta> = [
   {
+    id: "sand",
+    name: "Areia",
+    tagline: "O padrão — creme sobre espresso, tudo que está ligado fica quente.",
+    swatch: "oklch(0.93 0.035 88)",
+  },
+  {
     id: "violet",
-    name: "Violet",
-    tagline: "The default — confident, slightly playful.",
+    name: "Violeta",
+    tagline: "O padrão — confiante, levemente divertido.",
     swatch: "oklch(0.526 0.247 293)",
   },
   {
     id: "emerald",
-    name: "Emerald",
-    tagline: "Growth-coded, nods at messaging without copying WhatsApp green.",
+    name: "Esmeralda",
+    tagline: "Cara de crescimento, lembra mensagens sem copiar o verde do WhatsApp.",
     swatch: "oklch(0.62 0.16 162)",
   },
   {
     id: "cobalt",
-    name: "Cobalt",
-    tagline: "Clean B2B-SaaS blue — calm and product-y.",
+    name: "Cobalto",
+    tagline: "Azul limpo de software B2B — calmo e sóbrio.",
     swatch: "oklch(0.585 0.2 254)",
   },
   {
     id: "amber",
-    name: "Amber",
-    tagline: "Warm and friendly — feels good for SMB teams.",
+    name: "Âmbar",
+    tagline: "Quente e acolhedor — combina com pequenas empresas.",
     swatch: "oklch(0.745 0.16 65)",
   },
   {
     id: "rose",
-    name: "Rose",
-    tagline: "Bold and modern — D2C, creator-economy, lifestyle.",
+    name: "Rosa",
+    tagline: "Ousado e moderno — marcas diretas ao consumidor, criadores, estilo de vida.",
     swatch: "oklch(0.645 0.22 16)",
   },
 ];

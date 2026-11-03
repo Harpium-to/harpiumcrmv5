@@ -97,6 +97,9 @@ export interface AccountInvitation {
 }
 
 export interface Contact {
+  /** Instagram-scoped user id (IGSID) — the stable key for the
+   *  Instagram channel. The @handle lives in `instagram`. */
+  instagram_id?: string | null;
   id: string;
   user_id: string;
   account_id: string;
@@ -161,6 +164,16 @@ export interface Conversation {
   id: string;
   user_id: string;
   contact_id: string;
+  /**
+   * Which door this thread uses: 'whatsapp' (every thread that existed
+   * before migration 047) or 'instagram'. Optional because the column
+   * is simply absent until that migration runs — `CONVERSATION_SELECT`
+   * is a `*`, so it appears on its own and nothing breaks before.
+   *
+   * It decides where a reply goes, so it is not cosmetic: see
+   * `lib/channels/send-text.ts`.
+   */
+  channel?: string;
   status: ConversationStatus;
   assigned_agent_id?: string;
   last_message_text?: string;

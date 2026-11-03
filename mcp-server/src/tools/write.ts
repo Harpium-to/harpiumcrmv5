@@ -80,16 +80,59 @@ export function registerWriteTools(server: McpServer, client: WacrmClient): void
     {
       title: 'Update contact',
       description:
-        'Update an existing contact. Only the fields you pass are changed. Pass tags (an array of tag names) to replace the contact’s tags entirely.',
+        'Update an existing contact. Only the fields you pass are changed. Pass tags (an array of tag names) to replace the contact’s tags entirely. Lead qualification: temperature (cold/warm/hot), potential (0–100), segment, source, city, job_title, instagram, website.',
       inputSchema: {
         id: z.string().describe('Contact id.'),
         name: z.string().optional(),
         email: z.string().email().optional(),
         company: z.string().optional(),
+        temperature: z
+          .enum(['cold', 'warm', 'hot'])
+          .optional()
+          .describe('How ready the lead is to buy.'),
+        potential: z
+          .number()
+          .int()
+          .min(0)
+          .max(100)
+          .nullable()
+          .optional()
+          .describe('Lead score 0–100; null clears it.'),
+        segment: z.string().nullable().optional(),
+        source: z.string().nullable().optional().describe('Where the lead came from.'),
+        city: z.string().nullable().optional(),
+        job_title: z.string().nullable().optional(),
+        instagram: z.string().nullable().optional(),
+        website: z.string().nullable().optional(),
         tags: z.array(z.string()).optional().describe('Replaces the contact’s tags.'),
       },
       annotations: { title: 'Update contact', readOnlyHint: false, openWorldHint: true },
     },
     handle(async ({ id, ...body }) => jsonResult(await client.updateContact(id, body))),
+  );
+
+  server.registerTool(
+    'update_deal',
+    {
+      title: 'Update deal',
+      description:
+        'Update an existing deal. Only the fields you pass are changed. Move it with stage_id (a stage of the deal’s own pipeline — see list_pipelines), or close it with status won / lost.',
+      inputSchema: {
+        id: z.string().describe('Deal id.'),
+        stage_id: z.string().optional().describe('Target stage; must belong to the deal’s pipeline.'),
+        status: z.enum(['open', 'won', 'lost']).optional(),
+        title: z.string().min(1).optional(),
+        value: z.number().min(0).optional(),
+        notes: z.string().nullable().optional(),
+        expected_close_date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional()
+          .describe('YYYY-MM-DD; null clears it.'),
+      },
+      annotations: { title: 'Update deal', readOnlyHint: false, openWorldHint: true },
+    },
+    handle(async ({ id, ...body }) => jsonResult(await client.updateDeal(id, body))),
   );
 }

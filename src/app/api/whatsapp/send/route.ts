@@ -10,6 +10,11 @@ import {
   validateSendMessageParams,
   SendMessageError,
 } from '@/lib/whatsapp/send-message'
+import { getEvolutionConfig, isEvolutionReady } from '@/lib/evolution/config'
+import { sendEvolutionToConversation } from '@/lib/evolution/send'
+import { getUazapiConfig, isUazapiReady } from '@/lib/uazapi/config'
+import { sendInstagramToConversation } from '@/lib/instagram/send'
+import { sendUazapiToConversation } from '@/lib/uazapi/send'
 
 // The dashboard's outbound-send endpoint. It owns auth, per-user rate
 // limiting, and the two ways the UI targets a thread — an existing
@@ -31,7 +36,7 @@ export async function POST(request: Request) {
 
     if (authError || !user) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Não autorizado' },
         { status: 401 }
       )
     }
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
     const accountId = profile?.account_id as string | undefined
     if (!accountId) {
       return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
+        { error: 'Seu perfil não está ligado a uma conta.' },
         { status: 403 },
       )
     }
@@ -123,7 +128,7 @@ export async function POST(request: Request) {
 
       if (convError || !data) {
         return NextResponse.json(
-          { error: 'Conversation not found' },
+          { error: 'Conversa não encontrada' },
           { status: 404 }
         )
       }
@@ -140,7 +145,7 @@ export async function POST(request: Request) {
 
       if (contactErr || !contactRow) {
         return NextResponse.json(
-          { error: 'Contact not found' },
+          { error: 'Contato não encontrado' },
           { status: 404 }
         )
       }
@@ -153,7 +158,7 @@ export async function POST(request: Request) {
       )
       if (!resolved) {
         return NextResponse.json(
-          { error: 'Failed to open a conversation for this contact' },
+          { error: 'Falha ao abrir uma conversa com este contato' },
           { status: 500 }
         )
       }
@@ -162,9 +167,136 @@ export async function POST(request: Request) {
 
     if (!conversationId) {
       return NextResponse.json(
-        { error: 'Conversation not found' },
+        { error: 'Conversa não encontrada' },
         { status: 404 }
       )
+    }
+
+    // Instagram first, and on a different basis from everything below
+    // it: the WhatsApp channels are interchangeable, so the account's
+    // enabled provider decides between them, but Instagram is a
+    // different door. Which door a reply leaves by is a property of the
+    // *thread*, not of the account — answering an Instagram DM over
+    // WhatsApp is not a degraded send, it is a message to a stranger's
+    // phone. So this reads the conversation's channel.
+    const { data: convChannel } = await supabase
+      .from('conversations')
+      .select('channel')
+      .eq('id', conversationId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+
+    if (convChannel?.channel === 'instagram') {
+      if (message_type !== 'text' || !content_text) {
+        return NextResponse.json(
+          {
+            error:
+              'O canal Instagram suporta apenas mensagens de texto por enquanto.',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const result = await sendInstagramToConversation(
+          supabase,
+          accountId,
+          conversationId,
+          content_text
+        )
+        return NextResponse.json({
+          success: true,
+          message_id: result.messageId,
+          whatsapp_message_id: result.externalId,
+        })
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error
+                ? err.message
+                : 'Falha ao enviar pelo Instagram',
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Channel routing. An account can have more than one unofficial
+    // channel configured; UAZAPI is checked first because it is the one
+    // an operator pairs from inside the app, so an enabled UAZAPI
+    // instance is the more deliberate choice. Text only, same as
+    // Evolution: other types error rather than silently falling back to
+    // Meta (which may not even be configured).
+    const uazCfg = await getUazapiConfig(supabase, accountId)
+    if (isUazapiReady(uazCfg)) {
+      if (message_type !== 'text' || !content_text) {
+        return NextResponse.json(
+          {
+            error:
+              'O canal UAZAPI suporta apenas mensagens de texto por enquanto.',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const result = await sendUazapiToConversation(
+          supabase,
+          accountId,
+          conversationId,
+          content_text
+        )
+        return NextResponse.json({
+          success: true,
+          message_id: result.messageId,
+          whatsapp_message_id: result.externalId,
+        })
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error ? err.message : 'Falha ao enviar pelo UAZAPI',
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Channel routing: if this account has an enabled Evolution instance,
+    // route the send through it instead of Meta. First cut supports text
+    // only — other message types return a clear error rather than silently
+    // falling back to Meta (which may not even be configured).
+    const evoCfg = await getEvolutionConfig(supabase, accountId)
+    if (isEvolutionReady(evoCfg)) {
+      if (message_type !== 'text' || !content_text) {
+        return NextResponse.json(
+          {
+            error:
+              'O canal Evolution suporta apenas mensagens de texto por enquanto.',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const result = await sendEvolutionToConversation(
+          supabase,
+          accountId,
+          conversationId,
+          content_text
+        )
+        return NextResponse.json({
+          success: true,
+          message_id: result.messageId,
+          whatsapp_message_id: result.externalId,
+        })
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error ? err.message : 'Falha ao enviar pelo Evolution',
+          },
+          { status: 500 }
+        )
+      }
     }
 
     // Delegate to the shared send core (validates, sends to Meta with
@@ -203,7 +335,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error in WhatsApp send POST:', error)
     return NextResponse.json(
-      { error: 'Failed to send message' },
+      { error: 'Falha ao enviar a mensagem' },
       { status: 500 }
     )
   }

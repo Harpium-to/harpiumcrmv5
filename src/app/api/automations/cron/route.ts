@@ -17,11 +17,11 @@ import type { AutomationContext } from '@/lib/automations/engine'
 export async function GET(request: Request) {
   const expected = process.env.AUTOMATION_CRON_SECRET
   if (!expected) {
-    return NextResponse.json({ error: 'cron not configured' }, { status: 503 })
+    return NextResponse.json({ error: 'agendador não configurado' }, { status: 503 })
   }
   const supplied = request.headers.get('x-cron-secret')
   if (supplied !== expected) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
   const admin = supabaseAdmin()

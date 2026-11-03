@@ -6,6 +6,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ThemedToaster } from "@/components/themed-toaster";
+import { getGlobalBranding } from "@/lib/branding";
 import {
   DEFAULT_MODE,
   DEFAULT_THEME,
@@ -20,25 +21,41 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "wacrm",
-    template: "%s — wacrm",
-  },
-  description: "Self-hostable CRM template for WhatsApp.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-  icons: {
-    icon: [{ url: "/icon" }],
-  },
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
-};
+// Render every route per-request. Without this, statically-prerendered
+// pages (dashboard, contacts, …) bake the tab title + favicon at build
+// time (when no brand is set), so they'd show the default while the
+// dynamic /agencia pages show the brand — the inconsistency reported.
+// Forcing dynamic also sidesteps the "Supabase client at prerender"
+// build error on the auth pages.
+export const dynamic = "force-dynamic";
+
+// Dynamic so the browser tab title + favicon follow the global brand
+// (set by the agency in /agencia/marca). Falls back to the product
+// defaults when no brand is configured. A freshly uploaded logo has a
+// unique URL, so the browser busts its aggressive favicon cache on change.
+export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getGlobalBranding();
+  const appName = brand.name || "CRM";
+  return {
+    title: {
+      default: appName,
+      template: `%s — ${appName}`,
+    },
+    description: "CRM para WhatsApp.",
+    robots: {
+      index: false,
+      follow: false,
+    },
+    icons: {
+      icon: brand.logoUrl ? [{ url: brand.logoUrl }] : [{ url: "/icon" }],
+    },
+    formatDetection: {
+      email: false,
+      address: false,
+      telephone: false,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#020617",

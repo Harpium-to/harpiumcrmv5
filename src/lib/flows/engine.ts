@@ -490,7 +490,7 @@ async function evaluateConditionNode(
     const ALLOWED = ["name", "email", "phone", "company"] as const;
     type AllowedField = (typeof ALLOWED)[number];
     if (!ALLOWED.includes(cfg.subject_key as AllowedField)) {
-      throw new Error(`unsupported contact_field: ${cfg.subject_key}`);
+      throw new Error(`campo do contato não suportado: ${cfg.subject_key}`);
     }
     const { data } = await db
       .from("contacts")

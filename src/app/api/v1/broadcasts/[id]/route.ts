@@ -30,9 +30,9 @@ export async function GET(
 
     if (error) {
       console.error('[api/v1/broadcasts] read error:', error);
-      return fail('internal', 'Failed to read broadcast', 500);
+      return fail('internal', 'Falha ao ler o disparo', 500);
     }
-    if (!data) return fail('not_found', 'Broadcast not found', 404);
+    if (!data) return fail('not_found', 'Disparo não encontrado', 404);
 
     return ok(data);
   } catch (err) {

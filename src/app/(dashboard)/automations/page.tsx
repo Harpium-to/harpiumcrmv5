@@ -77,7 +77,7 @@ export default function AutomationsPage() {
       if (fetchErr) throw fetchErr
       setAutomations((data ?? []) as Automation[])
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load automations")
+      setError(err instanceof Error ? err.message : "Falha ao carregar as automações")
     }
   }
 
@@ -169,7 +169,7 @@ export default function AutomationsPage() {
         </div>
         <GatedButton
           canAct={canCreate}
-          gateReason="create automations"
+          gateReason="criar automações"
           onClick={() => router.push("/automations/new")}
           className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
@@ -336,7 +336,7 @@ function AutomationCard({
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label="Open menu"
+              aria-label="Abrir menu"
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[popup-open]:bg-muted"
             >
               <MoreVertical className="h-4 w-4" />

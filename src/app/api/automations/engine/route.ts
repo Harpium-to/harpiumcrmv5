@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null)
   if (!body?.trigger_type) {
-    return NextResponse.json({ error: 'trigger_type required' }, { status: 400 })
+    return NextResponse.json({ error: 'informe o gatilho' }, { status: 400 })
   }
 
   await runAutomationsForTrigger({

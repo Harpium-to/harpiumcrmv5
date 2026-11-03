@@ -80,7 +80,7 @@ describe('buildSendComponents — header', () => {
       buildSendComponents(
         row({ header_type: 'text', header_content: 'Hello {{1}}' }),
       ),
-    ).toThrow(/Header text variable \{\{1\}\}/);
+    ).toThrow(/variável \{\{1\}\} do cabeçalho/);
   });
 
   it('auto-includes IMAGE header from the stored sample URL', () => {

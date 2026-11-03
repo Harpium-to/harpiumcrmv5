@@ -9,8 +9,9 @@ import {
 } from "@/lib/inbox/conversations";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
-import { Search, ChevronDown, X } from "lucide-react";
+import { AtSign, ChevronDown, Search, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import {
@@ -447,6 +448,7 @@ function ConversationItem({
   const timeAgo = conversation.last_message_at
     ? formatDistanceToNow(new Date(conversation.last_message_at), {
         addSuffix: false,
+        locale: ptBR,
       })
     : "";
 
@@ -474,8 +476,21 @@ function ConversationItem({
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
-            {displayName}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-foreground">
+              {displayName}
+            </span>
+            {/* Which door this thread uses. Only drawn for Instagram:
+                WhatsApp is the overwhelming majority here, so badging
+                every row would be noise, and the one that needs
+                calling out is the exception. Absent entirely until
+                migration 047 adds the column. */}
+            {conversation.channel === "instagram" ? (
+              <AtSign
+                className="size-3 shrink-0 text-muted-foreground"
+                aria-label="Instagram"
+              />
+            ) : null}
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>

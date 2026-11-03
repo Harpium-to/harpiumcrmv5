@@ -1,0 +1,29 @@
+# ============================================================
+# Netlify — configuração de build/deploy.
+#
+# Este app é inteiramente dinâmico: todas as rotas saem como `ƒ`
+# (server-rendered on demand) no build do Next, e há um Proxy
+# (middleware) que valida a sessão Supabase em cada request. Não
+# existe export estático possível aqui — o Netlify serve isso via
+# o adapter `@netlify/plugin-nextjs`, que empacota o servidor Next
+# em funções.
+#
+# O adapter é instalado automaticamente pelo Netlify quando ele
+# detecta Next.js, mas declaramos o plugin explicitamente abaixo
+# para que a versão fique visível no repo em vez de implícita.
+#
+# NODE_VERSION está fixado porque `engines.node` do package.json
+# pede >=20 e o default da plataforma muda com o tempo — um build
+# que começa a rodar em Node antigo quebra de formas difíceis de
+# diagnosticar.
+# ============================================================
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

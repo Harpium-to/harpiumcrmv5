@@ -365,8 +365,8 @@ export function ContactDetailView({
 
       toast.success(t('toastTemplateSent', { name: template.name }));
     } catch (err) {
-      const reason = err instanceof Error ? err.message : 'network error';
-      toast.error(`Failed to send template: ${reason}`);
+      const reason = err instanceof Error ? err.message : 'erro de rede';
+      toast.error(`Falha ao enviar o modelo: ${reason}`);
     } finally {
       setSendingTemplate(false);
     }
@@ -468,7 +468,7 @@ export function ContactDetailView({
                   value="tags"
                   className="data-active:bg-muted data-active:text-primary text-muted-foreground"
                 >
-                  {t('tabs.tags', { fallback: 'Tags' })}
+                  {t('tabs.tags', { fallback: 'Etiquetas' })}
                 </TabsTrigger>
                 <TabsTrigger
                   value="notes"
@@ -494,7 +494,7 @@ export function ContactDetailView({
               <TabsContent value="details" className="flex-1 overflow-y-auto px-4 py-3">
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">{t('company', { fallback: 'Name' })}</Label>
+                    <Label className="text-muted-foreground text-xs">{t('company', { fallback: 'Empresa' })}</Label>
                     <Input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
@@ -633,7 +633,7 @@ export function ContactDetailView({
                           </button>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5">
-                          {new Date(note.created_at).toLocaleDateString('en-US', {
+                          {new Date(note.created_at).toLocaleDateString('pt-BR', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric',

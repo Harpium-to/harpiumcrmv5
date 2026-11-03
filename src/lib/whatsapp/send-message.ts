@@ -119,7 +119,7 @@ export function validateSendMessageParams(params: {
     params;
 
   if (!messageType) {
-    throw new SendMessageError('bad_request', 'message_type is required', 400);
+    throw new SendMessageError('bad_request', 'informe message_type', 400);
   }
 
   const isMediaKind = (MEDIA_KINDS as readonly string[]).includes(messageType);
@@ -174,7 +174,7 @@ export function validateSendMessageParams(params: {
   ) {
     throw new SendMessageError(
       'bad_request',
-      'Caption exceeds the 1024-character limit',
+      'A legenda passa do limite de 1024 caracteres',
       400
     );
   }
@@ -202,7 +202,7 @@ export async function sendMessageToConversation(
   if (!conversationId) {
     throw new SendMessageError(
       'bad_request',
-      'conversation_id is required',
+      'informe conversation_id',
       400
     );
   }
@@ -226,14 +226,14 @@ export async function sendMessageToConversation(
     .single();
 
   if (convError || !conversation) {
-    throw new SendMessageError('not_found', 'Conversation not found', 404);
+    throw new SendMessageError('not_found', 'Conversa não encontrada', 404);
   }
 
   const contact = conversation.contact;
   if (!contact?.phone) {
     throw new SendMessageError(
       'bad_request',
-      'Contact phone number not found',
+      'Telefone do contato não encontrado',
       400
     );
   }
@@ -242,7 +242,7 @@ export async function sendMessageToConversation(
   if (!isValidE164(sanitizedPhone)) {
     throw new SendMessageError(
       'bad_request',
-      'Invalid phone number format',
+      'Formato de telefone inválido',
       400
     );
   }
@@ -257,7 +257,7 @@ export async function sendMessageToConversation(
   if (configError || !config) {
     throw new SendMessageError(
       'whatsapp_not_configured',
-      'WhatsApp not configured. Please set up your WhatsApp integration first.',
+      'WhatsApp não configurado. Configure a integração com o WhatsApp primeiro.',
       400
     );
   }
@@ -322,7 +322,7 @@ export async function sendMessageToConversation(
     if (data && !isMessageTemplate(data)) {
       throw new SendMessageError(
         'template_malformed',
-        'Template row is malformed locally — run "Sync from Meta" in Settings to repair it.',
+        'O modelo está corrompido aqui — use "Sincronizar com a Meta" em Configurações para corrigir.',
         500
       );
     }
@@ -425,9 +425,9 @@ export async function sendMessageToConversation(
     if (lastError) throw lastError;
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : 'Unknown Meta API error';
+      err instanceof Error ? err.message : 'Erro desconhecido na API da Meta';
     console.error('[send-message] Meta send failed for all variants:', message);
-    throw new SendMessageError('meta_error', `Meta API error: ${message}`, 502);
+    throw new SendMessageError('meta_error', `Erro na API da Meta: ${message}`, 502);
   }
 
   if (workingPhone !== sanitizedPhone) {
@@ -470,7 +470,7 @@ export async function sendMessageToConversation(
     console.error('[send-message] error inserting sent message:', msgError);
     throw new SendMessageError(
       'db_error',
-      `Message sent to Meta but failed to save to DB: ${msgError.message}`,
+      `Mensagem enviada à Meta, mas falhou ao salvar no banco: ${msgError.message}`,
       500
     );
   }
