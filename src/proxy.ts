@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/leads', '/canais', '/pipelines', '/broadcasts', '/automations', '/settings', '/agencia']
+  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/leads', '/canais', '/pipelines', '/broadcasts', '/automations', '/flows', '/agents', '/relatorios', '/notifications', '/settings', '/agencia']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
@@ -81,7 +81,7 @@ export async function middleware(request: NextRequest) {
   if (!user && request.nextUrl.pathname.startsWith('/api/whatsapp/') &&
       !request.nextUrl.pathname.includes('/webhook')) {
     return withRefreshedCookies(
-      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     )
   }
 
