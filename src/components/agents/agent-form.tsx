@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PillNav } from "@/components/ui/pill-nav";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { removeReplacedAvatar, removeUploadedAvatar } from "@/lib/storage/avatars";
 import { useAuth } from "@/hooks/use-auth";
 import { AGENT_ROLES } from "@/lib/agents/roles";
 import { AGENT_TOOLS, AGENT_CHANNELS } from "@/lib/agents/tools";
@@ -328,6 +329,7 @@ export function AgentForm({
     e.preventDefault();
     if (saving) return;
     setSaving(true);
+    let uploadedPath: string | null = null;
     try {
       let avatarUrl = form.avatarUrl.trim();
       if (pendingAvatar) {
@@ -348,6 +350,7 @@ export function AgentForm({
             contentType: pendingAvatar.type,
           });
         if (uploadError) throw new Error(uploadError.message);
+        uploadedPath = path;
         avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data
           .publicUrl;
       }
@@ -384,10 +387,22 @@ export function AgentForm({
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "erro");
+      uploadedPath = null;
+      if (agent) {
+        // A duplicated agent shares the file; the helper checks for that.
+        void removeReplacedAvatar(
+          supabase,
+          agent.avatarUrl,
+          (data.agent as Agent).avatarUrl,
+          { agentId: agent.id },
+        );
+      }
       toast.success(t("saved"));
       onSaved(data.agent as Agent);
       onOpenChange(false);
     } catch (err) {
+      // Uploaded, then the save failed: nothing references the file.
+      if (uploadedPath) void removeUploadedAvatar(supabase, uploadedPath);
       toast.error(err instanceof Error ? err.message : "erro");
     } finally {
       setSaving(false);
@@ -402,6 +417,9 @@ export function AgentForm({
       const res = await fetch(`/api/agents/${agent.id}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "erro");
+      // The row is gone (a hard delete), so its picture goes too —
+      // unless a duplicate of this agent still shows it.
+      void removeReplacedAvatar(supabase, agent.avatarUrl, null, { agentId: agent.id });
       toast.success(t("deleted"));
       onDeleted(agent.id);
       onOpenChange(false);

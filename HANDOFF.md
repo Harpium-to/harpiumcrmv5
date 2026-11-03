@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Quatro
+**Nada do que foi construído funciona até isso acontecer.** Cinco
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -16,6 +16,7 @@ migrations estão no repo e não foram aplicadas:
 | `045_agent_operation.sql` | cargo, autonomia, fila, aprovações, memória, qualificação de lead | a operação de agentes inteira some |
 | `046_deal_close_timestamp.sql` | data real de fechamento de negócio | relatórios usam `updated_at` e se marcam como aproximados |
 | `047_instagram_channel.sql` | canal Instagram, `conversations.channel` | Instagram não aparece; inbox inalterado |
+| `048_report_first_response.sql` | função `report_first_response` + índice `messages(conversation_id, created_at, id)` | o cartão "Tempo de primeira resposta" em `/relatorios` explica que falta a migration |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -25,7 +26,13 @@ projeto estiver linkado.
 
 **Depois de aplicar, confira nesta ordem:** `/agents` lista agentes →
 criar um pela biblioteca → `/relatorios` para de mostrar o aviso de
-aproximação → `/canais/instagram` aceita credenciais.
+aproximação → o cartão de primeira resposta mostra números →
+`/canais/instagram` aceita credenciais.
+
+A 048 cria um índice em `messages`. Sem `CONCURRENTLY` (o SQL editor
+roda tudo numa transação), então ela trava escrita em `messages` pelo
+tempo de construir o índice — em conta pequena é instantâneo, em conta
+grande rode fora do horário de pico.
 
 ---
 
@@ -104,16 +111,24 @@ formulário funciona no dia em que a permissão sai.
   `segment`, `source`, `city`, `job_title`, `instagram`, `website`
   (validação em `parseContactPatch`, `src/lib/api/v1/contacts.ts`), e
   a ferramenta `update_contact` do MCP também, e o painel da extensão
-  tem o seletor Frio / Morno / Quente. Mudar etapa é outra coisa: é um
-  `deal`, e não existe `/api/v1/deals` ainda.
+  tem o seletor Frio / Morno / Quente. Mudar etapa também está feito:
+  `/api/v1/deals` (listar, ler, `PATCH` com `stage_id` validado contra o
+  funil do próprio negócio), `/api/v1/pipelines`, escopos `deals:read`
+  / `deals:write`, ferramentas MCP e o seletor de etapa no painel.
+  Criar negócio pela API ainda não existe.
 
-### 2.5 Relatórios: tempo de primeira resposta
+### 2.5 ~~Relatórios: tempo de primeira resposta~~ — feito
 
-Ficou de fora porque exige varredura pareada de mensagens e ficaria
-caro numa janela de 90 dias. O dashboard já tem uma versão em
-`loadResponseTime` (`src/lib/dashboard/queries.ts`), limitada a duas
-semanas. Se for fazer, faça em SQL (uma RPC com `LATERAL`), não em
-TypeScript.
+RPC `report_first_response` na migration 048 (pareamento com
+`LATERAL`, testado no PGlite). Uma rajada de mensagens do cliente conta
+como uma espera; sem resposta conta à parte, nunca como zero; tempo de
+relógio, não horário comercial (a conta não guarda horário). Cartão em
+`src/components/reports/first-response.tsx`, CSV
+`first_response_by_day`, e o analista IA recebe os números.
+
+O dashboard ainda usa a versão própria em `loadResponseTime`
+(`src/lib/dashboard/queries.ts`, duas semanas, em TypeScript). Dá para
+apontá-lo para a RPC depois que a 048 estiver aplicada.
 
 ---
 
@@ -132,11 +147,13 @@ Coberto por `src/lib/dashboard/queries.test.ts`.
 
 `date-utils.test.ts` constrói datas locais (`new Date(2026, 4, 18)`).
 
-### 3.3 Avatares órfãos no storage
+### 3.3 ~~Avatares órfãos no storage~~ — corrigido
 
-Trocar a foto de um agente (ou de um perfil) sobe um arquivo novo e
-deixa o antigo no bucket. Comportamento já existente em
-`profile-form.tsx`; o avatar de agente seguiu o mesmo padrão.
+`src/lib/storage/avatars.ts`: depois que o perfil ou o agente salva, o
+arquivo antigo é apagado — só se nenhum agente ou perfil visível ainda
+aponta para ele (duplicar agente copia o `avatar_url`). Upload cujo
+save falha também é apagado. Arquivo na pasta de outro usuário fica:
+a policy do bucket só deixa apagar a própria pasta.
 
 ---
 
