@@ -26,7 +26,16 @@ const PANEL_ID = "crm-connector-panel";
 const POLL_MS = 800;
 
 let currentPhone = null;
+let currentContact = null;
+let currentBaseUrl = "";
 let panel = null;
+
+// The API's `temperature` values, in the order the control shows them.
+const TEMPERATURES = [
+  ["cold", "Frio"],
+  ["warm", "Morno"],
+  ["hot", "Quente"],
+];
 
 // ------------------------------------------------------------
 // Reading the open conversation
@@ -94,6 +103,9 @@ function ensurePanel() {
     if (action === "settings") void send("openOptions");
     if (action === "create") void createContact();
     if (action === "retry") void refresh(true);
+    if (action === "temperature") {
+      void setTemperature(event.target.getAttribute("data-value"));
+    }
   });
 
   return panel;
@@ -131,7 +143,21 @@ function renderMessage(text, actionLabel, action) {
   `);
 }
 
-function renderContact(contact, baseUrl) {
+function renderTemperature(contact) {
+  // `null` means the CRM hasn't applied migration 045 yet: there is no
+  // column to write to, so there is no control to offer.
+  if (!contact.temperature) return "";
+  const buttons = TEMPERATURES.map(
+    ([value, label]) => `
+      <button class="crmc-seg" data-act="temperature" data-value="${value}"
+              aria-pressed="${contact.temperature === value}">${label}</button>`,
+  ).join("");
+  return `<div class="crmc-temp" role="group" aria-label="Temperatura">${buttons}</div>`;
+}
+
+function renderContact(contact, baseUrl, notice) {
+  currentContact = contact;
+  currentBaseUrl = baseUrl;
   const tags = (contact.tags || [])
     .map((t) => `<span class="crmc-tag">${escapeHtml(t.name)}</span>`)
     .join("");
@@ -141,6 +167,13 @@ function renderContact(contact, baseUrl) {
     <p class="crmc-sub">${escapeHtml(contact.phone)}</p>
     ${contact.company ? `<p class="crmc-row"><span>Empresa</span>${escapeHtml(contact.company)}</p>` : ""}
     ${contact.email ? `<p class="crmc-row"><span>Email</span>${escapeHtml(contact.email)}</p>` : ""}
+    ${
+      contact.potential != null
+        ? `<p class="crmc-row"><span>Potencial</span>${escapeHtml(contact.potential)}/100</p>`
+        : ""
+    }
+    ${renderTemperature(contact)}
+    ${notice ? `<p class="crmc-err">${escapeHtml(notice)}</p>` : ""}
     ${tags ? `<div class="crmc-tags">${tags}</div>` : ""}
     <a class="crmc-btn" target="_blank" rel="noreferrer noopener"
        href="${escapeHtml(baseUrl)}/contacts?contact=${encodeURIComponent(contact.id)}">
@@ -161,6 +194,31 @@ async function createContact() {
   await refresh(true);
 }
 
+async function setTemperature(value) {
+  const contact = currentContact;
+  if (!contact || contact.temperature === value) return;
+  const phone = currentPhone;
+  const baseUrl = currentBaseUrl;
+
+  for (const button of body().querySelectorAll(".crmc-seg")) button.disabled = true;
+  const result = await send("update", { id: contact.id, fields: { temperature: value } });
+
+  // The operator may have switched chats while this was in flight. The
+  // reply belongs to the contact that was open then; drawing it now
+  // would put one customer's card beside another customer's chat.
+  if (currentPhone !== phone) return;
+
+  if (!result.ok) {
+    const notice =
+      result.error === "unauthorized"
+        ? "A chave de API não tem permissão para editar contatos."
+        : "Não consegui salvar a temperatura.";
+    renderContact(contact, baseUrl, notice);
+    return;
+  }
+  renderContact(result.data, baseUrl);
+}
+
 // ------------------------------------------------------------
 // The loop
 // ------------------------------------------------------------
@@ -170,6 +228,7 @@ async function refresh(force) {
 
   if (!force && phone === currentPhone) return;
   currentPhone = phone;
+  currentContact = null;
 
   const settings = await send("settings");
   const baseUrl = settings.ok ? settings.data.baseUrl : "";

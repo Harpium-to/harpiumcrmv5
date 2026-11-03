@@ -103,10 +103,9 @@ formulário funciona no dia em que a permissão sai.
   `PATCH /api/v1/contacts/[id]` recebe `temperature`, `potential`,
   `segment`, `source`, `city`, `job_title`, `instagram`, `website`
   (validação em `parseContactPatch`, `src/lib/api/v1/contacts.ts`), e
-  a ferramenta `update_contact` do MCP também. Falta o botão no painel
-  da extensão. Mudar etapa é outra coisa: é um `deal`, e não existe
-  `/api/v1/deals` ainda.
-- Ícone da extensão (`manifest.json` não declara `icons`).
+  a ferramenta `update_contact` do MCP também, e o painel da extensão
+  tem o seletor Frio / Morno / Quente. Mudar etapa é outra coisa: é um
+  `deal`, e não existe `/api/v1/deals` ainda.
 
 ### 2.5 Relatórios: tempo de primeira resposta
 

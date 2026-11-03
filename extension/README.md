@@ -18,7 +18,10 @@ escopos `contacts:read` e `contacts:write`.
 
 Com uma conversa individual aberta no WhatsApp Web, o painel procura o
 contato pelo telefone e mostra nome, empresa, email e etiquetas, com um
-link para abrir o registro completo. Se não houver cadastro, oferece
+link para abrir o registro completo. Abaixo dos dados fica a
+**temperatura** do lead (Frio / Morno / Quente): um clique grava no
+CRM. O controle só aparece quando o CRM já tem a migration 045 — antes
+dela não existe onde gravar. Se não houver cadastro, oferece
 criar — usando o nome que o WhatsApp exibe, quando ele não é só o
 próprio número.
 
@@ -58,3 +61,8 @@ Essa escolha é deliberada. Mostrar o registro de um cliente ao lado da
 conversa de outro é pior do que não mostrar nada — quem está lendo não
 tem como perceber, e é assim que alguém é chamado pelo nome errado ou
 recebe o preço errado.
+
+## Ícones
+
+`icons/icon.svg` é a fonte; os PNGs (16, 32, 48, 128) são exportados
+dele, porque o Chrome não aceita SVG como ícone de extensão.

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CRM Connector",
-  "version": "0.1.0",
-  "description": "Mostra o contato do CRM ao lado da conversa aberta no WhatsApp Web, e cria o lead sem sair dali.",
+  "version": "0.2.0",
+  "description": "Mostra o contato do CRM ao lado da conversa aberta no WhatsApp Web, cria o lead e marca a temperatura sem sair dali.",
   "permissions": [
     "storage"
   ],
@@ -31,9 +31,19 @@
       "run_at": "document_idle"
     }
   ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "options_page": "options.html",
   "action": {
-    "default_title": "CRM Connector"
+    "default_title": "CRM Connector",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
   },
   "web_accessible_resources": [
     {
