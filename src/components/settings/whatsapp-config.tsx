@@ -627,6 +627,7 @@ export function WhatsAppConfig() {
               />
               <p className="text-xs text-muted-foreground">
                 {t('webhookVerifyTokenHint')}
+                {config?.verify_token ? ` ${t('webhookVerifyTokenKeep')}` : ''}
               </p>
             </div>
 

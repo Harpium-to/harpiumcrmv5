@@ -274,7 +274,7 @@ export async function POST(request: Request) {
     // /register when the user didn't provide a PIN this time around.
     const { data: existing } = await supabase
       .from('whatsapp_config')
-      .select('id, registered_at, phone_number_id')
+      .select('id, registered_at, phone_number_id, verify_token')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -357,7 +357,10 @@ export async function POST(request: Request) {
       phone_number_id,
       waba_id: waba_id || null,
       access_token: encryptedAccessToken,
-      verify_token: encryptedVerifyToken,
+      // The form never shows the saved verify token, so a blank field
+      // on a re-save (say, to rotate the access token) means "keep it",
+      // not "clear it" — clearing would break the next webhook check.
+      verify_token: encryptedVerifyToken ?? existing?.verify_token ?? null,
       status: registrationError ? 'disconnected' : 'connected',
       connected_at: registrationError ? null : new Date().toISOString(),
       registered_at: registrationError ? null : registeredAt,

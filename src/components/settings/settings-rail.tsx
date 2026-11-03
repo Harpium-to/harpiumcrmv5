@@ -31,7 +31,7 @@ export function SettingsRail({
   onSelect: (section: SettingsSection) => void;
   hints?: Partial<Record<SettingsSection, ReactNode>>;
 }) {
-  const t = useTranslations('Configurações');
+  const t = useTranslations('Settings');
   const activeRef = useRef<HTMLButtonElement>(null);
 
   // When horizontal (mobile), keep the active chip in view. On desktop
