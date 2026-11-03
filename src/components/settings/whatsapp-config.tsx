@@ -315,6 +315,9 @@ export function WhatsAppConfig() {
         method: 'GET',
       });
       const data = (await res.json()) as RegistrationProbe;
+      // Reload first: fetchConfig clears the probe, so setting it
+      // before the reload made the result vanish the moment it arrived.
+      if (accountId) await fetchConfig(accountId);
       setRegistrationProbe(data);
       if (data.live) {
         toast.success('Número totalmente conectado — a Meta está entregando os eventos.');
@@ -324,7 +327,6 @@ export function WhatsAppConfig() {
           { duration: 8000 },
         );
       }
-      if (accountId) await fetchConfig(accountId);
     } catch (err) {
       console.error('verify-registration failed:', err);
       toast.error('Não consegui falar com o serviço de verificação.');
