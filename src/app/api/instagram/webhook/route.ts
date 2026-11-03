@@ -41,14 +41,14 @@ export async function POST(request: Request) {
   // Anyone can POST to this URL; the signature is what makes the
   // payload the app's own. Checked before the body is even parsed.
   if (!verifyMetaWebhookSignature(rawBody, signature)) {
-    return NextResponse.json({ error: 'invalid signature' }, { status: 401 })
+    return NextResponse.json({ error: 'assinatura inválida' }, { status: 401 })
   }
 
   let payload: unknown
   try {
     payload = JSON.parse(rawBody)
   } catch {
-    return NextResponse.json({ error: 'bad json' }, { status: 400 })
+    return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
   const messages = parseInstagramWebhook(payload)

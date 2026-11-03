@@ -69,7 +69,7 @@ export async function PATCH(
 
     if (!update) {
       return NextResponse.json(
-        { error: 'action deve ser "cancel" ou "prioritize"' },
+        { error: 'a ação precisa ser "cancel" ou "prioritize"' },
         { status: 400 },
       )
     }

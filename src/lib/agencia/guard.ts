@@ -79,7 +79,7 @@ export async function requireAgencia(): Promise<{
     throw new UnauthorizedError()
   }
   if (gate.status === 'forbidden') {
-    throw new ForbiddenError('Agency access required')
+    throw new ForbiddenError('Acesso restrito à agência')
   }
   return { userId: gate.userId, admin: gate.admin }
 }

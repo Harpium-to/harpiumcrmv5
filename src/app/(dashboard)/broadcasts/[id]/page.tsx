@@ -487,7 +487,7 @@ export default function BroadcastDetailPage() {
                   return (
                     <TableRow key={recipient.id} className="border-border">
                       <TableCell className="font-medium text-foreground">
-                        {recipient.contact?.name ?? 'Unknown'}
+                        {recipient.contact?.name ?? 'Desconhecido'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {recipient.contact?.phone ?? '-'}

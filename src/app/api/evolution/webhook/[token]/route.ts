@@ -30,10 +30,10 @@ export async function POST(
     .maybeSingle()
   if (error) {
     console.error('[evolution webhook] config lookup failed:', error.message)
-    return NextResponse.json({ error: 'server error' }, { status: 500 })
+    return NextResponse.json({ error: 'erro no servidor' }, { status: 500 })
   }
   if (!cfg) {
-    return NextResponse.json({ error: 'invalid token' }, { status: 404 })
+    return NextResponse.json({ error: 'token inválido' }, { status: 404 })
   }
 
   const { data: account } = await admin
@@ -42,7 +42,7 @@ export async function POST(
     .eq('id', cfg.account_id)
     .maybeSingle()
   if (!account) {
-    return NextResponse.json({ error: 'server error' }, { status: 500 })
+    return NextResponse.json({ error: 'erro no servidor' }, { status: 500 })
   }
 
   const messages = parseEvolutionInbound(payload)

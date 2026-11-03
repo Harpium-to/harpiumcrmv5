@@ -92,19 +92,19 @@ export async function createBroadcast(
   const templateLanguage = params.templateLanguage || 'en_US';
 
   if (!templateName) {
-    throw new BroadcastError('bad_request', "'template_name' is required", 400);
+    throw new BroadcastError('bad_request', "informe 'template_name'", 400);
   }
   if (!Array.isArray(recipients) || recipients.length === 0) {
     throw new BroadcastError(
       'bad_request',
-      "'recipients' must be a non-empty array of { to, params? }",
+      "'recipients' precisa ser uma lista não vazia de { to, params? }",
       400
     );
   }
   if (recipients.length > MAX_RECIPIENTS) {
     throw new BroadcastError(
       'bad_request',
-      `A broadcast is capped at ${MAX_RECIPIENTS} recipients per request; split larger sends`,
+      `Um disparo aceita no máximo ${MAX_RECIPIENTS} destinatários por vez; divida envios maiores`,
       400
     );
   }
@@ -119,7 +119,7 @@ export async function createBroadcast(
   if (configError || !config) {
     throw new BroadcastError(
       'whatsapp_not_configured',
-      'WhatsApp not configured. Please set up your WhatsApp integration first.',
+      'WhatsApp não configurado. Configure a integração com o WhatsApp primeiro.',
       400
     );
   }
@@ -137,7 +137,7 @@ export async function createBroadcast(
   if (rawTemplateRow && !isMessageTemplate(rawTemplateRow)) {
     throw new BroadcastError(
       'template_malformed',
-      'Template row is malformed locally — run "Sync from Meta" in Settings to repair it before broadcasting.',
+      'O modelo está corrompido aqui — use "Sincronizar com a Meta" em Configurações para corrigir antes de disparar.',
       500
     );
   }
@@ -180,7 +180,7 @@ export async function createBroadcast(
   if (deduped.length === 0) {
     throw new BroadcastError(
       'bad_request',
-      'No recipients had a valid E.164 phone number',
+      'Nenhum destinatário tinha telefone válido no formato E.164',
       400
     );
   }
@@ -208,7 +208,7 @@ export async function createBroadcast(
     .single();
   if (bErr || !broadcast) {
     console.error('[broadcast-core] create broadcast error:', bErr);
-    throw new BroadcastError('internal', 'Failed to create broadcast', 500);
+    throw new BroadcastError('internal', 'Falha ao criar o disparo', 500);
   }
 
   const { data: recipientRows, error: rErr } = await db
@@ -223,7 +223,7 @@ export async function createBroadcast(
     .select('id, contact_id');
   if (rErr || !recipientRows) {
     console.error('[broadcast-core] create recipients error:', rErr);
-    throw new BroadcastError('internal', 'Failed to create broadcast', 500);
+    throw new BroadcastError('internal', 'Falha ao criar o disparo', 500);
   }
 
   // Pair each inserted recipient row back to its phone/params by
@@ -285,7 +285,7 @@ export async function deliverBroadcast(
         lastError = null;
         break;
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const message = error instanceof Error ? error.message : 'Erro desconhecido';
         lastError = message;
         // Only a "recipient not allowed" error is worth another variant.
         if (!isRecipientNotAllowedError(message)) break;
@@ -308,7 +308,7 @@ export async function deliverBroadcast(
         .from('broadcast_recipients')
         .update({
           status: 'failed',
-          error_message: lastError || 'Unknown error',
+          error_message: lastError || 'Erro desconhecido',
         })
         .eq('id', recipient.recipientRowId);
     }

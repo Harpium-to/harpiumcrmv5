@@ -31,10 +31,10 @@ export async function POST(
     .maybeSingle()
   if (cfgErr) {
     console.error('[leads ingest] config lookup failed:', cfgErr.message)
-    return NextResponse.json({ error: 'server error' }, { status: 500 })
+    return NextResponse.json({ error: 'erro no servidor' }, { status: 500 })
   }
   if (!cfg) {
-    return NextResponse.json({ error: 'invalid token' }, { status: 404 })
+    return NextResponse.json({ error: 'token inválido' }, { status: 404 })
   }
 
   // Google Lead Form deliveries carry a `google_key`; if the account set
@@ -47,7 +47,7 @@ export async function POST(
     const provided =
       typeof dict.google_key === 'string' ? dict.google_key : ''
     if (provided !== cfg.google_key) {
-      return NextResponse.json({ error: 'invalid key' }, { status: 401 })
+      return NextResponse.json({ error: 'chave inválida' }, { status: 401 })
     }
   }
 
@@ -58,7 +58,7 @@ export async function POST(
     .maybeSingle()
   if (accErr || !acc) {
     console.error('[leads ingest] account lookup failed:', accErr?.message)
-    return NextResponse.json({ error: 'server error' }, { status: 500 })
+    return NextResponse.json({ error: 'erro no servidor' }, { status: 500 })
   }
 
   const normalized = normalizeLead(payload)
@@ -76,6 +76,6 @@ export async function POST(
     })
   } catch (err) {
     console.error('[leads ingest] failed:', err)
-    return NextResponse.json({ error: 'ingest failed' }, { status: 500 })
+    return NextResponse.json({ error: 'falha ao receber o lead' }, { status: 500 })
   }
 }

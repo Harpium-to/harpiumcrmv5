@@ -59,10 +59,10 @@ const SAMPLE_CONTACT: Contact = {
   id: 'sample',
   user_id: '',
   account_id: '',
-  name: 'John Doe',
+  name: 'Maria Silva',
   phone: '+1234567890',
   email: 'john@example.com',
-  company: 'Acme Corp',
+  company: 'Empresa Exemplo',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
@@ -270,15 +270,15 @@ export function Step3Personalize({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={headerMediaUrl.trim()}
-                alt="Header preview"
+                alt="Prévia do cabeçalho"
                 className="mt-3 max-h-40 rounded-lg border border-border object-contain"
               />
             )}
           {headerMediaError && (
             <p className="mt-1.5 text-xs text-amber-300">
               {headerMediaError === 'missing'
-                ? 'A media URL is required to send this template.'
-                : 'Enter a valid http(s) URL.'}
+                ? 'Este modelo precisa de uma URL de mídia para ser enviado.'
+                : 'Informe uma URL http(s) válida.'}
             </p>
           )}
         </div>
@@ -344,7 +344,7 @@ export function Step3Personalize({
                         onChange={(e) =>
                           updateVariable(key, { value: e.target.value })
                         }
-                        placeholder="Enter value..."
+                        placeholder="Digite o valor..."
                         className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
                       />
                     ) : mapping.type === 'field' ? (
@@ -376,10 +376,10 @@ export function Step3Personalize({
                           <SelectValue
                             placeholder={
                               loadingFields
-                                ? 'Loading…'
+                                ? 'Carregando…'
                                 : customFields.length === 0
-                                  ? 'No custom fields'
-                                  : 'Select custom field…'
+                                  ? 'Nenhum campo personalizado'
+                                  : 'Escolha um campo personalizado…'
                             }
                           />
                         </SelectTrigger>
@@ -422,11 +422,11 @@ export function Step3Personalize({
 
       {unmappedKeys.length > 0 && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-          Map every placeholder before continuing — still missing{' '}
+          Preencha todas as variáveis antes de continuar — ainda faltam{' '}
           <span className="font-mono font-semibold">
             {unmappedKeys.join(', ')}
           </span>
-          . Otherwise those placeholders will ship to Meta as empty strings.
+          . Senão elas vão para a Meta em branco.
         </div>
       )}
 

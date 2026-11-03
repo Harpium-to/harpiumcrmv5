@@ -63,7 +63,7 @@ export default async function AgenciaContatosPage({
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Telefone</th>
-                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">E-mail</th>
                 <th className="px-4 py-3 font-medium">Empresa</th>
                 <th className="px-4 py-3 font-medium">Criado em</th>
               </tr>

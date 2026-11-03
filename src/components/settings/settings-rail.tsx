@@ -31,7 +31,7 @@ export function SettingsRail({
   onSelect: (section: SettingsSection) => void;
   hints?: Partial<Record<SettingsSection, ReactNode>>;
 }) {
-  const t = useTranslations('Settings');
+  const t = useTranslations('Configurações');
   const activeRef = useRef<HTMLButtonElement>(null);
 
   // When horizontal (mobile), keep the active chip in view. On desktop
@@ -48,7 +48,7 @@ export function SettingsRail({
 
   return (
     <nav
-      aria-label="Settings sections"
+      aria-label="Seções das configurações"
       className={cn(
         'flex gap-1 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         'border-b border-border',

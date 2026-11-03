@@ -26,7 +26,7 @@ export async function GET(
     const ctx = await requireApiKey(request, 'deals:read');
     const { id } = await params;
     const deal = await getDealById(ctx.supabase, ctx.accountId, id);
-    if (!deal) return fail('not_found', 'Deal not found', 404);
+    if (!deal) return fail('not_found', 'Negócio não encontrado', 404);
     return ok(deal);
   } catch (err) {
     return toApiErrorResponse(err);
@@ -46,7 +46,7 @@ export async function PATCH(
       unknown
     > | null;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
-      return fail('bad_request', 'Request body must be a JSON object', 400);
+      return fail('bad_request', 'O corpo da requisição precisa ser um objeto JSON', 400);
     }
 
     const patch = parseDealPatch(body);
@@ -55,7 +55,7 @@ export async function PATCH(
 
     // Verify the deal is in this account before mutating anything.
     const existing = await getDealById(ctx.supabase, ctx.accountId, id);
-    if (!existing) return fail('not_found', 'Deal not found', 404);
+    if (!existing) return fail('not_found', 'Negócio não encontrado', 404);
 
     if (typeof updates.stage_id === 'string' && existing.pipeline) {
       const valid = await stageBelongsToPipeline(
@@ -66,7 +66,7 @@ export async function PATCH(
       if (!valid) {
         return fail(
           'bad_request',
-          "'stage_id' must be a stage of the deal's pipeline",
+          "'stage_id' precisa ser uma etapa do funil do próprio negócio",
           400
         );
       }
@@ -81,7 +81,7 @@ export async function PATCH(
         .eq('account_id', ctx.accountId);
       if (error) {
         console.error('[api/v1/deals] update error:', error);
-        return fail('internal', 'Failed to update deal', 500);
+        return fail('internal', 'Falha ao atualizar o negócio', 500);
       }
     }
 

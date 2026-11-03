@@ -66,7 +66,7 @@ describe("sendInteractiveButtons — validation", () => {
         ...BASE_ARGS,
         buttons: [{ id: "", title: "Choose me" }],
       }),
-    ).rejects.toThrow(/missing id/);
+    ).rejects.toThrow(/sem ID/);
   });
 
   it("rejects an empty body text", async () => {
@@ -76,7 +76,7 @@ describe("sendInteractiveButtons — validation", () => {
         bodyText: "",
         buttons: [{ id: "a", title: "A" }],
       }),
-    ).rejects.toThrow(/requires bodyText/);
+    ).rejects.toThrow(/precisa de um texto/);
   });
 
   it("rejects a header text over the limit", async () => {
@@ -204,7 +204,7 @@ describe("sendInteractiveList — validation", () => {
           { rows: [{ id: "dupe", title: "Second" }] },
         ],
       }),
-    ).rejects.toThrow(/duplicate row id/);
+    ).rejects.toThrow(/ID de linha repetido/);
   });
 
   it("rejects an empty buttonLabel", async () => {
@@ -214,7 +214,7 @@ describe("sendInteractiveList — validation", () => {
         buttonLabel: "",
         sections: [{ rows: [ROW] }],
       }),
-    ).rejects.toThrow(/requires a buttonLabel/);
+    ).rejects.toThrow(/precisa do texto do botão/);
   });
 
   it("sends the right payload shape when valid", async () => {

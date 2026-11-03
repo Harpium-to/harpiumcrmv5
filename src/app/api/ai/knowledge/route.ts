@@ -25,7 +25,7 @@ export async function GET() {
     if (error) {
       console.error('[ai/knowledge GET] error:', error)
       return NextResponse.json(
-        { error: 'Failed to load knowledge base' },
+        { error: 'Falha ao carregar a base de conhecimento' },
         { status: 500 },
       )
     }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     const content = typeof body?.content === 'string' ? body.content.trim() : ''
     if (!title || !content) {
       return NextResponse.json(
-        { error: 'title and content are required' },
+        { error: 'informe o título e o conteúdo' },
         { status: 400 },
       )
     }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     if (error || !doc) {
       console.error('[ai/knowledge POST] insert error:', error)
       return NextResponse.json(
-        { error: 'Failed to save document' },
+        { error: 'Falha ao salvar o documento' },
         { status: 500 },
       )
     }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         content,
       )
     } catch (err) {
-      const message = err instanceof AiError ? err.message : 'indexing failed'
+      const message = err instanceof AiError ? err.message : 'falha ao indexar'
       console.error('[ai/knowledge POST] ingest error:', err)
       return NextResponse.json(
         {
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
         success: true,
         id: doc.id,
         warning:
-          'Saved with keyword search only — your embeddings key could not be decrypted (check ENCRYPTION_KEY, then re-enter the key).',
+          'Salvo só com busca por palavra-chave — a sua chave de embeddings não pôde ser decifrada (confira a ENCRYPTION_KEY e informe a chave de novo).',
       })
     }
     return NextResponse.json({ success: true, id: doc.id })

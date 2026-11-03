@@ -362,7 +362,7 @@ export default function LeadsPage() {
                   <th className="px-4 py-3 font-medium">Origem</th>
                   <th className="px-4 py-3 font-medium">Nome</th>
                   <th className="px-4 py-3 font-medium">Telefone</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
+                  <th className="px-4 py-3 font-medium">E-mail</th>
                   <th className="px-4 py-3 font-medium">Campanha</th>
                   <th className="px-4 py-3 font-medium">Recebido</th>
                   <th className="px-4 py-3 font-medium">Contato</th>

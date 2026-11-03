@@ -106,14 +106,14 @@ export function parseDealPatch(body: Record<string, unknown>): DealPatch {
 
   if ('stage_id' in body) {
     if (typeof body.stage_id !== 'string' || body.stage_id === '') {
-      return { ok: false, message: `'stage_id' must be a stage id` };
+      return { ok: false, message: `'stage_id' precisa ser o ID de uma etapa` };
     }
     updates.stage_id = body.stage_id;
   }
 
   if ('status' in body) {
     if (!DEAL_STATUSES.includes(body.status as ApiDealStatus)) {
-      return { ok: false, message: `'status' must be one of ${DEAL_STATUSES.join(', ')}` };
+      return { ok: false, message: `'status' precisa ser um destes: ${DEAL_STATUSES.join(', ')}` };
     }
     updates.status = body.status;
   }
@@ -121,7 +121,7 @@ export function parseDealPatch(body: Record<string, unknown>): DealPatch {
   if ('title' in body) {
     // NOT NULL in the table, and an untitled card is unreadable on the board.
     if (typeof body.title !== 'string' || body.title.trim() === '') {
-      return { ok: false, message: `'title' must be a non-empty string` };
+      return { ok: false, message: `'title' precisa ser um texto não vazio` };
     }
     updates.title = body.title.trim();
   }
@@ -129,14 +129,14 @@ export function parseDealPatch(body: Record<string, unknown>): DealPatch {
   if ('value' in body) {
     const value = body.value;
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-      return { ok: false, message: `'value' must be a number of 0 or more` };
+      return { ok: false, message: `'value' precisa ser um número igual ou maior que 0` };
     }
     updates.value = value;
   }
 
   if ('notes' in body) {
     if (body.notes !== null && typeof body.notes !== 'string') {
-      return { ok: false, message: `'notes' must be a string or null` };
+      return { ok: false, message: `'notes' precisa ser texto ou null` };
     }
     updates.notes = body.notes;
   }
@@ -144,7 +144,7 @@ export function parseDealPatch(body: Record<string, unknown>): DealPatch {
   if ('expected_close_date' in body) {
     const value = body.expected_close_date;
     if (value !== null && !(typeof value === 'string' && DATE_ONLY.test(value))) {
-      return { ok: false, message: `'expected_close_date' must be YYYY-MM-DD or null` };
+      return { ok: false, message: `'expected_close_date' precisa ser AAAA-MM-DD ou null` };
     }
     updates.expected_close_date = value;
   }

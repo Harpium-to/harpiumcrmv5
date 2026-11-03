@@ -441,11 +441,11 @@ export function Step2SelectAudience({
             <span className="text-sm text-foreground">
               {estimatedCount.toLocaleString()}
             </span>
-            <span className="text-xs text-muted-foreground">estimated recipients</span>
+            <span className="text-xs text-muted-foreground">destinatários estimados</span>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Select an audience type to see the estimate.
+            Escolha um tipo de público para ver a estimativa.
           </p>
         )}
       </div>

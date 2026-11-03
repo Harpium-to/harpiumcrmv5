@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const rawBody = await request.text()
   const signature = request.headers.get('x-hub-signature-256') ?? ''
   if (!verifyMetaWebhookSignature(rawBody, signature)) {
-    return NextResponse.json({ error: 'invalid signature' }, { status: 401 })
+    return NextResponse.json({ error: 'assinatura inválida' }, { status: 401 })
   }
 
   let payload: {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   try {
     payload = JSON.parse(rawBody)
   } catch {
-    return NextResponse.json({ error: 'bad json' }, { status: 400 })
+    return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
   const admin = supabaseAdmin()

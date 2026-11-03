@@ -31,7 +31,7 @@ export async function PATCH(
         : ''
     if (decision !== 'approve' && decision !== 'reject') {
       return NextResponse.json(
-        { error: 'decision deve ser "approve" ou "reject"' },
+        { error: 'a decisão precisa ser "approve" ou "reject"' },
         { status: 400 },
       )
     }

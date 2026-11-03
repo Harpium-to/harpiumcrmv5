@@ -96,13 +96,13 @@ describe('AgentNetwork', () => {
     // Two ways in on the left (cold prospecting and reviving a dead
     // thread), one line out to the right.
     expect(stations(render(TEAM))).toEqual([
-      'Prospector',
-      'Follow-up',
+      'Prospectador',
+      'Acompanhamento',
       'Pesquisador',
-      'SDR',
+      'Pré-vendas (SDR)',
       'Executivo comercial',
-      'Closer',
-      'Customer success',
+      'Fechamento',
+      'Sucesso do cliente',
     ])
   })
 

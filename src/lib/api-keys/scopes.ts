@@ -29,15 +29,15 @@ export type ApiScope = (typeof API_SCOPES)[number];
 
 /** Human-readable descriptions, surfaced in the key-creation UI. */
 export const SCOPE_DESCRIPTIONS: Record<ApiScope, string> = {
-  'messages:send': 'Send WhatsApp messages',
-  'messages:read': 'Read messages and their delivery status',
-  'contacts:read': 'List and read contacts',
-  'contacts:write': 'Create and update contacts',
-  'conversations:read': 'List and read conversations',
-  'deals:read': 'List and read deals and pipelines',
-  'deals:write': 'Update deals (move stage, mark won/lost)',
-  'broadcasts:send': 'Launch broadcast campaigns',
-  'webhooks:manage': 'Register and manage outbound event webhooks',
+  'messages:send': 'Enviar mensagens de WhatsApp',
+  'messages:read': 'Ler mensagens e o status de entrega',
+  'contacts:read': 'Listar e ler contatos',
+  'contacts:write': 'Criar e atualizar contatos',
+  'conversations:read': 'Listar e ler conversas',
+  'deals:read': 'Listar e ler negócios e funis',
+  'deals:write': 'Atualizar negócios (mudar etapa, marcar ganho/perdido)',
+  'broadcasts:send': 'Lançar campanhas de disparo',
+  'webhooks:manage': 'Cadastrar e gerenciar webhooks de eventos',
 };
 
 /** Type-narrow an unknown value into a valid `ApiScope`. */

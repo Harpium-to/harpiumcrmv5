@@ -112,7 +112,7 @@ describe("getCurrentAccount", () => {
     await expect(getCurrentAccount()).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
-  it("maps a profiles query error to 'Could not load account context'", async () => {
+  it("maps a profiles query error to 'Não consegui carregar os dados da conta'", async () => {
     const { client } = makeClient({
       user: { id: "user-1" },
       byTable: {
@@ -121,11 +121,11 @@ describe("getCurrentAccount", () => {
     });
     createClient.mockReturnValue(client);
     await expect(getCurrentAccount()).rejects.toThrow(
-      "Could not load account context",
+      "Não consegui carregar os dados da conta",
     );
   });
 
-  it("maps an accounts query error to 'Could not load account context'", async () => {
+  it("maps an accounts query error to 'Não consegui carregar os dados da conta'", async () => {
     // The exact #294 shape if the embed were still in play, but now on
     // the decoupled accounts lookup: profile resolves, account read errors.
     const { client } = makeClient({
@@ -141,7 +141,7 @@ describe("getCurrentAccount", () => {
     createClient.mockReturnValue(client);
     const err = await getCurrentAccount().catch((e) => e);
     expect(err).toBeInstanceOf(ForbiddenError);
-    expect(err.message).toBe("Could not load account context");
+    expect(err.message).toBe("Não consegui carregar os dados da conta");
   });
 
   it("rejects a profile not linked to an account", async () => {
@@ -153,7 +153,7 @@ describe("getCurrentAccount", () => {
     });
     createClient.mockReturnValue(client);
     await expect(getCurrentAccount()).rejects.toThrow(
-      "Profile is not linked to an account",
+      "O perfil não está ligado a uma conta",
     );
   });
 
@@ -170,7 +170,7 @@ describe("getCurrentAccount", () => {
     });
     createClient.mockReturnValue(client);
     await expect(getCurrentAccount()).rejects.toThrow(
-      "Profile is not linked to an account",
+      "O perfil não está ligado a uma conta",
     );
   });
 });

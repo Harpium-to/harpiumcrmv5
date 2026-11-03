@@ -65,9 +65,9 @@ export async function exchangeCodeForToken(params: {
     code: params.code,
   })
   const res = await fetch(`${GRAPH}/oauth/access_token?${q.toString()}`)
-  if (!res.ok) throw new Error(`Token exchange failed: ${await graphError(res)}`)
+  if (!res.ok) throw new Error(`Falha na troca de token: ${await graphError(res)}`)
   const j = await res.json()
-  if (!j.access_token) throw new Error('Token exchange returned no access_token')
+  if (!j.access_token) throw new Error('A troca de token não devolveu access_token')
   return j.access_token as string
 }
 
@@ -85,7 +85,7 @@ export async function fetchPages(userToken: string): Promise<MetaPage[]> {
   // Follow paging.next so accounts with many Pages come through in full.
   while (url) {
     const res: Response = await fetch(url)
-    if (!res.ok) throw new Error(`Fetch pages failed: ${await graphError(res)}`)
+    if (!res.ok) throw new Error(`Falha ao buscar as páginas: ${await graphError(res)}`)
     const j = await res.json()
     for (const p of j.data ?? []) {
       if (p.id && p.access_token) {
@@ -130,6 +130,6 @@ export async function fetchLead(
   const res = await fetch(
     `${GRAPH}/${leadgenId}?fields=${fields}&access_token=${encodeURIComponent(pageToken)}`,
   )
-  if (!res.ok) throw new Error(`Fetch lead failed: ${await graphError(res)}`)
+  if (!res.ok) throw new Error(`Falha ao buscar o lead: ${await graphError(res)}`)
   return (await res.json()) as Record<string, unknown>
 }

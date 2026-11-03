@@ -109,7 +109,7 @@ export async function checkInstagramCreds(
   } catch (err) {
     return {
       ok: false,
-      detail: err instanceof Error ? err.message : 'network error',
+      detail: err instanceof Error ? err.message : 'erro de rede',
     }
   }
 }

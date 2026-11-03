@@ -29,7 +29,7 @@ export async function ensureImageHeaderHandle(
   const appId = process.env.META_APP_ID
   if (!appId) {
     throw new Error(
-      'Image-header templates need META_APP_ID set (used for Meta’s Resumable Upload). Add it to your environment, or remove the image header.',
+      'Modelos com imagem no cabeçalho precisam da variável META_APP_ID configurada. Adicione no ambiente ou remova a imagem do cabeçalho.',
     )
   }
 
@@ -39,20 +39,20 @@ export async function ensureImageHeaderHandle(
   try {
     res = await fetch(payload.header_media_url)
   } catch {
-    throw new Error('Could not fetch the header image URL. Make sure it is publicly reachable.')
+    throw new Error('Não consegui baixar a imagem do cabeçalho. Confira se a URL é pública.')
   }
   if (!res.ok) {
-    throw new Error(`Header image URL returned ${res.status}. It must be publicly reachable.`)
+    throw new Error(`A URL da imagem do cabeçalho respondeu ${res.status}. Ela precisa ser pública.`)
   }
 
   const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
   if (contentType && !ALLOWED_IMAGE_TYPES.includes(contentType)) {
-    throw new Error(`Header image must be JPEG or PNG (got ${contentType}).`)
+    throw new Error(`A imagem do cabeçalho precisa ser JPEG ou PNG (veio ${contentType}).`)
   }
 
   const bytes = new Uint8Array(await res.arrayBuffer())
   if (bytes.byteLength === 0) {
-    throw new Error('Header image is empty.')
+    throw new Error('A imagem do cabeçalho está vazia.')
   }
   if (bytes.byteLength > IMAGE_MAX_BYTES) {
     throw new Error(

@@ -32,7 +32,7 @@ const MAX_TASKS_PER_ACCOUNT = 5
 export async function GET(request: Request) {
   const expected = process.env.AUTOMATION_CRON_SECRET
   if (!expected) {
-    return NextResponse.json({ error: 'cron not configured' }, { status: 503 })
+    return NextResponse.json({ error: 'agendador não configurado' }, { status: 503 })
   }
   // Constant-time compare so an attacker who can reach the endpoint
   // can't recover the secret from response-time deltas. The length
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     suppliedBuf.length !== expectedBuf.length ||
     !timingSafeEqual(suppliedBuf, expectedBuf)
   ) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
   const db = supabaseAdmin()

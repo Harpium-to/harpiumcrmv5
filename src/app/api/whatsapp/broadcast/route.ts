@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
     // Per-user broadcast budget. Note: this limits how often a user
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     const accountId = profile?.account_id as string | undefined
     if (!accountId) {
       return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
+        { error: 'Seu perfil não está ligado a uma conta.' },
         { status: 403 },
       )
     }
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'Provide either `recipients` (preferred) or `phone_numbers` — must be a non-empty array',
+            'Informe `recipients` (de preferência) ou `phone_numbers` — precisa ser uma lista não vazia',
         },
         { status: 400 }
       )
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
 
     if (!template_name) {
       return NextResponse.json(
-        { error: 'template_name is required' },
+        { error: 'informe template_name' },
         { status: 400 }
       )
     }
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'WhatsApp not configured. Please set up your WhatsApp integration first.',
+            'WhatsApp não configurado. Configure a integração com o WhatsApp primeiro.',
         },
         { status: 400 }
       )
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'Template row is malformed locally — run "Sync from Meta" in Settings to repair it before broadcasting.',
+            'O modelo está corrompido aqui — use "Sincronizar com a Meta" em Configurações para corrigir antes de disparar.',
         },
         { status: 500 },
       )
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
         results.push({
           phone: recipient.phone,
           status: 'failed',
-          error: 'Invalid phone number format',
+          error: 'Formato de telefone inválido',
         })
         failedCount++
         continue
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
           break
         } catch (error) {
           const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error'
+            error instanceof Error ? error.message : 'Erro desconhecido'
           if (!isRecipientNotAllowedError(errorMessage)) {
             lastError = errorMessage
             break
@@ -240,7 +240,7 @@ export async function POST(request: Request) {
         results.push({
           phone: recipient.phone,
           status: 'failed',
-          error: lastError || 'Unknown error',
+          error: lastError || 'Erro desconhecido',
         })
         failedCount++
       }
@@ -256,7 +256,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error in WhatsApp broadcast POST:', error)
     return NextResponse.json(
-      { error: 'Failed to process broadcast' },
+      { error: 'Falha ao processar o disparo' },
       { status: 500 }
     )
   }

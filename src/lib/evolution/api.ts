@@ -33,7 +33,7 @@ export async function sendEvolutionText(
     } catch {
       /* keep status */
     }
-    throw new Error(`Evolution send failed: ${detail}`)
+    throw new Error(`Falha no envio pela Evolution: ${detail}`)
   }
   const j = await res.json().catch(() => ({}))
   const externalId =
@@ -53,6 +53,6 @@ export async function checkEvolutionInstance(
     if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` }
     return { ok: true }
   } catch (err) {
-    return { ok: false, detail: err instanceof Error ? err.message : 'network error' }
+    return { ok: false, detail: err instanceof Error ? err.message : 'erro de rede' }
   }
 }

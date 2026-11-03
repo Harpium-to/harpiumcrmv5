@@ -70,7 +70,7 @@ describe('ensureImageHeaderHandle', () => {
   it('rejects a non-image content type', async () => {
     vi.stubEnv('META_APP_ID', 'app-1');
     vi.stubGlobal('fetch', vi.fn(async () => imgResponse('text/html')));
-    await expect(ensureImageHeaderHandle(payload(), 'tok')).rejects.toThrow(/JPEG or PNG/);
+    await expect(ensureImageHeaderHandle(payload(), 'tok')).rejects.toThrow(/JPEG ou PNG/);
   });
 
   it('rejects an image over 5 MB', async () => {

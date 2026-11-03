@@ -126,7 +126,7 @@ export function parseContactPatch(body: Record<string, unknown>): ContactPatch {
     if (!(field in body)) continue;
     const value = body[field];
     if (value !== null && typeof value !== 'string') {
-      return { ok: false, message: `'${field}' must be a string or null` };
+      return { ok: false, message: `'${field}' precisa ser texto ou null` };
     }
     updates[field] = value;
   }
@@ -137,7 +137,7 @@ export function parseContactPatch(body: Record<string, unknown>): ContactPatch {
     if (!CONTACT_TEMPERATURES.includes(value as ContactTemperature)) {
       return {
         ok: false,
-        message: `'temperature' must be one of ${CONTACT_TEMPERATURES.join(', ')}`,
+        message: `'temperature' precisa ser um destes: ${CONTACT_TEMPERATURES.join(', ')}`,
       };
     }
     updates.temperature = value;
@@ -149,7 +149,7 @@ export function parseContactPatch(body: Record<string, unknown>): ContactPatch {
       value === null ||
       (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100);
     if (!valid) {
-      return { ok: false, message: `'potential' must be an integer from 0 to 100, or null` };
+      return { ok: false, message: `'potential' precisa ser um inteiro de 0 a 100, ou null` };
     }
     updates.potential = value;
   }
@@ -186,7 +186,7 @@ export async function resolveAuditUserId(
     .maybeSingle();
   const owner = account?.owner_user_id as string | undefined;
   if (!owner) {
-    throw new ContactError('Account owner could not be resolved', 500);
+    throw new ContactError('Não consegui identificar o dono da conta', 500);
   }
   return owner;
 }
@@ -213,7 +213,7 @@ export async function findOrCreateContact(
   const sanitized = sanitizePhoneForMeta(input.phone);
   if (!isValidE164(sanitized)) {
     throw new ContactError(
-      "'phone' must be a valid phone number in E.164 format (e.g. +14155550123)",
+      "'phone' precisa ser um telefone válido no formato E.164 (ex.: +5511999999999)",
       400
     );
   }
@@ -242,7 +242,7 @@ export async function findOrCreateContact(
       if (raced) return { id: raced.id, created: false };
     }
     console.error('[api/v1/contacts] create error:', error);
-    throw new ContactError('Failed to create contact', 500);
+    throw new ContactError('Falha ao criar o contato', 500);
   }
 
   return { id: created.id, created: true };
@@ -279,7 +279,7 @@ export async function setContactTags(
     .select('tag_id')
     .eq('contact_id', contactId);
   if (readErr) {
-    throw new ContactError('Failed to read contact tags', 500);
+    throw new ContactError('Falha ao ler as etiquetas do contato', 500);
   }
   const existing = new Set(
     (current ?? []).map((r) => r.tag_id as string)
@@ -294,13 +294,13 @@ export async function setContactTags(
       .delete()
       .eq('contact_id', contactId)
       .in('tag_id', toRemove);
-    if (error) throw new ContactError('Failed to update contact tags', 500);
+    if (error) throw new ContactError('Falha ao atualizar as etiquetas do contato', 500);
   }
   if (toAdd.length > 0) {
     const { error } = await db
       .from('contact_tags')
       .insert(toAdd.map((tag_id) => ({ contact_id: contactId, tag_id })));
-    if (error) throw new ContactError('Failed to update contact tags', 500);
+    if (error) throw new ContactError('Falha ao atualizar as etiquetas do contato', 500);
   }
 }
 

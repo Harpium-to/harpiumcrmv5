@@ -35,10 +35,10 @@ export async function POST(
     .maybeSingle()
   if (error) {
     console.error('[uazapi webhook] config lookup failed:', error.message)
-    return NextResponse.json({ error: 'server error' }, { status: 500 })
+    return NextResponse.json({ error: 'erro no servidor' }, { status: 500 })
   }
   if (!cfg) {
-    return NextResponse.json({ error: 'invalid token' }, { status: 404 })
+    return NextResponse.json({ error: 'token inválido' }, { status: 404 })
   }
 
   // Body token must match the instance we minted/stored, when both exist.
@@ -54,7 +54,7 @@ export async function POST(
         ? (payload as { token: string }).token
         : null
     if (expected && got && got !== expected) {
-      return NextResponse.json({ error: 'invalid token' }, { status: 404 })
+      return NextResponse.json({ error: 'token inválido' }, { status: 404 })
     }
   }
 
@@ -64,7 +64,7 @@ export async function POST(
     .eq('id', cfg.account_id)
     .maybeSingle()
   if (!account) {
-    return NextResponse.json({ error: 'server error' }, { status: 500 })
+    return NextResponse.json({ error: 'erro no servidor' }, { status: 500 })
   }
 
   const messages = parseUazapiInbound(payload)

@@ -35,13 +35,13 @@ export const dynamic = "force-dynamic";
 // unique URL, so the browser busts its aggressive favicon cache on change.
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getGlobalBranding();
-  const appName = brand.name || "wacrm";
+  const appName = brand.name || "CRM";
   return {
     title: {
       default: appName,
       template: `%s — ${appName}`,
     },
-    description: "Self-hostable CRM template for WhatsApp.",
+    description: "CRM para WhatsApp.",
     robots: {
       index: false,
       follow: false,

@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     if (status && !DEAL_STATUSES.includes(status as ApiDealStatus)) {
       return fail(
         'bad_request',
-        `'status' must be one of ${DEAL_STATUSES.join(', ')}`,
+        `'status' precisa ser um destes: ${DEAL_STATUSES.join(', ')}`,
         400
       );
     }
@@ -54,10 +54,10 @@ export async function GET(request: Request) {
     if (error) {
       // A malformed id filter is the caller's mistake, not ours.
       if (error.code === '22P02') {
-        return fail('bad_request', 'contact_id and pipeline_id must be ids', 400);
+        return fail('bad_request', 'contact_id e pipeline_id precisam ser IDs', 400);
       }
       console.error('[api/v1/deals] list error:', error);
-      return fail('internal', 'Failed to list deals', 500);
+      return fail('internal', 'Falha ao listar os negócios', 500);
     }
 
     const { items, nextCursor } = buildPage(

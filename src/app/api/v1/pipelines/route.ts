@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('[api/v1/pipelines] list error:', error);
-      return fail('internal', 'Failed to list pipelines', 500);
+      return fail('internal', 'Falha ao listar os funis', 500);
     }
 
     return ok(
