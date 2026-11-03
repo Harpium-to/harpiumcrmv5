@@ -14,6 +14,7 @@
  */
 
 export const THEME_IDS = [
+  "sand",
   "violet",
   "emerald",
   "cobalt",
@@ -23,9 +24,17 @@ export const THEME_IDS = [
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
-export const DEFAULT_THEME: ThemeId = "violet";
+export const DEFAULT_THEME: ThemeId = "sand";
 
-export const STORAGE_KEY = "wacrm.theme";
+/**
+ * Namespaced `v2` because the redesign re-scoped what an accent
+ * *means*: it now drives the neutral surfaces too, not just the
+ * primary colour. Anyone carrying a saved `wacrm.theme` from the old
+ * palette would otherwise open the new build pinned to Violet and
+ * never see the default skin. Bumping the key retires those values
+ * and lands everyone on Sand once; their next pick persists normally.
+ */
+export const STORAGE_KEY = "wacrm.theme.v2";
 
 /**
  * MODE — the light/dark dimension, orthogonal to the accent theme.
@@ -45,7 +54,7 @@ export type Mode = (typeof MODES)[number];
 
 export const DEFAULT_MODE: Mode = "dark";
 
-export const MODE_STORAGE_KEY = "wacrm.mode";
+export const MODE_STORAGE_KEY = "wacrm.mode.v2";
 
 export function isMode(value: unknown): value is Mode {
   return (
@@ -67,6 +76,12 @@ export interface ThemeMeta {
 }
 
 export const THEMES: ReadonlyArray<ThemeMeta> = [
+  {
+    id: "sand",
+    name: "Sand",
+    tagline: "O padrão — creme sobre espresso, tudo que está ligado fica quente.",
+    swatch: "oklch(0.93 0.035 88)",
+  },
   {
     id: "violet",
     name: "Violet",

@@ -169,7 +169,7 @@ export default async function AgenciaHomePage({
               <Link
                 key={a.id}
                 href={`/agencia/${a.id}`}
-                className="group flex flex-col justify-between rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50"
+                className="group fx-lift flex flex-col justify-between rounded-xl border border-border bg-card p-4"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
@@ -201,7 +201,7 @@ export default async function AgenciaHomePage({
 
 function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="fx-lift rounded-xl border border-border bg-card p-4">
       <p className="text-xl font-bold">{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
     </div>

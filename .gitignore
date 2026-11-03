@@ -42,3 +42,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# netlify
+.netlify
+
+# supabase cli (cache de versão local)
+supabase/.temp
+
+# claude code (preferências e permissões da máquina)
+.claude/settings.local.json
+
+# byproduto do bundle de edge functions do netlify
+deno.lock

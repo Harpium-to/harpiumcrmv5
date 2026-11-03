@@ -48,13 +48,19 @@
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
   --color-primary-soft-2: var(--primary-soft-2);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* The "appliance" surface pair — the tinted glass a card sits on
+   * when idle, and the lifted edge that separates it from the page.
+   * Used by the card/panel primitives so the whole app shares one
+   * depth model instead of each screen inventing its own. */
+  --color-surface: var(--surface);
+  --color-surface-edge: var(--surface-edge);
+  --radius-sm: calc(var(--radius) * 0.35);
+  --radius-md: calc(var(--radius) * 0.5);
+  --radius-lg: calc(var(--radius) * 0.7);
+  --radius-xl: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.25);
+  --radius-3xl: calc(var(--radius) * 1.5);
+  --radius-4xl: calc(var(--radius) * 1.8);
 }
 
 /* ============================================================
@@ -62,93 +68,124 @@
  *
  *   1. MODE   (light / dark)  → neutral surfaces. Selected with
  *      `document.documentElement.dataset.mode`. Defaults to dark.
- *   2. ACCENT (violet / …)    → the primary color only. Selected
- *      with `document.documentElement.dataset.theme`.
+ *   2. ACCENT (sand / …)      → the primary color, AND the
+ *      temperature of the neutrals. Selected with
+ *      `document.documentElement.dataset.theme`.
  *
- * The two compose: any accent works in either mode. Neutral
- * tokens (background / card / border / muted / sidebar surfaces /
- * neutral charts / radius) live in the MODE blocks below; accent
- * tokens (--primary*, --ring, --chart-1, --sidebar-primary*,
- * --sidebar-ring) live in the ACCENT blocks. They set disjoint
- * variables, so cascade order between them doesn't matter.
+ * The two compose: any accent works in either mode.
  *
- * `:root` carries the dark-mode + violet defaults so a visitor
+ * WHY THE NEUTRALS MOVED INTO THE ACCENT BLOCKS
+ *   They didn't — but their *hue* did. Each accent now publishes
+ *   `--nh` / `--nc` (neutral hue + chroma) and the MODE blocks
+ *   build every neutral surface from those. So picking Sand gives
+ *   you an espresso-brown workspace, Cobalt a cool slate one, and
+ *   nobody has to maintain six parallel sets of surface tokens.
+ *   This is what makes the accent read as a whole skin rather than
+ *   as a button colour sitting on an unrelated grey.
+ *
+ *   Custom properties resolve at use time, not declaration time, so
+ *   the MODE blocks may reference `--nh` even though the ACCENT
+ *   blocks come after them.
+ *
+ * `:root` carries the dark-mode + sand defaults so a visitor
  * renders correctly before JS runs; the boot script in
  * layout.tsx replays the saved mode + accent before first paint.
  *
  * The three `--primary-*` extras (hover / soft / soft-2) feed
- * hovered primary buttons and tinted-primary surfaces (sidebar
- * active pill, validation badges).
- *
- * Token shapes come straight from the design handoff at
- * project/Color Themes.html — change one, change the other.
+ * hovered primary buttons and tinted-primary surfaces (nav active
+ * pill, validation badges).
  * ============================================================ */
 
 /* ---- MODE: neutral surfaces ---- */
 
 :root,
 html[data-mode="dark"] {
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.18 0.01 260);
-  --card-2: oklch(0.205 0.01 260);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.18 0.01 260);
-  --popover-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.22 0.01 260);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.22 0.01 260);
-  --muted-foreground: oklch(0.65 0.01 260);
-  --accent: oklch(0.22 0.01 260);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.28 0.01 260);
-  --input: oklch(0.28 0.01 260);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.16 0.01 260);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.22 0.01 260);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.28 0.01 260);
+  --background: oklch(0.175 var(--nc) var(--nh));
+  --foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --card: oklch(0.235 var(--nc) var(--nh));
+  --card-2: oklch(0.275 var(--nc) var(--nh));
+  --card-foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --popover: oklch(0.235 var(--nc) var(--nh));
+  --popover-foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --secondary: oklch(0.275 var(--nc) var(--nh));
+  --secondary-foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --muted: oklch(0.265 var(--nc) var(--nh));
+  --muted-foreground: oklch(0.7 calc(var(--nc) * 1.1) var(--nh));
+  --accent: oklch(0.29 var(--nc) var(--nh));
+  --accent-foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --destructive: oklch(0.63 0.2 25);
+  --border: oklch(0.325 var(--nc) var(--nh));
+  --input: oklch(0.325 var(--nc) var(--nh));
+  --surface: oklch(0.235 var(--nc) var(--nh) / 0.72);
+  --surface-edge: oklch(0.99 0 0 / 0.07);
+  --chart-2: oklch(0.72 0.05 var(--nh));
+  --chart-3: oklch(0.6 0.04 var(--nh));
+  --chart-4: oklch(0.48 0.03 var(--nh));
+  --chart-5: oklch(0.37 0.02 var(--nh));
+  --radius: 1.15rem;
+  --sidebar: oklch(0.205 var(--nc) var(--nh));
+  --sidebar-foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --sidebar-accent: oklch(0.29 var(--nc) var(--nh));
+  --sidebar-accent-foreground: oklch(0.955 calc(var(--nc) * 0.9) var(--nh));
+  --sidebar-border: oklch(0.325 var(--nc) var(--nh));
 }
 
 html[data-mode="light"] {
-  --background: oklch(0.99 0.002 260);
-  --foreground: oklch(0.21 0.01 260);
-  --card: oklch(1 0 0);
-  --card-2: oklch(0.985 0.002 260);
-  --card-foreground: oklch(0.21 0.01 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.01 260);
-  --secondary: oklch(0.967 0.003 260);
-  --secondary-foreground: oklch(0.25 0.01 260);
-  --muted: oklch(0.967 0.003 260);
-  --muted-foreground: oklch(0.52 0.015 260);
-  --accent: oklch(0.96 0.004 260);
-  --accent-foreground: oklch(0.25 0.01 260);
+  --background: oklch(0.975 calc(var(--nc) * 0.5) var(--nh));
+  --foreground: oklch(0.255 calc(var(--nc) * 1.2) var(--nh));
+  --card: oklch(0.995 calc(var(--nc) * 0.25) var(--nh));
+  --card-2: oklch(0.955 calc(var(--nc) * 0.5) var(--nh));
+  --card-foreground: oklch(0.255 calc(var(--nc) * 1.2) var(--nh));
+  --popover: oklch(0.995 calc(var(--nc) * 0.25) var(--nh));
+  --popover-foreground: oklch(0.255 calc(var(--nc) * 1.2) var(--nh));
+  --secondary: oklch(0.945 calc(var(--nc) * 0.6) var(--nh));
+  --secondary-foreground: oklch(0.3 calc(var(--nc) * 1.2) var(--nh));
+  --muted: oklch(0.945 calc(var(--nc) * 0.6) var(--nh));
+  --muted-foreground: oklch(0.52 calc(var(--nc) * 1.4) var(--nh));
+  --accent: oklch(0.93 calc(var(--nc) * 0.8) var(--nh));
+  --accent-foreground: oklch(0.3 calc(var(--nc) * 1.2) var(--nh));
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0.004 260);
-  --input: oklch(0.922 0.004 260);
-  --chart-2: oklch(0.6 0.1 260);
-  --chart-3: oklch(0.7 0.06 260);
-  --chart-4: oklch(0.8 0.04 260);
-  --chart-5: oklch(0.87 0.03 260);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.002 260);
-  --sidebar-foreground: oklch(0.21 0.01 260);
-  --sidebar-accent: oklch(0.96 0.004 260);
-  --sidebar-accent-foreground: oklch(0.25 0.01 260);
-  --sidebar-border: oklch(0.922 0.004 260);
+  --border: oklch(0.9 calc(var(--nc) * 0.8) var(--nh));
+  --input: oklch(0.9 calc(var(--nc) * 0.8) var(--nh));
+  --surface: oklch(0.995 calc(var(--nc) * 0.25) var(--nh) / 0.8);
+  --surface-edge: oklch(0.2 0 0 / 0.06);
+  --chart-2: oklch(0.6 0.1 var(--nh));
+  --chart-3: oklch(0.7 0.06 var(--nh));
+  --chart-4: oklch(0.8 0.04 var(--nh));
+  --chart-5: oklch(0.87 0.03 var(--nh));
+  --radius: 1.15rem;
+  --sidebar: oklch(0.955 calc(var(--nc) * 0.5) var(--nh));
+  --sidebar-foreground: oklch(0.255 calc(var(--nc) * 1.2) var(--nh));
+  --sidebar-accent: oklch(0.93 calc(var(--nc) * 0.8) var(--nh));
+  --sidebar-accent-foreground: oklch(0.3 calc(var(--nc) * 1.2) var(--nh));
+  --sidebar-border: oklch(0.9 calc(var(--nc) * 0.8) var(--nh));
 }
 
-/* ---- ACCENT: primary color ---- */
+/* ---- ACCENT: primary color + neutral temperature ---- */
 
+/* Sand — the default. A near-white cream on espresso brown: the
+ * "lit appliance" look, where anything switched on goes warm and
+ * solid while everything idle recedes into the dark. Its primary is
+ * light, so --primary-foreground is the dark one. */
 :root,
+html[data-theme="sand"] {
+  --nh: 72;
+  --nc: 0.012;
+  --primary: oklch(0.93 0.035 88);
+  --primary-foreground: oklch(0.22 0.02 72);
+  --primary-hover: oklch(0.97 0.03 88);
+  --primary-soft: oklch(0.93 0.035 88 / 0.14);
+  --primary-soft-2: oklch(0.93 0.035 88 / 0.26);
+  --ring: oklch(0.93 0.035 88);
+  --chart-1: oklch(0.93 0.035 88);
+  --sidebar-primary: oklch(0.93 0.035 88);
+  --sidebar-primary-foreground: oklch(0.22 0.02 72);
+  --sidebar-ring: oklch(0.93 0.035 88);
+}
+
 html[data-theme="violet"] {
+  --nh: 293;
+  --nc: 0.009;
   --primary: oklch(0.526 0.247 293);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.6 0.22 293);
@@ -162,6 +199,8 @@ html[data-theme="violet"] {
 }
 
 html[data-theme="emerald"] {
+  --nh: 162;
+  --nc: 0.008;
   --primary: oklch(0.62 0.16 162);
   --primary-foreground: oklch(0.16 0.02 162);
   --primary-hover: oklch(0.68 0.15 162);
@@ -176,6 +215,8 @@ html[data-theme="emerald"] {
 }
 
 html[data-theme="cobalt"] {
+  --nh: 254;
+  --nc: 0.01;
   --primary: oklch(0.585 0.2 254);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.66 0.18 254);
@@ -190,6 +231,8 @@ html[data-theme="cobalt"] {
 }
 
 html[data-theme="amber"] {
+  --nh: 65;
+  --nc: 0.012;
   --primary: oklch(0.745 0.16 65);
   --primary-foreground: oklch(0.18 0.03 65);
   --primary-hover: oklch(0.8 0.15 65);
@@ -204,6 +247,8 @@ html[data-theme="amber"] {
 }
 
 html[data-theme="rose"] {
+  --nh: 16;
+  --nc: 0.009;
   --primary: oklch(0.645 0.22 16);
   --primary-foreground: oklch(0.985 0 0);
   --primary-hover: oklch(0.71 0.2 16);
@@ -226,5 +271,376 @@ html[data-theme="rose"] {
   }
   html {
     @apply font-sans;
+  }
+
+  /* Display type. The workspace headings are set large, tight and
+   * light — the number or the noun carries the screen, and the
+   * surrounding chrome stays quiet. Applied via `.display` so the
+   * scale lives in one place instead of per-page font-size soup. */
+  .display {
+    font-weight: 300;
+    letter-spacing: -0.045em;
+    line-height: 0.92;
+    font-size: clamp(2.5rem, 1.4rem + 4.2vw, 4.5rem);
+  }
+
+  .display-sm {
+    font-weight: 300;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    font-size: clamp(1.75rem, 1.1rem + 2.2vw, 2.75rem);
+  }
+
+  /* Eyebrow labels above a metric — the small-caps line that lets a
+   * big number sit on the page without a heavy heading over it. */
+  .eyebrow {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--muted-foreground);
+  }
+}
+
+/* ============================================================
+ * MOTION — the shared animation kit
+ *
+ * Every effect here is plain CSS driven by the accent tokens
+ * above, so motion follows the user's mode + accent for free and
+ * costs nothing on the bundle. That is deliberate: this is a CRM
+ * people keep open all day, so an animation runtime on every
+ * route (and GPU-pinning particle/WebGL backdrops) would be paid
+ * for continuously to decorate screens that are read, not
+ * watched.
+ *
+ * The components in components/ui/ supply only *timing* — Reveal
+ * waits for an element to scroll into view, AnimatedNumber
+ * counts. All the visuals live in this block.
+ *
+ * `--enter-delay` is the stagger knob: callers set it inline and
+ * the classes below read it, so one class drives a whole cascade.
+ *
+ * Durations stay in the 400–600ms band. Below ~300ms a reveal
+ * reads as a flicker; above ~700ms it delays someone who just
+ * wants to check a number.
+ * ============================================================ */
+
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* The VerticalCutReveal effect: a line climbs out from behind its
+ * own clipping box. The parent supplies `overflow: hidden`. */
+@keyframes fx-cut {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* Ambient backdrop. Scale + drift only — no opacity flicker, so it
+ * reads as depth rather than as a pulsing element competing with
+ * the content on top of it. */
+@keyframes fx-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -3%, 0) scale(1.12);
+  }
+}
+
+@keyframes fx-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* An agent that is mid-run. A ring breathes outward from the
+ * avatar — slow enough (2.4s) to read as "alive and thinking"
+ * rather than as an alert demanding a click. */
+@keyframes fx-halo {
+  0% {
+    box-shadow: 0 0 0 0 var(--primary-soft-2);
+  }
+  70% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* The three-dot "typing" tell on a working agent's status line. */
+@keyframes fx-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* A run row that just arrived over Realtime flashes its accent edge
+ * once, so a feed someone is watching shows what changed. */
+@keyframes fx-landed {
+  from {
+    background-color: var(--primary-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@layer components {
+  /* Scroll-in reveal. `Reveal` renders the element pending (hidden),
+   * then flips data-reveal to "shown" once it intersects. Kept as
+   * two states rather than toggling a class so the hidden style is
+   * impossible to apply without the observer that clears it. */
+  [data-reveal="pending"] {
+    opacity: 0;
+  }
+
+  [data-reveal="shown"] {
+    animation: fx-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+
+  /* Route-change enter. Applied in DashboardShell to a wrapper keyed
+   * on the pathname, so every route in the app inherits it without
+   * touching a single page file. */
+  .fx-page {
+    animation: fx-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .fx-cut-line {
+    display: inline-block;
+    animation: fx-cut 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+
+  /* Ambient accent wash. Sized/positioned by the caller; this only
+   * owns the paint. `--primary` keeps it on-brand across all six
+   * accents, and the low opacity keeps text contrast intact in
+   * light mode where the wash sits under dark type. */
+  .fx-glow {
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      var(--primary) 0%,
+      transparent 70%
+    );
+    opacity: 0.16;
+    filter: blur(64px);
+    animation: fx-drift 16s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  html[data-mode="light"] .fx-glow {
+    opacity: 0.1;
+  }
+
+  /* Loading shimmer for skeletons — a highlight sweeping across the
+   * muted surface, replacing a flat pulse. */
+  .fx-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      var(--card-2) 40%,
+      var(--muted) 80%
+    );
+    background-size: 200% 100%;
+    animation: fx-shimmer 1.6s linear infinite;
+  }
+
+  /* Card hover lift. Border warms to the accent and the surface
+   * rises a hair — the whole interactive affordance in one class. */
+  .fx-lift {
+    transition:
+      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .fx-lift:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-soft-2);
+    box-shadow: 0 8px 24px -12px var(--primary-soft-2);
+  }
+
+  .fx-halo {
+    animation: fx-halo 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+
+  .fx-blink > * {
+    animation: fx-blink 1.4s ease-in-out infinite;
+  }
+
+  .fx-blink > *:nth-child(2) {
+    animation-delay: 0.18s;
+  }
+
+  .fx-blink > *:nth-child(3) {
+    animation-delay: 0.36s;
+  }
+
+  .fx-landed {
+    animation: fx-landed 1.6s ease-out both;
+  }
+
+  /* ----------------------------------------------------------
+   * SURFACES — the two states every panel in the app can be in.
+   *
+   * `.surface` is the idle state: tinted glass that lets the warm
+   * page bleed through, edged with a one-pixel highlight rather
+   * than a drawn border. `.surface-on` is the switched-on state:
+   * opaque accent, dark type, a soft bloom underneath. The pair is
+   * the whole visual grammar — a channel that is connected, an
+   * agent that is enabled and a filter that is selected all use
+   * the same two classes, so "on" means one thing everywhere.
+   * ---------------------------------------------------------- */
+  .surface {
+    background-color: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--surface-edge);
+  }
+
+  /* The blur is opt-in, not part of `.surface`.
+   *
+   * `.surface` is what every Card in the app resolves to, and a busy
+   * screen (the inbox, a pipeline board) paints dozens of them. Each
+   * `backdrop-filter` forces its own offscreen composite of whatever
+   * is behind it, so putting the blur in the base class would cost a
+   * full-screen readback per card to blur a backdrop that is, for a
+   * card sitting flat on the page, almost entirely one flat colour.
+   *
+   * Where it earns its keep is the chrome that genuinely floats over
+   * moving content — the rail, the top bar, the pill track. Those are
+   * three elements, they never scroll, and the blur is the whole
+   * reason they read as hovering rather than as cut-out boxes. */
+  .surface-blur {
+    backdrop-filter: blur(20px);
+  }
+
+  .surface-on {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow:
+      inset 0 0 0 1px oklch(1 0 0 / 0.1),
+      0 12px 36px -18px var(--primary);
+  }
+
+  /* The floating segmented control in the top bar, and the filter
+   * row under a page heading. One class for the track, one for the
+   * items; `data-active` (not a class) marks the selection so the
+   * markup stays declarative. */
+  .pill-track {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 9999px;
+    padding: 0.3rem;
+    background-color: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--surface-edge);
+    backdrop-filter: blur(20px);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    border-radius: 9999px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    transition:
+      color 0.2s ease,
+      background-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .pill:hover {
+    color: var(--foreground);
+  }
+
+  .pill[data-active="true"] {
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px var(--primary-soft-2);
+    background-color: var(--primary-soft);
+  }
+
+  /* Standalone (un-tracked) filter chip — the "Todos / Luzes / Ar"
+   * row. Same selection language as `.pill`, but carries its own
+   * edge because there is no track behind it. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    border-radius: 9999px;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    background-color: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--surface-edge);
+    transition:
+      color 0.2s ease,
+      background-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .chip:hover {
+    color: var(--foreground);
+  }
+
+  .chip[data-active="true"] {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.12);
+  }
+}
+
+/* Motion sensitivity is a real accessibility need, and a reveal that
+ * blurs + translates is exactly the kind of thing that triggers it.
+ * Everything collapses to its resting state: content still appears,
+ * it just stops moving. The `opacity: 1` is load-bearing — without
+ * it the pending state above would leave elements invisible. */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  .fx-page,
+  .fx-cut-line,
+  .fx-glow,
+  .fx-shimmer,
+  .fx-halo,
+  .fx-blink > *,
+  .fx-landed {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .fx-glow {
+    opacity: 0.12 !important;
+  }
+
+  .fx-lift {
+    transition: border-color 0.25s ease;
+  }
+
+  .fx-lift:hover {
+    transform: none;
   }
 }

@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
+import { Rail } from "@/components/layout/rail";
+import { TopBar } from "@/components/layout/topbar";
+import { PageTransition } from "@/components/layout/page-transition";
+import { Glow } from "@/components/ui/glow";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 
 // Auth-gated dashboard shell. Extracted from the layout so the layout
@@ -15,10 +17,10 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // Sidebar drawer state — only used on mobile. On lg+ the sidebar is
-  // always visible and this stays at `false` (ignored by the component).
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  // Nav drawer state — only used on mobile. On lg+ the rail is always
+  // visible and this stays at `false` (ignored by the component).
+  const [navOpen, setNavOpen] = useState(false);
+  const closeNav = useCallback(() => setNavOpen(false), []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -30,8 +32,8 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Carregando...</p>
         </div>
       </div>
     );
@@ -40,15 +42,34 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    // One scroll container for the whole workspace. The rail floats
+    // over it and the top bar sticks to it, so there is no nested
+    // scroll region and no bordered frame — just the warm plane with
+    // the chrome resting on top.
+    <div className="relative isolate h-screen overflow-y-auto bg-background">
       {/* Reports this tab's online/away presence once we know a user is
           signed in. Headless — renders nothing. */}
       <PresenceHeartbeat />
-      <Sidebar open={sidebarOpen} onClose={closeSidebar} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onOpenSidebar={() => setSidebarOpen(true)} />
-        {/* Thinner horizontal padding on mobile so cards have room to breathe. */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+
+      {/* Ambient backdrop. `fixed` so it stays put while content
+          scrolls past it, which is what makes it read as the room the
+          workspace sits in rather than as an element on the page. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <Glow className="-top-40 left-1/2 h-[34rem] w-[52rem] -translate-x-1/2" />
+        <Glow className="right-[-10rem] bottom-[-12rem] h-[26rem] w-[26rem]" />
+      </div>
+
+      <Rail open={navOpen} onClose={closeNav} />
+
+      {/* The left padding is the rail's gutter: it only exists on lg+,
+          where the rail is actually there to clear. */}
+      <div className="lg:pl-[5.25rem]">
+        <TopBar onOpenNav={() => setNavOpen(true)} />
+        <main className="px-3 pt-2 pb-10 sm:px-4 sm:pb-14">
+          {/* This one wrapper is what gives all ~20 dashboard routes
+              an enter animation, with none of them opting in. */}
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );

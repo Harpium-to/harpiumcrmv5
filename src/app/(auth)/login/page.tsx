@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { TextReveal } from "@/components/ui/text-reveal";
 import { MessageSquare, UsersRound } from "lucide-react";
 
 // `useSearchParams` opts the component out of static prerendering
@@ -74,8 +75,8 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-border bg-card">
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <Card className="fx-page w-full max-w-md border-border bg-card">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
             {inviteToken ? (
@@ -85,7 +86,9 @@ function LoginPageInner() {
             )}
           </div>
           <CardTitle className="text-xl text-foreground">
-            {inviteToken ? t('titleAccept') : t('titleWelcome')}
+            <TextReveal delay={120}>
+              {inviteToken ? t('titleAccept') : t('titleWelcome')}
+            </TextReveal>
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             {inviteToken

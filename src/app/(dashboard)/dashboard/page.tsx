@@ -26,13 +26,16 @@ import type {
   ResponseTimeSummary,
 } from '@/lib/dashboard/types'
 
+import { Reveal } from '@/components/ui/reveal'
+import { DisplayHeading } from '@/components/ui/display-heading'
 import { MetricCard } from '@/components/dashboard/metric-card'
-import { SkeletonCard } from '@/components/dashboard/skeleton'
+import { SkeletonStat } from '@/components/dashboard/skeleton'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { OperationTimeline } from '@/components/dashboard/operation-timeline'
 
 import { useTranslations } from 'next-intl'
 
@@ -122,74 +125,90 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('description')}
-        </p>
-      </div>
-
-      {/* Metric cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-8">
+      {/* The screen opens as one statement: the oversized heading and
+          the figures that qualify it share a baseline, so the top of
+          the page reads left-to-right instead of as a title stacked
+          on a row of boxes. */}
+      <DisplayHeading title={t('title')} subtitle={t('titleLine2')}>
         {metricsLoading || !metrics ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+          Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
         ) : (
           <>
-            <MetricCard
-              title={t('activeConversations')}
-              value={metrics.activeConversations.current.toLocaleString()}
-              icon={MessageSquare}
-              delta={{
-                sign: metrics.activeConversations.previous,
-                label: deltaLabel(
-                  metrics.activeConversations.previous, 
-                  t('newTodayVsYesterday'), 
-                  t('noChange', { suffix: t('newTodayVsYesterday') })
-                ),
-              }}
-            />
-            <MetricCard
-              title={t('newContactsToday')}
-              value={metrics.newContactsToday.current.toLocaleString()}
-              icon={UserPlus}
-              delta={{
-                sign:
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                label: deltaLabel(
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
-            />
-            <MetricCard
-              title={t('openDealsValue')}
-              value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
-              icon={DollarSign}
-              subtitle={t('openDeals', { count: metrics.openDealsCount })}
-            />
-            <MetricCard
-              title={t('messagesSentToday')}
-              value={metrics.messagesSentToday.current.toLocaleString()}
-              icon={Send}
-              delta={{
-                sign:
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                label: deltaLabel(
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
-            />
+            {/* `index` staggers the figures into a cascade rather than
+                having them all land at once. Values are passed raw so
+                each one can count up to its number. */}
+            <Reveal index={0}>
+              <MetricCard
+                title={t('activeConversations')}
+                value={metrics.activeConversations.current}
+                icon={MessageSquare}
+                delta={{
+                  sign: metrics.activeConversations.previous,
+                  label: deltaLabel(
+                    metrics.activeConversations.previous,
+                    t('newTodayVsYesterday'),
+                    t('noChange', { suffix: t('newTodayVsYesterday') })
+                  ),
+                }}
+              />
+            </Reveal>
+            <Reveal index={1}>
+              <MetricCard
+                title={t('newContactsToday')}
+                value={metrics.newContactsToday.current}
+                icon={UserPlus}
+                delta={{
+                  sign:
+                    metrics.newContactsToday.current - metrics.newContactsToday.previous,
+                  label: deltaLabel(
+                    metrics.newContactsToday.current - metrics.newContactsToday.previous,
+                    t('vsYesterday'),
+                    t('noChange', { suffix: t('vsYesterday') })
+                  ),
+                }}
+              />
+            </Reveal>
+            <Reveal index={2}>
+              <MetricCard
+                title={t('openDealsValue')}
+                value={metrics.openDealsValue}
+                format={(n) => formatCurrency(n, defaultCurrency)}
+                icon={DollarSign}
+                subtitle={t('openDeals', { count: metrics.openDealsCount })}
+              />
+            </Reveal>
+            <Reveal index={3}>
+              <MetricCard
+                title={t('messagesSentToday')}
+                value={metrics.messagesSentToday.current}
+                icon={Send}
+                delta={{
+                  sign:
+                    metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
+                  label: deltaLabel(
+                    metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
+                    t('vsYesterday'),
+                    t('noChange', { suffix: t('vsYesterday') })
+                  ),
+                }}
+              />
+            </Reveal>
           </>
         )}
-      </div>
+      </DisplayHeading>
 
       {/* Quick actions */}
-      <QuickActions />
+      <Reveal>
+        <QuickActions />
+      </Reveal>
+
+      {/* What the agents are doing right now. Sits above the charts
+          because it is the only thing on this page that changes while
+          you are looking at it. */}
+      <Reveal>
+        <OperationTimeline />
+      </Reveal>
 
       {/* Charts row */}
       {/* items-stretch (the grid default) stretches the two columns to
@@ -199,28 +218,32 @@ export default function DashboardPage() {
           this, the pipeline card rendered at its natural (shorter)
           height while the line chart drove the row height. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="h-full lg:col-span-3">
+        <Reveal index={0} className="h-full lg:col-span-3">
           <ConversationsChart
             series={series}
             loading={seriesLoading}
             range={range}
             onRangeChange={handleRangeChange}
           />
-        </div>
-        <div className="h-full lg:col-span-2">
+        </Reveal>
+        <Reveal index={1} className="h-full lg:col-span-2">
           <PipelineDonut
             data={pipeline}
             loading={pipelineLoading}
             currency={defaultCurrency}
           />
-        </div>
+        </Reveal>
       </div>
 
       {/* Response time */}
-      <ResponseTimeChart data={responseTime} loading={responseTimeLoading} />
+      <Reveal>
+        <ResponseTimeChart data={responseTime} loading={responseTimeLoading} />
+      </Reveal>
 
       {/* Activity feed */}
-      <ActivityFeed items={activity} loading={activityLoading} />
+      <Reveal>
+        <ActivityFeed items={activity} loading={activityLoading} />
+      </Reveal>
     </div>
   )
 }

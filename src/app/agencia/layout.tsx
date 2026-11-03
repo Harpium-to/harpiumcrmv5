@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { Building2 } from 'lucide-react'
 
 import { loadAgencia } from '@/lib/agencia/guard'
+import { PageTransition } from '@/components/layout/page-transition'
+import { Glow } from '@/components/ui/glow'
 
 // Noindex, like the dashboard layout — the agency console is a
 // privileged internal surface and must never be crawled.
@@ -66,7 +68,14 @@ export default async function AgenciaLayout({
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
+      {/* `isolate` keeps the glow's negative z-index inside this box, so
+          it paints over the page background but under the console. */}
+      <div className="relative isolate overflow-hidden">
+        <Glow className="-top-24 left-1/2 h-[26rem] w-[42rem] -translate-x-1/2" />
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          <PageTransition>{children}</PageTransition>
+        </main>
+      </div>
     </div>
   )
 }

@@ -12,6 +12,8 @@ import {
 } from '@/lib/whatsapp/send-message'
 import { getEvolutionConfig, isEvolutionReady } from '@/lib/evolution/config'
 import { sendEvolutionToConversation } from '@/lib/evolution/send'
+import { getUazapiConfig, isUazapiReady } from '@/lib/uazapi/config'
+import { sendUazapiToConversation } from '@/lib/uazapi/send'
 
 // The dashboard's outbound-send endpoint. It owns auth, per-user rate
 // limiting, and the two ways the UI targets a thread — an existing
@@ -167,6 +169,46 @@ export async function POST(request: Request) {
         { error: 'Conversation not found' },
         { status: 404 }
       )
+    }
+
+    // Channel routing. An account can have more than one unofficial
+    // channel configured; UAZAPI is checked first because it is the one
+    // an operator pairs from inside the app, so an enabled UAZAPI
+    // instance is the more deliberate choice. Text only, same as
+    // Evolution: other types error rather than silently falling back to
+    // Meta (which may not even be configured).
+    const uazCfg = await getUazapiConfig(supabase, accountId)
+    if (isUazapiReady(uazCfg)) {
+      if (message_type !== 'text' || !content_text) {
+        return NextResponse.json(
+          {
+            error:
+              'O canal UAZAPI suporta apenas mensagens de texto por enquanto.',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const result = await sendUazapiToConversation(
+          supabase,
+          accountId,
+          conversationId,
+          content_text
+        )
+        return NextResponse.json({
+          success: true,
+          message_id: result.messageId,
+          whatsapp_message_id: result.externalId,
+        })
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error ? err.message : 'Falha ao enviar pelo UAZAPI',
+          },
+          { status: 500 }
+        )
+      }
     }
 
     // Channel routing: if this account has an enabled Evolution instance,

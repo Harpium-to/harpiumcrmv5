@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Vendored minified opus-recorder encoder worker (served statically).
     "public/opus/**",
+    // Netlify adapter build output (functions, edge functions, bundled
+    // static assets). Generated on every deploy, never hand-edited.
+    ".netlify/**",
   ]),
 ]);
 
