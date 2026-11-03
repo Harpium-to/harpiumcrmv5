@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Copy, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Copy, KeyRound, Loader2, Plus, Puzzle, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -153,6 +153,15 @@ export function ApiKeysSettings() {
           </RequireRole>
         }
       />
+
+      {/* The Chrome extension is the one consumer of these keys that
+          ships with the product, and nothing else in the app mentions
+          it exists. A key generated here is what connects it. */}
+      <div className="surface flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl px-4 py-3">
+        <Puzzle className="size-4 shrink-0 text-muted-foreground" />
+        <p className="text-sm text-foreground">{t('extensionTitle')}</p>
+        <p className="text-xs text-muted-foreground">{t('extensionHint')}</p>
+      </div>
 
       {keys.length === 0 ? (
         <Card>

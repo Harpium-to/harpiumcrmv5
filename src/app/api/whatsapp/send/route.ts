@@ -13,6 +13,7 @@ import {
 import { getEvolutionConfig, isEvolutionReady } from '@/lib/evolution/config'
 import { sendEvolutionToConversation } from '@/lib/evolution/send'
 import { getUazapiConfig, isUazapiReady } from '@/lib/uazapi/config'
+import { sendInstagramToConversation } from '@/lib/instagram/send'
 import { sendUazapiToConversation } from '@/lib/uazapi/send'
 
 // The dashboard's outbound-send endpoint. It owns auth, per-user rate
@@ -169,6 +170,55 @@ export async function POST(request: Request) {
         { error: 'Conversation not found' },
         { status: 404 }
       )
+    }
+
+    // Instagram first, and on a different basis from everything below
+    // it: the WhatsApp channels are interchangeable, so the account's
+    // enabled provider decides between them, but Instagram is a
+    // different door. Which door a reply leaves by is a property of the
+    // *thread*, not of the account — answering an Instagram DM over
+    // WhatsApp is not a degraded send, it is a message to a stranger's
+    // phone. So this reads the conversation's channel.
+    const { data: convChannel } = await supabase
+      .from('conversations')
+      .select('channel')
+      .eq('id', conversationId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+
+    if (convChannel?.channel === 'instagram') {
+      if (message_type !== 'text' || !content_text) {
+        return NextResponse.json(
+          {
+            error:
+              'O canal Instagram suporta apenas mensagens de texto por enquanto.',
+          },
+          { status: 400 }
+        )
+      }
+      try {
+        const result = await sendInstagramToConversation(
+          supabase,
+          accountId,
+          conversationId,
+          content_text
+        )
+        return NextResponse.json({
+          success: true,
+          message_id: result.messageId,
+          whatsapp_message_id: result.externalId,
+        })
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error:
+              err instanceof Error
+                ? err.message
+                : 'Falha ao enviar pelo Instagram',
+          },
+          { status: 500 }
+        )
+      }
     }
 
     // Channel routing. An account can have more than one unofficial

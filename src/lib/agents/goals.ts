@@ -22,6 +22,30 @@
 
 export type GoalPeriod = 'day' | 'week' | 'month'
 
+/**
+ * Where the *actual* for a target is counted from.
+ *
+ * `null` means the schema has nothing to count. Three of the metrics
+ * below are in that state: there is no meetings table, no proposals
+ * table, and `deals` carries no AI-agent attribution (only
+ * `assigned_to`, which is a person). An operator can still set those
+ * targets — the agent is told them and paces itself by them — but the
+ * report has to say "sem fonte de medição" rather than render 0%.
+ *
+ * Showing 0% would be the worse bug of the two: it reads as an agent
+ * failing completely, and somebody would switch off an agent that is
+ * working fine. A metric with no source is a gap in the product, not a
+ * gap in the agent's performance, and the two must not look alike.
+ */
+export type GoalSource =
+  /** Runs this agent closed with a given outcome. */
+  | { from: 'agent_runs'; status: 'replied' | 'handoff' }
+  /** Queue tasks of a kind this agent completed. */
+  | { from: 'agent_tasks'; kind: string }
+  /** Contacts whose `owner_agent_id` is this agent. */
+  | { from: 'contacts_owned' }
+  | null
+
 export interface AgentGoalMetric {
   /** Key inside `agents.goals`. */
   id: string
@@ -32,6 +56,8 @@ export interface AgentGoalMetric {
   noun: string
   /** Starting value when an operator adds this metric. */
   suggested: number
+  /** How the report measures it, or null when it cannot. */
+  source: GoalSource
 }
 
 export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
@@ -41,6 +67,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'day',
     noun: 'leads novos',
     suggested: 20,
+    source: { from: 'contacts_owned' },
   },
   {
     id: 'briefings_per_day',
@@ -48,6 +75,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'day',
     noun: 'briefings de pesquisa',
     suggested: 20,
+    source: { from: 'agent_tasks', kind: 'research' },
   },
   {
     id: 'conversations_per_day',
@@ -55,6 +83,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'day',
     noun: 'conversas atendidas',
     suggested: 15,
+    source: { from: 'agent_runs', status: 'replied' },
   },
   {
     id: 'reviews_per_day',
@@ -62,6 +91,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'day',
     noun: 'análises da operação',
     suggested: 1,
+    source: { from: 'agent_tasks', kind: 'qualify' },
   },
   {
     id: 'meetings_per_week',
@@ -69,6 +99,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'week',
     noun: 'reuniões agendadas',
     suggested: 5,
+    source: null, // sem tabela de agenda
   },
   {
     id: 'recovered_per_week',
@@ -76,6 +107,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'week',
     noun: 'conversas retomadas',
     suggested: 5,
+    source: { from: 'agent_tasks', kind: 'followup' },
   },
   {
     id: 'proposals_per_week',
@@ -83,6 +115,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'week',
     noun: 'propostas enviadas',
     suggested: 8,
+    source: null, // sem tabela de propostas
   },
   {
     id: 'checkins_per_week',
@@ -90,6 +123,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'week',
     noun: 'check-ins com clientes',
     suggested: 20,
+    source: { from: 'agent_tasks', kind: 'onboard' },
   },
   {
     id: 'closes_per_month',
@@ -97,6 +131,7 @@ export const AGENT_GOAL_METRICS: AgentGoalMetric[] = [
     period: 'month',
     noun: 'negócios fechados',
     suggested: 10,
+    source: null, // deals não tem atribuição a agente IA
   },
 ]
 

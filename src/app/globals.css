@@ -118,6 +118,40 @@ html[data-mode="dark"] {
   --input: oklch(0.325 var(--nc) var(--nh));
   --surface: oklch(0.235 var(--nc) var(--nh) / 0.72);
   --surface-edge: oklch(0.99 0 0 / 0.07);
+
+  /* ---- Data-viz marks ----------------------------------------
+   * Fixed hexes, not derived from the accent, and that is
+   * deliberate. The accent is tuned for chrome: `sand` is
+   * oklch(0.93 0.035 88), a cream that works as a button with dark
+   * text on it and vanishes as a 7px bar on a near-white card. A
+   * chart mark has requirements the accent cannot be asked to meet
+   * across six accents and two modes — >=3:1 against the surface it
+   * sits on, chroma above the gray threshold, and enough separation
+   * between two series to survive colour-blindness.
+   *
+   * So these are validated against this project's own card colours
+   * (#221d18 dark, #fffdfb light) rather than assumed:
+   *   series-1 / series-2  categorical identity (two unrelated
+   *                        series, e.g. messages in vs out)
+   *   pos / neg            polarity (won vs lost). NOT green/red:
+   *                        that pair measures ΔE 4.1 under
+   *                        deuteranopia, and inside a stacked bar
+   *                        there is no room for the icon+label that
+   *                        normally rescues a status colour, so for
+   *                        ~8% of men the chart would carry no
+   *                        information at all. Blue↔red is the
+   *                        warm/cool pair that survives it (ΔE 23.8
+   *                        light / 19.2 dark).
+   * Steps per mode, not one set flipped: the dark values are their
+   * own steps chosen for the dark band.
+   * ------------------------------------------------------------ */
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-pos: #3987e5;
+  --viz-neg: #e66767;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #898781;
+
   --chart-2: oklch(0.72 0.05 var(--nh));
   --chart-3: oklch(0.6 0.04 var(--nh));
   --chart-4: oklch(0.48 0.03 var(--nh));
@@ -149,6 +183,15 @@ html[data-mode="light"] {
   --input: oklch(0.9 calc(var(--nc) * 0.8) var(--nh));
   --surface: oklch(0.995 calc(var(--nc) * 0.25) var(--nh) / 0.8);
   --surface-edge: oklch(0.2 0 0 / 0.06);
+
+  /* Light-mode steps for the same roles — see the note above. */
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-pos: #2a78d6;
+  --viz-neg: #d03b3b;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #898781;
+
   --chart-2: oklch(0.6 0.1 var(--nh));
   --chart-3: oklch(0.7 0.06 var(--nh));
   --chart-4: oklch(0.8 0.04 var(--nh));
@@ -642,5 +685,90 @@ html[data-theme="rose"] {
 
   .fx-lift:hover {
     transform: none;
+  }
+}
+
+/* ============================================================
+ * PRINT — the "exportar PDF" path.
+ *
+ * There is no PDF library here on purpose: the browser's own print
+ * pipeline produces a real, selectable, correctly-paginated PDF from
+ * the page already on screen, and adding a renderer would mean
+ * maintaining a second layout that drifts from the first one.
+ *
+ * Two things have to be forced.
+ *
+ * Colours: the app is dark by default, and a dark page sent to a
+ * printer is either a solid page of ink or white text on white paper.
+ * So print re-stamps the neutral tokens light, whatever mode the
+ * viewer is in, while keeping the data-mark hues — those are the only
+ * colour that carries meaning.
+ *
+ * Backgrounds: browsers drop background colours when printing unless
+ * told otherwise, which would erase every bar on the page and leave
+ * the axes. `print-color-adjust: exact` keeps them.
+ * ============================================================ */
+@media print {
+  :root,
+  html[data-mode="dark"],
+  html[data-mode="light"] {
+    --background: #ffffff;
+    --foreground: #16150f;
+    --card: #ffffff;
+    --card-2: #f6f5f1;
+    --card-foreground: #16150f;
+    --muted: #f2f1ec;
+    --muted-foreground: #55534c;
+    --border: #d6d4cc;
+    --surface: #ffffff;
+    --surface-edge: #d6d4cc;
+    --viz-grid: #e1e0d9;
+    --viz-axis: #55534c;
+    --viz-series-1: #2a78d6;
+    --viz-series-2: #eb6834;
+    --viz-pos: #2a78d6;
+    --viz-neg: #d03b3b;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Navigation, backdrops and the controls that only make sense on a
+     screen. A printed page has no filter chips to click. */
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  /* The rail gutter and the floating-bar offset are screen layout. */
+  [data-print="flatten"] {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .surface {
+    box-shadow: inset 0 0 0 1px var(--surface-edge) !important;
+  }
+
+  .surface-blur {
+    backdrop-filter: none !important;
+  }
+
+  /* Keep a card and its chart on one sheet. */
+  section {
+    break-inside: avoid;
+  }
+
+  /* Entrance animations have nothing to do on paper, and an element
+     mid-fade prints at whatever opacity it was caught at. */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
   }
 }

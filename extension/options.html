@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CRM Connector</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0 auto;
+        padding: 32px 24px;
+        max-width: 520px;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      h1 { font-size: 19px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 24px; opacity: 0.7; }
+      label { display: block; font-weight: 600; margin: 16px 0 6px; }
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 9px 11px;
+        border: 1px solid rgba(128, 128, 128, 0.4);
+        border-radius: 8px;
+        font: inherit;
+      }
+      small { display: block; margin-top: 6px; opacity: 0.7; }
+      button {
+        margin-top: 24px;
+        padding: 9px 18px;
+        border: 0;
+        border-radius: 999px;
+        background: #00a884;
+        color: #fff;
+        font: inherit;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      #status { margin-top: 14px; min-height: 20px; }
+      .ok { color: #0ca30c; }
+      .bad { color: #d03b3b; }
+    </style>
+  </head>
+  <body>
+    <h1>CRM Connector</h1>
+    <p class="sub">
+      Liga o WhatsApp Web ao seu CRM. A chave fica guardada só neste
+      navegador e nunca entra na página do WhatsApp.
+    </p>
+
+    <label for="baseUrl">Endereço do CRM</label>
+    <input id="baseUrl" type="url" placeholder="https://seu-crm.com.br" />
+    <small>Sem barra no fim e sem /api.</small>
+
+    <label for="apiKey">Chave de API</label>
+    <input id="apiKey" type="password" placeholder="Cole a chave gerada no CRM" />
+    <small>
+      Gere em Configurações &rsaquo; API. Precisa dos escopos
+      <code>contacts:read</code> e <code>contacts:write</code>.
+    </small>
+
+    <button id="save">Salvar e testar</button>
+    <p id="status"></p>
+
+    <script src="options.js"></script>
+  </body>
+</html>

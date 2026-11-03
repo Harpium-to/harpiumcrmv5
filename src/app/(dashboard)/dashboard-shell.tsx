@@ -54,18 +54,28 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       {/* Ambient backdrop. `fixed` so it stays put while content
           scrolls past it, which is what makes it read as the room the
           workspace sits in rather than as an element on the page. */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+      <div
+        aria-hidden
+        data-print="hide"
+        className="pointer-events-none fixed inset-0 -z-10"
+      >
         <Glow className="-top-40 left-1/2 h-[34rem] w-[52rem] -translate-x-1/2" />
         <Glow className="right-[-10rem] bottom-[-12rem] h-[26rem] w-[26rem]" />
       </div>
 
-      <Rail open={navOpen} onClose={closeNav} />
+      {/* The rail and the top bar are screen navigation; print drops
+          them (see the @media print block in globals.css). */}
+      <div data-print="hide">
+        <Rail open={navOpen} onClose={closeNav} />
+      </div>
 
       {/* The left padding is the rail's gutter: it only exists on lg+,
           where the rail is actually there to clear. */}
-      <div className="lg:pl-[5.25rem]">
-        <TopBar onOpenNav={() => setNavOpen(true)} />
-        <main className="px-3 pt-2 pb-10 sm:px-4 sm:pb-14">
+      <div className="lg:pl-[5.25rem]" data-print="flatten">
+        <div data-print="hide">
+          <TopBar onOpenNav={() => setNavOpen(true)} />
+        </div>
+        <main className="px-3 pt-2 pb-10 sm:px-4 sm:pb-14" data-print="flatten">
           {/* This one wrapper is what gives all ~20 dashboard routes
               an enter animation, with none of them opting in. */}
           <PageTransition>{children}</PageTransition>

@@ -17,7 +17,7 @@ import {
   type StartRunArgs,
 } from '@/lib/agents/runtime'
 import type { Agent } from '@/lib/agents/types'
-import { engineSendText } from '@/lib/flows/meta-send'
+import { sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 interface DispatchArgs {
@@ -327,7 +327,7 @@ export async function dispatchInboundToAiReply(
         return
       }
 
-      await engineSendText({
+      await sendChannelText({
         accountId,
         userId: configOwnerUserId,
         conversationId,

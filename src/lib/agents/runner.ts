@@ -5,7 +5,7 @@ import { loadAiConfig } from '@/lib/ai/config'
 import { generateReply } from '@/lib/ai/generate'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { logAiUsage } from '@/lib/ai/usage'
-import { engineSendText } from '@/lib/flows/meta-send'
+import { sendChannelText } from '@/lib/channels/send-text'
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation'
 import type { AiConfig, AiUsage } from '@/lib/ai/types'
 
@@ -281,7 +281,7 @@ async function runMessageTask(
       await failTask(db, { ...task, attempts: task.maxAttempts }, 'no_conversation')
       return 'failed'
     }
-    await engineSendText({
+    await sendChannelText({
       accountId,
       userId: target.ownerUserId,
       conversationId: target.conversationId,
@@ -401,7 +401,7 @@ async function runMessageTask(
     await failTask(db, { ...task, attempts: task.maxAttempts }, 'no_conversation')
     return 'failed'
   }
-  await engineSendText({
+  await sendChannelText({
     accountId,
     userId: target.ownerUserId,
     conversationId: target.conversationId,

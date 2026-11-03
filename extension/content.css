@@ -1,0 +1,147 @@
+/* ============================================================
+ * The panel's own styles.
+ *
+ * Every rule is scoped under #crm-connector-panel and every property
+ * is stated outright — no inheritance from the page. This stylesheet
+ * is injected into WhatsApp Web, so anything left unset is whatever
+ * WhatsApp happens to set today, and anything set loosely leaks into
+ * their layout. Neither side should be able to restyle the other by
+ * accident.
+ *
+ * Deliberately NOT a copy of the CRM's own theme: this panel sits
+ * inside someone else's product, and pretending to be a native part
+ * of WhatsApp is both a visual lie and a support burden. It reads as
+ * a tool clipped on top, which is what it is.
+ * ============================================================ */
+
+#crm-connector-panel {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 2147483000;
+  width: 268px;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #111b21;
+  box-shadow: 0 10px 30px rgba(11, 20, 26, 0.18);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  #crm-connector-panel {
+    background: #202c33;
+    color: #e9edef;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+}
+
+#crm-connector-panel .crmc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(134, 150, 160, 0.25);
+}
+
+#crm-connector-panel .crmc-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+#crm-connector-panel .crmc-icon {
+  all: unset;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  text-align: center;
+  line-height: 22px;
+  opacity: 0.6;
+}
+
+#crm-connector-panel .crmc-icon:hover {
+  opacity: 1;
+  background: rgba(134, 150, 160, 0.18);
+}
+
+#crm-connector-panel .crmc-body {
+  padding: 12px;
+}
+
+#crm-connector-panel.crmc-collapsed .crmc-body {
+  display: none;
+}
+
+#crm-connector-panel .crmc-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-sub {
+  margin: 2px 0 0;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+#crm-connector-panel .crmc-msg {
+  margin: 0;
+  opacity: 0.75;
+}
+
+#crm-connector-panel .crmc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0 0;
+}
+
+#crm-connector-panel .crmc-row span {
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+#crm-connector-panel .crmc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+#crm-connector-panel .crmc-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(134, 150, 160, 0.2);
+  font-size: 11px;
+}
+
+#crm-connector-panel .crmc-btn {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #00a884;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-btn:hover {
+  background: #029a79;
+}

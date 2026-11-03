@@ -1,6 +1,7 @@
 import { requireAgencia } from '@/lib/agencia/guard'
 import { logAgenciaAccess } from '@/lib/agencia/queries'
 import { toErrorResponse } from '@/lib/auth/account'
+import { csvResponse, slugForFilename, toCsv } from '@/lib/reports/csv'
 
 // CSV export of an account's contacts, for the agency to analyse offline
 // or hand to the client. Gated by requireAgencia(); reads via service
@@ -48,43 +49,21 @@ export async function GET(
       if (!data || data.length < CHUNK) break
     }
 
-    const header = ['Nome', 'Telefone', 'Email', 'Empresa', 'Criado em']
-    const lines = [header.map(csvCell).join(',')]
-    for (const c of rows) {
-      lines.push(
-        [
-          c.name ?? '',
-          c.phone,
-          c.email ?? '',
-          c.company ?? '',
-          formatDate(c.created_at),
-        ]
-          .map(csvCell)
-          .join(','),
-      )
-    }
-    // BOM (﻿) so Excel reads UTF-8 accents correctly.
-    const body = '﻿' + lines.join('\r\n')
+    // Quoting, formula-injection defusing and the BOM live in
+    // lib/reports/csv, which is where the reports read them from too.
+    const body = toCsv(rows, [
+      { header: 'Nome', value: (c) => c.name },
+      { header: 'Telefone', value: (c) => c.phone },
+      { header: 'Email', value: (c) => c.email },
+      { header: 'Empresa', value: (c) => c.company },
+      { header: 'Criado em', value: (c) => formatDate(c.created_at) },
+    ])
 
-    const filename = `contatos-${slug(account?.name ?? accountId)}.csv`
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-      },
-    })
+    const filename = `contatos-${slugForFilename(account?.name ?? accountId)}.csv`
+    return csvResponse(body, filename)
   } catch (err) {
     return toErrorResponse(err)
   }
-}
-
-// Quote per RFC 4180 and defuse spreadsheet formula injection.
-function csvCell(value: string): string {
-  let s = value ?? ''
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
-  if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"'
-  return s
 }
 
 function formatDate(iso: string): string {
@@ -95,16 +74,4 @@ function formatDate(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function slug(name: string): string {
-  return (
-    name
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase()
-      .slice(0, 40) || 'conta'
-  )
 }

@@ -18,6 +18,37 @@ const eslintConfig = defineConfig([
     // static assets). Generated on every deploy, never hand-edited.
     ".netlify/**",
   ]),
+
+  // The Chrome extension. Plain browser JavaScript, not Next.js and
+  // not TypeScript, so the shared config matches none of it and it
+  // was going unlinted — which is the wrong state for code that runs
+  // inside someone else's browser on web.whatsapp.com.
+  //
+  // Declaring the globals rather than switching on a whole browser
+  // env: `chrome` is the one API surface that matters here, and
+  // spelling it out means a typo like `chrom.storage` is still an
+  // error instead of being waved through by a broad env.
+  {
+    files: ["extension/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        chrome: "readonly",
+        console: "readonly",
+        document: "readonly",
+        fetch: "readonly",
+        setInterval: "readonly",
+        setTimeout: "readonly",
+        window: "readonly",
+        URL: "readonly",
+      },
+    },
+    rules: {
+      "no-undef": "error",
+      "no-unused-vars": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;
