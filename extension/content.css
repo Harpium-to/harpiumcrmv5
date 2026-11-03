@@ -227,3 +227,80 @@
     color: #f28b82;
   }
 }
+
+/* Deals: one block per open deal, with its stage as a native select —
+   the browser's own picker is keyboard- and screen-reader-ready, and
+   it can't be restyled by WhatsApp's CSS into something unreadable. */
+#crm-connector-panel .crmc-deals:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-section {
+  margin: 14px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+#crm-connector-panel .crmc-muted {
+  margin: 12px 0 0;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+#crm-connector-panel .crmc-deal {
+  margin: 8px 0 0;
+}
+
+#crm-connector-panel .crmc-deal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-deal-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-deal-value {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+#crm-connector-panel .crmc-stage {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(134, 150, 160, 0.4);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-stage:focus-visible {
+  outline: 2px solid #00a884;
+  outline-offset: 1px;
+}
+
+#crm-connector-panel .crmc-stage:disabled {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  #crm-connector-panel .crmc-stage option {
+    background: #202c33;
+    color: #e9edef;
+  }
+}

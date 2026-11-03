@@ -117,6 +117,25 @@ const handlers = {
     });
   },
 
+  /** Open deals of one contact, each with its stage and pipeline. */
+  async deals({ contactId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/deals?contact_id=${encodeURIComponent(contactId)}&status=open`);
+  },
+
+  /** Every pipeline with its stages, for the stage picker. */
+  async pipelines() {
+    return callApi("/pipelines");
+  },
+
+  async moveDeal({ id, stageId }) {
+    if (!id || !stageId) return { ok: false, error: "no_id" };
+    return callApi(`/deals/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ stage_id: stageId }),
+    });
+  },
+
   async settings() {
     const { baseUrl, apiKey } = await readSettings();
     // The key itself never crosses this boundary — only whether one

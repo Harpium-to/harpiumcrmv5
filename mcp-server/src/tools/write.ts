@@ -110,4 +110,29 @@ export function registerWriteTools(server: McpServer, client: WacrmClient): void
     },
     handle(async ({ id, ...body }) => jsonResult(await client.updateContact(id, body))),
   );
+
+  server.registerTool(
+    'update_deal',
+    {
+      title: 'Update deal',
+      description:
+        'Update an existing deal. Only the fields you pass are changed. Move it with stage_id (a stage of the deal’s own pipeline — see list_pipelines), or close it with status won / lost.',
+      inputSchema: {
+        id: z.string().describe('Deal id.'),
+        stage_id: z.string().optional().describe('Target stage; must belong to the deal’s pipeline.'),
+        status: z.enum(['open', 'won', 'lost']).optional(),
+        title: z.string().min(1).optional(),
+        value: z.number().min(0).optional(),
+        notes: z.string().nullable().optional(),
+        expected_close_date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable()
+          .optional()
+          .describe('YYYY-MM-DD; null clears it.'),
+      },
+      annotations: { title: 'Update deal', readOnlyHint: false, openWorldHint: true },
+    },
+    handle(async ({ id, ...body }) => jsonResult(await client.updateDeal(id, body))),
+  );
 }

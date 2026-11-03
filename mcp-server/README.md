@@ -76,10 +76,14 @@ when their guard is set.
 | `list_conversations` | read      | `conversations:read` | List conversations, filter by status/contact    |
 | `get_conversation`   | read      | `conversations:read` | Read one conversation                           |
 | `list_messages`      | read      | `messages:read`      | List a conversation's messages                  |
+| `list_deals`         | read      | `deals:read`         | List deals, filter by contact/pipeline/status   |
+| `get_deal`           | read      | `deals:read`         | Read one deal with its stage                    |
+| `list_pipelines`     | read      | `deals:read`         | List pipelines and their stages                 |
 | `get_broadcast`      | read      | `broadcasts:send`    | Poll a broadcast's delivery status              |
 | `send_message`       | write     | `messages:send`      | Send a WhatsApp message (text/template/media)   |
 | `create_contact`     | write     | `contacts:write`     | Create (find-or-create) a contact               |
 | `update_contact`     | write     | `contacts:write`     | Update a contact / replace its tags             |
+| `update_deal`        | write     | `deals:write`        | Move a deal's stage, mark it won/lost           |
 | `send_broadcast`     | broadcast | `broadcasts:send`    | Launch a template broadcast (requires `confirm`)|
 
 ## Safety model

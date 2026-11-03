@@ -30,6 +30,12 @@ let currentContact = null;
 let currentBaseUrl = "";
 let panel = null;
 
+// The open deals of the contact on screen. Kept apart from the contact
+// so re-drawing the card (after a temperature change) doesn't refetch
+// them, and keyed by contact so a late reply for the previous chat is
+// recognisable as late.
+let dealsState = { contactId: null, status: "idle", deals: [], pipelines: [], notice: null };
+
 // The API's `temperature` values, in the order the control shows them.
 const TEMPERATURES = [
   ["cold", "Frio"],
@@ -108,6 +114,12 @@ function ensurePanel() {
     }
   });
 
+  panel.addEventListener("change", (event) => {
+    const select = event.target;
+    if (!select?.classList?.contains("crmc-stage")) return;
+    void moveDeal(select.getAttribute("data-deal"), select.value);
+  });
+
   return panel;
 }
 
@@ -155,6 +167,121 @@ function renderTemperature(contact) {
   return `<div class="crmc-temp" role="group" aria-label="Temperatura">${buttons}</div>`;
 }
 
+function formatMoney(value, currency) {
+  try {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: currency || "BRL",
+    }).format(value);
+  } catch {
+    // An unknown currency code: the number is still worth showing.
+    return new Intl.NumberFormat("pt-BR").format(value);
+  }
+}
+
+function renderDeal(deal) {
+  const pipeline = dealsState.pipelines.find((p) => p.id === deal.pipeline?.id);
+  // A stage list that doesn't include the current stage would show the
+  // wrong one selected, so fall back to just the stage it is in.
+  const stages = pipeline?.stages?.length ? pipeline.stages : deal.stage ? [deal.stage] : [];
+  const options = stages
+    .map(
+      (stage) =>
+        `<option value="${escapeHtml(stage.id)}"${
+          stage.id === deal.stage?.id ? " selected" : ""
+        }>${escapeHtml(stage.name)}</option>`,
+    )
+    .join("");
+  return `
+    <div class="crmc-deal">
+      <p class="crmc-deal-head">
+        <span class="crmc-deal-title">${escapeHtml(deal.title)}</span>
+        <span class="crmc-deal-value">${escapeHtml(formatMoney(deal.value, deal.currency))}</span>
+      </p>
+      <select class="crmc-stage" data-deal="${escapeHtml(deal.id)}"
+              aria-label="Etapa de ${escapeHtml(deal.title)}">${options}</select>
+    </div>`;
+}
+
+function renderDeals(contactId) {
+  if (dealsState.contactId !== contactId) return "";
+  const { status, deals, notice } = dealsState;
+  if (status === "loading") return `<p class="crmc-muted">Carregando negócios…</p>`;
+  if (status === "forbidden") {
+    return `<p class="crmc-muted">A chave de API não tem acesso a negócios.</p>`;
+  }
+  if (status === "error") return `<p class="crmc-muted">Não consegui carregar os negócios.</p>`;
+  const list = deals.length
+    ? deals.map(renderDeal).join("")
+    : `<p class="crmc-muted">Nenhum negócio em aberto.</p>`;
+  return `
+    <p class="crmc-section">Negócios</p>
+    ${list}
+    ${notice ? `<p class="crmc-err">${escapeHtml(notice)}</p>` : ""}`;
+}
+
+function paintDeals() {
+  const slot = body().querySelector(".crmc-deals");
+  if (slot && currentContact) slot.innerHTML = renderDeals(currentContact.id);
+}
+
+async function loadDeals(contactId) {
+  dealsState = { contactId, status: "loading", deals: [], pipelines: [], notice: null };
+  paintDeals();
+
+  const [deals, pipelines] = await Promise.all([
+    send("deals", { contactId }),
+    send("pipelines"),
+  ]);
+  // Another chat opened while this was loading.
+  if (currentContact?.id !== contactId) return;
+
+  if (!deals.ok || !pipelines.ok) {
+    const forbidden = deals.error === "unauthorized" || pipelines.error === "unauthorized";
+    dealsState = { ...dealsState, status: forbidden ? "forbidden" : "error" };
+  } else {
+    dealsState = {
+      ...dealsState,
+      status: "ready",
+      deals: Array.isArray(deals.data) ? deals.data : [],
+      pipelines: Array.isArray(pipelines.data) ? pipelines.data : [],
+    };
+  }
+  paintDeals();
+}
+
+async function moveDeal(dealId, stageId) {
+  const contactId = currentContact?.id;
+  const deal = dealsState.deals.find((d) => d.id === dealId);
+  if (!contactId || !deal || deal.stage?.id === stageId) return;
+
+  for (const select of body().querySelectorAll(".crmc-stage")) select.disabled = true;
+  const result = await send("moveDeal", { id: dealId, stageId });
+
+  // Same rule as the temperature: a reply for a chat that is no longer
+  // open must not be drawn into the one that is.
+  if (currentContact?.id !== contactId) return;
+
+  if (!result.ok) {
+    dealsState = {
+      ...dealsState,
+      notice:
+        result.error === "unauthorized"
+          ? "A chave de API não tem permissão para mover negócios."
+          : "Não consegui mudar a etapa.",
+    };
+  } else {
+    dealsState = {
+      ...dealsState,
+      notice: null,
+      deals: dealsState.deals.map((d) => (d.id === dealId ? result.data : d)),
+    };
+  }
+  // Re-render either way: on failure this puts the select back on the
+  // stage the deal is really in.
+  paintDeals();
+}
+
 function renderContact(contact, baseUrl, notice) {
   currentContact = contact;
   currentBaseUrl = baseUrl;
@@ -175,6 +302,7 @@ function renderContact(contact, baseUrl, notice) {
     ${renderTemperature(contact)}
     ${notice ? `<p class="crmc-err">${escapeHtml(notice)}</p>` : ""}
     ${tags ? `<div class="crmc-tags">${tags}</div>` : ""}
+    <div class="crmc-deals">${renderDeals(contact.id)}</div>
     <a class="crmc-btn" target="_blank" rel="noreferrer noopener"
        href="${escapeHtml(baseUrl)}/contacts?contact=${encodeURIComponent(contact.id)}">
       Abrir no CRM
@@ -274,6 +402,7 @@ async function refresh(force) {
   }
 
   renderContact(result.data, baseUrl);
+  void loadDeals(result.data.id);
 }
 
 // Polled rather than observed: WhatsApp Web swaps the whole #main

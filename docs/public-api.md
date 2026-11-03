@@ -48,6 +48,8 @@ it. Grant the minimum.
 | `contacts:read`      | List and read contacts                   |
 | `contacts:write`     | Create and update contacts               |
 | `conversations:read` | List and read conversations              |
+| `deals:read`         | List and read deals and pipelines        |
+| `deals:write`        | Update deals (move stage, mark won/lost) |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
 
@@ -240,6 +242,59 @@ Paginated. Each message includes its `direction` (`inbound` /
 `content_*`. The conversation is verified to belong to your account
 first (`404` otherwise).
 
+### `GET /api/v1/deals`
+
+List deals, newest first. Scope: `deals:read`. Paginated. Optional
+filters: `?contact_id=`, `?pipeline_id=` and `?status=` (`open` /
+`won` / `lost`). Each deal embeds its pipeline and stage.
+
+```json
+{
+  "data": [
+    {
+      "id": "…", "title": "Implante", "value": 1200.5, "currency": "BRL",
+      "status": "open", "notes": null, "expected_close_date": "2026-12-01",
+      "closed_at": null, "contact_id": "…", "conversation_id": null,
+      "pipeline": { "id": "…", "name": "Vendas" },
+      "stage": { "id": "…", "name": "Proposta", "color": "#f59e0b", "position": 1 },
+      "created_at": "…", "updated_at": "…"
+    }
+  ],
+  "meta": { "next_cursor": null }
+}
+```
+
+`value` is a number. `closed_at` is when the deal reached `won` or
+`lost`; it is set by the database and is `null` while the deal is open
+(or on a deployment without migration `046`).
+
+### `GET` / `PATCH /api/v1/deals/{id}`
+
+Read or update one deal. Scopes: `deals:read` / `deals:write`. A deal
+in another account returns `404`. `PATCH` updates only the fields you
+send:
+
+| Field | Accepts |
+|---|---|
+| `stage_id` | a stage of the deal's **own** pipeline (else `400`) |
+| `status` | `"open"`, `"won"` or `"lost"` |
+| `title` | non-empty string |
+| `value` | number, `0` or more |
+| `notes` | string, or `null` to clear |
+| `expected_close_date` | `"YYYY-MM-DD"`, or `null` to clear |
+
+```bash
+curl -X PATCH https://your-app/api/v1/deals/<id> \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "stage_id": "<stage id>" }'
+```
+
+### `GET /api/v1/pipelines`
+
+Every pipeline with its stages in board order. Scope: `deals:read`.
+Not paginated. Use a stage `id` from here as `stage_id` above.
+
 ### `POST /api/v1/broadcasts`
 
 Launch a template broadcast to a list of recipients. Scope:
@@ -397,8 +452,7 @@ internal targets are refused at delivery time.
 
 ## Roadmap
 
-The public API now covers messaging, contacts, conversations,
-broadcasts, and outbound webhooks — the full scope of
-[#245](https://github.com/ArnasDon/wacrm/issues/245). Future ideas
-(deals/pipelines, templates, flows, a delivery queue for webhooks) are
-not yet scheduled.
+The public API now covers messaging, contacts, conversations, deals
+and pipelines (read, move, close), broadcasts, and outbound webhooks.
+Future ideas (creating deals, templates, flows, a delivery queue for
+webhooks) are not yet scheduled.

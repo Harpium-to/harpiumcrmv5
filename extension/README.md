@@ -12,7 +12,9 @@ aberta no WhatsApp Web, e cria o lead sem sair dali.
 5. Cole o endereço do seu CRM e uma chave de API.
 
 A chave é gerada no CRM em **Configurações › API**, e precisa dos
-escopos `contacts:read` e `contacts:write`.
+escopos `contacts:read` e `contacts:write`. Para ver e mover negócios,
+também `deals:read` e `deals:write` — sem eles o painel funciona e só
+avisa que não tem acesso a negócios.
 
 ## O que ela faz
 
@@ -21,7 +23,9 @@ contato pelo telefone e mostra nome, empresa, email e etiquetas, com um
 link para abrir o registro completo. Abaixo dos dados fica a
 **temperatura** do lead (Frio / Morno / Quente): um clique grava no
 CRM. O controle só aparece quando o CRM já tem a migration 045 — antes
-dela não existe onde gravar. Se não houver cadastro, oferece
+dela não existe onde gravar. Embaixo, os **negócios em aberto** do
+contato, cada um com a etapa do funil num seletor: trocar a etapa ali
+é o mesmo que arrastar o card no quadro. Se não houver cadastro, oferece
 criar — usando o nome que o WhatsApp exibe, quando ele não é só o
 próprio número.
 

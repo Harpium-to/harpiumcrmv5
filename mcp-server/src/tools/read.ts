@@ -94,6 +94,49 @@ export function registerReadTools(server: McpServer, client: WacrmClient): void 
   );
 
   server.registerTool(
+    'list_deals',
+    {
+      title: 'List deals',
+      description:
+        'List deals (sales opportunities), newest first, each with its pipeline and stage. Optionally filter by contact, pipeline, or status (open / won / lost). Paginated.',
+      inputSchema: {
+        contact_id: z.string().optional().describe('Only deals for this contact.'),
+        pipeline_id: z.string().optional().describe('Only deals in this pipeline.'),
+        status: z.enum(['open', 'won', 'lost']).optional().describe('Deal status filter.'),
+        limit: z.number().int().min(1).max(100).optional().describe('Page size, 1–100 (default 50).'),
+        cursor: z.string().optional().describe('Opaque pagination cursor.'),
+      },
+      annotations: { ...READ_ONLY, title: 'List deals' },
+    },
+    handle(async (args) => jsonResult(await client.listDeals(args))),
+  );
+
+  server.registerTool(
+    'get_deal',
+    {
+      title: 'Get deal',
+      description: 'Read a single deal by id, including its pipeline and stage.',
+      inputSchema: {
+        id: z.string().describe('Deal id.'),
+      },
+      annotations: { ...READ_ONLY, title: 'Get deal' },
+    },
+    handle(async ({ id }) => jsonResult(await client.getDeal(id))),
+  );
+
+  server.registerTool(
+    'list_pipelines',
+    {
+      title: 'List pipelines',
+      description:
+        'List the sales pipelines with their stages in board order. Use the stage ids with update_deal to move a deal.',
+      inputSchema: {},
+      annotations: { ...READ_ONLY, title: 'List pipelines' },
+    },
+    handle(async () => jsonResult(await client.listPipelines())),
+  );
+
+  server.registerTool(
     'list_messages',
     {
       title: 'List messages',

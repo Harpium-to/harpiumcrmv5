@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CRM Connector",
-  "version": "0.2.0",
-  "description": "Mostra o contato do CRM ao lado da conversa aberta no WhatsApp Web, cria o lead e marca a temperatura sem sair dali.",
+  "version": "0.3.0",
+  "description": "Mostra o contato do CRM ao lado da conversa aberta no WhatsApp Web, cria o lead, marca a temperatura e move o negócio no funil sem sair dali.",
   "permissions": [
     "storage"
   ],

@@ -145,6 +145,30 @@ export class WacrmClient {
     return this.request('PATCH', `/contacts/${encodeURIComponent(id)}`, { body });
   }
 
+  // --- Deals --------------------------------------------------------
+
+  listDeals(query: {
+    limit?: number;
+    cursor?: string;
+    contact_id?: string;
+    pipeline_id?: string;
+    status?: string;
+  }): Promise<Paginated<unknown>> {
+    return this.list('/deals', query);
+  }
+
+  getDeal(id: string): Promise<{ data: unknown }> {
+    return this.request('GET', `/deals/${encodeURIComponent(id)}`);
+  }
+
+  updateDeal(id: string, body: unknown): Promise<{ data: unknown }> {
+    return this.request('PATCH', `/deals/${encodeURIComponent(id)}`, { body });
+  }
+
+  listPipelines(): Promise<{ data: unknown }> {
+    return this.request('GET', '/pipelines');
+  }
+
   // --- Conversations ------------------------------------------------
 
   listConversations(query: {
