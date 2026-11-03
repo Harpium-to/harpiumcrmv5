@@ -45,8 +45,7 @@ aproximação → `/canais/instagram` aceita credenciais.
 - **Extensão de Chrome** — MV3 em `extension/`, autenticada por chave
   de API, painel no WhatsApp Web.
 
-879 testes passando. Duas falhas pré-existentes em
-`src/lib/dashboard/date-utils.test.ts` (ver §4).
+882 testes passando, nenhuma falha.
 
 ---
 
@@ -120,32 +119,16 @@ TypeScript.
 
 Não são minhas, mas são reais e alguém vai tropeçar nelas.
 
-### 3.1 O dashboard trunca em 1000 linhas, em silêncio
+### 3.1 ~~O dashboard trunca em 1000 linhas~~ — corrigido
 
-`src/lib/dashboard/queries.ts` → `loadConversationsSeries` seleciona
-todas as mensagens da janela **sem paginar**. O PostgREST corta em
-1000. Em qualquer conta com mais que isso, o gráfico do dashboard está
-errado e não há nada na tela que diga.
+`src/lib/dashboard/queries.ts` agora lê mensagens e negócios por
+`fetchAllRows` (com `id` como desempate da ordenação) e soma `value`
+com `num()` — antes, `NUMERIC` em string concatenava em vez de somar.
+Coberto por `src/lib/dashboard/queries.test.ts`.
 
-O arquivo até admite a dívida num comentário ("if a tenant's dataset
-outgrows this, we'd migrate the heavy aggregations to SQL RPCs").
+### 3.2 ~~Dois testes falhando por fuso~~ — corrigido
 
-**A correção já existe:** `src/lib/reports/fetch-all.ts` pagina até o
-fim e **estoura** em vez de truncar. Apontar as consultas do dashboard
-para ele é mecânico.
-
-### 3.2 Dois testes falhando por bug de fuso no próprio teste
-
-`src/lib/dashboard/date-utils.test.ts` → `mondayIndex`. O teste faz
-`new Date("2026-05-18")`, que o JS interpreta como meia-noite **UTC** —
-e isso é domingo em Brasília, não segunda. O bug está no teste, não em
-`mondayIndex`.
-
-Deixei intocado de propósito: é de outra frente, e mexer em teste
-alheio no meio de outro trabalho esconde o que eu mesmo quebrei.
-
-Correção: construir a data local (`new Date(2026, 4, 18)`) ou usar o
-helper com fuso explícito de `src/lib/reports/range.ts`.
+`date-utils.test.ts` constrói datas locais (`new Date(2026, 4, 18)`).
 
 ### 3.3 Avatares órfãos no storage
 
@@ -218,7 +201,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 879 passando, 2 falhas pré-existentes (§3.2)
+npx vitest run                   # 882 passando
 npx next build                   # precisa compilar
 ```
 

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { num } from '@/lib/reports/aggregate'
+import { fetchAllRows } from '@/lib/reports/fetch-all'
 import {
   daysAgoStart,
   DOW_SHORT_MON_FIRST,
@@ -20,9 +22,12 @@ import type {
 // ------------------------------------------------------------
 // All client-side aggregation. RLS scopes every query to the
 // signed-in user automatically, so we never pass user_id explicitly
-// here. Perf is acceptable for the current scale (low thousands of
-// messages) — if a tenant's dataset outgrows this, we'd migrate the
-// heavy aggregations to SQL RPCs. Noted in the PR.
+// here. Row-level reads go through `fetchAllRows`, which pages past
+// PostgREST's 1000-row cap and throws instead of truncating — a chart
+// that fails is fixable, a chart that is quietly short is not. Each
+// page orders by a unique tiebreaker (`id`) so offsets stay stable.
+// If a tenant's dataset outgrows the cap, move the aggregation to a
+// SQL RPC.
 // ------------------------------------------------------------
 
 type DB = SupabaseClient
@@ -61,7 +66,9 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', yesterdayStart)
       .lt('created_at', todayStart),
-    db.from('deals').select('value, status').eq('status', 'open'),
+    fetchAllRows<{ value: unknown }>((from, to) =>
+      db.from('deals').select('value').eq('status', 'open').order('id').range(from, to),
+    ),
     db
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -75,8 +82,8 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .lt('created_at', todayStart),
   ])
 
-  const openDealsRows = (openDeals.data ?? []) as { value: number | null }[]
-  const openDealsValue = openDealsRows.reduce((sum, d) => sum + (d.value ?? 0), 0)
+  // `value` is NUMERIC, which PostgREST returns as a string.
+  const openDealsValue = openDeals.reduce((sum, d) => sum + num(d.value), 0)
 
   return {
     activeConversations: {
@@ -91,7 +98,7 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       previous: newContactsYesterday.count ?? 0,
     },
     openDealsValue,
-    openDealsCount: openDealsRows.length,
+    openDealsCount: openDeals.length,
     messagesSentToday: {
       current: messagesToday.count ?? 0,
       previous: messagesYesterday.count ?? 0,
@@ -106,18 +113,21 @@ export async function loadConversationsSeries(
   rangeDays: number,
 ): Promise<ConversationsSeriesPoint[]> {
   const start = daysAgoStart(rangeDays - 1).toISOString()
-  const { data, error } = await db
-    .from('messages')
-    .select('created_at, sender_type')
-    .gte('created_at', start)
-    .order('created_at', { ascending: true })
-  if (error) throw error
+  const rows = await fetchAllRows<{ created_at: string; sender_type: string }>((from, to) =>
+    db
+      .from('messages')
+      .select('created_at, sender_type')
+      .gte('created_at', start)
+      .order('created_at', { ascending: true })
+      .order('id')
+      .range(from, to),
+  )
 
   const keys = lastNDayKeys(rangeDays)
   const buckets = new Map<string, { incoming: number; outgoing: number }>()
   for (const k of keys) buckets.set(k, { incoming: 0, outgoing: 0 })
 
-  for (const row of (data ?? []) as { created_at: string; sender_type: string }[]) {
+  for (const row of rows) {
     const key = localDayKey(row.created_at)
     const bucket = buckets.get(key)
     if (!bucket) continue
@@ -133,18 +143,19 @@ export async function loadConversationsSeries(
 export async function loadPipelineDonut(db: DB): Promise<PipelineDonutData> {
   const [stagesRes, dealsRes] = await Promise.all([
     db.from('pipeline_stages').select('id, name, color, pipeline_id, position').order('position'),
-    db.from('deals').select('stage_id, value, status').eq('status', 'open'),
+    fetchAllRows<{ stage_id: string; value: unknown }>((from, to) =>
+      db.from('deals').select('stage_id, value').eq('status', 'open').order('id').range(from, to),
+    ),
   ])
 
   const stages =
     (stagesRes.data ?? []) as { id: string; name: string; color: string }[]
-  const deals = (dealsRes.data ?? []) as { stage_id: string; value: number | null }[]
 
   const byStage = new Map<string, { count: number; total: number }>()
-  for (const d of deals) {
+  for (const d of dealsRes) {
     const row = byStage.get(d.stage_id) ?? { count: 0, total: 0 }
     row.count += 1
-    row.total += d.value ?? 0
+    row.total += num(d.value)
     byStage.set(d.stage_id, row)
   }
 
@@ -176,19 +187,20 @@ export async function loadResponseTime(db: DB): Promise<ResponseTimeSummary> {
   // with enough overlap if the user opens the dashboard late on a
   // Monday.
   const fourteenDaysAgo = daysAgoStart(13).toISOString()
-  const { data, error } = await db
-    .from('messages')
-    .select('conversation_id, sender_type, created_at')
-    .gte('created_at', fourteenDaysAgo)
-    .order('conversation_id', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (error) throw error
-
-  const rows = (data ?? []) as {
+  const rows = await fetchAllRows<{
     conversation_id: string
     sender_type: string
     created_at: string
-  }[]
+  }>((from, to) =>
+    db
+      .from('messages')
+      .select('conversation_id, sender_type, created_at')
+      .gte('created_at', fourteenDaysAgo)
+      .order('conversation_id', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id')
+      .range(from, to),
+  )
 
   // Group per conversation, pair unreplied customer messages with the
   // next outbound message from the agent/bot. A single customer message
