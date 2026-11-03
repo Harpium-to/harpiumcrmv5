@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   bucketForecast,
+  buildFirstResponse,
   buildGoals,
   buildOutcome,
   closedByDay,
@@ -417,5 +418,45 @@ describe('buildGoals', () => {
       ['b', true], // 1 of 1
       ['a', false], // sem fonte
     ])
+  })
+})
+
+describe('buildFirstResponse', () => {
+  const range = resolvePeriod('last7', NOW, SP)
+
+  it('converts seconds to minutes and fills every day of the window', () => {
+    const out = buildFirstResponse(
+      {
+        replied: 3,
+        unreplied: 1,
+        median_seconds: 210,
+        p90_seconds: 2280,
+        by_responder: [{ responder: 'bot', replied: 1, median_seconds: 12 }],
+        by_day: [{ day: range.dayKeys[2], replied: 3, median_seconds: 210 }],
+      },
+      range,
+    )
+    expect(out.medianMinutes).toBe(3.5)
+    expect(out.p90Minutes).toBe(38)
+    expect(out.byResponder[0].medianMinutes).toBe(0.2)
+    expect(out.byDay.map((d) => d.day)).toEqual(range.dayKeys)
+    expect(out.byDay[2]).toEqual({ day: range.dayKeys[2], replied: 3, medianMinutes: 3.5 })
+  })
+
+  it('leaves a day with no answered wait as null, not zero minutes', () => {
+    const out = buildFirstResponse(
+      {
+        replied: 0,
+        unreplied: 2,
+        median_seconds: null,
+        p90_seconds: null,
+        by_responder: [],
+        by_day: [],
+      },
+      range,
+    )
+    expect(out.medianMinutes).toBeNull()
+    expect(out.unreplied).toBe(2)
+    expect(out.byDay.every((d) => d.medianMinutes === null && d.replied === 0)).toBe(true)
   })
 })

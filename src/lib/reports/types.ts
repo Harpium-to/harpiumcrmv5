@@ -114,6 +114,26 @@ export interface ApprovalTotals {
   medianDecisionMinutes: number | null
 }
 
+export interface FirstResponseDay {
+  day: string
+  replied: number
+  /** Null on a day with no answered wait — not 0, which would mean "instant". */
+  medianMinutes: number | null
+}
+
+export interface FirstResponseSummary {
+  /** Waits that got an answer. */
+  replied: number
+  /** Waits still without one — counted apart, never as zero minutes. */
+  unreplied: number
+  medianMinutes: number | null
+  p90Minutes: number | null
+  /** By who answered: `agent` (a person) and `bot` (AI reply or flow). */
+  byResponder: { responder: string; replied: number; medianMinutes: number | null }[]
+  /** One point per range day, same x-axis as every other daily series. */
+  byDay: FirstResponseDay[]
+}
+
 // ------------------------------------------------------------
 // The bundle one page load needs
 // ------------------------------------------------------------
@@ -133,6 +153,8 @@ export interface ReportBundle {
   contactsBySegment: BreakdownRow[]
   messagesByDay: TwoSeriesDayPoint[]
   conversationsByStatus: BreakdownRow[]
+  /** Null until migration 048 adds `report_first_response`. */
+  firstResponse: FirstResponseSummary | null
   /**
    * Null when the agent tables are not there yet (044/045 unapplied).
    * The section is then absent rather than zeroed.

@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/dashboard/skeleton";
 
 import { CategoryBars } from "@/components/reports/category-bars";
 import { DayBars } from "@/components/reports/day-bars";
+import { FirstResponse } from "@/components/reports/first-response";
 import { GoalMeters } from "@/components/reports/goal-meters";
 import { ReportCard } from "@/components/reports/report-card";
 import { AnalystPanel } from "@/components/reports/analyst-panel";
@@ -416,6 +417,23 @@ function ReportsPageInner() {
                   rows={bundle.conversationsByStatus}
                   labelFor={(row) => conversationLabel(row.key, t)}
                 />
+              </ReportCard>
+            </Reveal>
+
+            <Reveal index={10} className="lg:col-span-2">
+              <ReportCard
+                title={t("cardFirstResponse")}
+                hint={t("cardFirstResponseHint")}
+                exportId={bundle.firstResponse ? "first_response_by_day" : undefined}
+                query={query}
+              >
+                {bundle.firstResponse ? (
+                  <FirstResponse summary={bundle.firstResponse} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {t("firstResponseUnavailable")}
+                  </p>
+                )}
               </ReportCard>
             </Reveal>
           </div>

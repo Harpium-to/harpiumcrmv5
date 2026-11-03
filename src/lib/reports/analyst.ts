@@ -121,6 +121,31 @@ export function buildDigest(bundle: ReportBundle): string {
       )}.`,
   )
 
+  const fr = bundle.firstResponse
+  if (!fr) {
+    lines.push(
+      'PRIMEIRA RESPOSTA: sem dados — a função de cálculo não existe neste ' +
+        'banco ainda. Não especule sobre tempo de resposta.',
+    )
+  } else {
+    const minutes = (m: number | null) => (m === null ? 'sem dado' : `${m} min`)
+    lines.push(
+      `PRIMEIRA RESPOSTA (tempo de relógio, não horário comercial): ` +
+        `mediana ${minutes(fr.medianMinutes)}, 90% em até ${minutes(fr.p90Minutes)}, ` +
+        `${fr.replied} esperas respondidas, ${fr.unreplied} ainda sem resposta. ` +
+        `Por quem respondeu — ${
+          fr.byResponder.length === 0
+            ? 'nenhum'
+            : fr.byResponder
+                .map(
+                  (r) =>
+                    `${labelForKey(r.responder, '')}: ${minutes(r.medianMinutes)} (${r.replied})`,
+                )
+                .join('; ')
+        }.`,
+    )
+  }
+
   if (!bundle.agents) {
     lines.push(
       'AGENTES IA: sem dados — as tabelas de agentes não existem neste ' +

@@ -39,12 +39,36 @@ function bundle(over: Partial<ReportBundle> = {}): ReportBundle {
     contactsBySegment: [],
     messagesByDay: [{ day: '2026-05-18', a: 12, b: 30 }],
     conversationsByStatus: [{ key: 'open', label: '', count: 5, value: null }],
+    firstResponse: null,
     agents: null,
     ...over,
   }
 }
 
 describe('buildDigest', () => {
+  it('reports first response, and says so when it cannot be measured', () => {
+    expect(buildDigest(bundle())).toContain('PRIMEIRA RESPOSTA: sem dados')
+    const text = buildDigest(
+      bundle({
+        firstResponse: {
+          replied: 40,
+          unreplied: 3,
+          medianMinutes: 4.5,
+          p90Minutes: 38,
+          byResponder: [
+            { responder: 'agent', replied: 30, medianMinutes: 6 },
+            { responder: 'bot', replied: 10, medianMinutes: 0.2 },
+          ],
+          byDay: [],
+        },
+      }),
+    )
+    expect(text).toContain('mediana 4.5 min')
+    expect(text).toContain('3 ainda sem resposta')
+    expect(text).toContain('Pessoa: 6 min (30)')
+    expect(text).toContain('IA / fluxo: 0.2 min (10)')
+  })
+
   it('states the window, the currency and the zone', () => {
     const text = buildDigest(bundle())
     expect(text).toContain('2026-05-01 a 2026-05-18')

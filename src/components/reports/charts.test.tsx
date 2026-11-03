@@ -4,10 +4,15 @@ import { NextIntlClientProvider } from 'next-intl'
 
 import { CategoryBars } from './category-bars'
 import { DayBars } from './day-bars'
+import { FirstResponse } from './first-response'
 import { GoalMeters } from './goal-meters'
 import { OTHER, UNASSIGNED } from '@/lib/reports/aggregate'
 import messages from '../../../messages/pt.json'
-import type { BreakdownRow, GoalAttainmentRow } from '@/lib/reports/types'
+import type {
+  BreakdownRow,
+  FirstResponseSummary,
+  GoalAttainmentRow,
+} from '@/lib/reports/types'
 
 /**
  * The reports screen renders behind a login this session cannot pass,
@@ -214,5 +219,54 @@ describe('GoalMeters', () => {
     expect(render(<GoalMeters rows={[]} />)).toContain(
       'Nenhum agente tem meta definida',
     )
+  })
+})
+
+describe('FirstResponse', () => {
+  const summary: FirstResponseSummary = {
+    replied: 40,
+    unreplied: 3,
+    medianMinutes: 4.5,
+    p90Minutes: 38,
+    byResponder: [
+      { responder: 'agent', replied: 30, medianMinutes: 6 },
+      { responder: 'bot', replied: 10, medianMinutes: 0.2 },
+    ],
+    byDay: [
+      { day: '2026-05-17', replied: 0, medianMinutes: null },
+      { day: '2026-05-18', replied: 40, medianMinutes: 4.5 },
+    ],
+  }
+
+  it('shows median, p90 and unanswered as separate numbers', () => {
+    const html = render(<FirstResponse summary={summary} />)
+    expect(html).toContain('4,5 min')
+    expect(html).toContain('38 min')
+    expect(html).toMatch(/Sem resposta<\/dt><dd[^>]*>3</)
+  })
+
+  it('names who answered instead of leaking the raw sender type', () => {
+    const html = render(<FirstResponse summary={summary} />)
+    expect(html).toContain('Respondido por pessoa')
+    expect(html).toContain('Respondido por IA / fluxo')
+    expect(html).toContain('0,2 min')
+    expect(html).not.toContain('>bot<')
+  })
+
+  it('leaves a day with no answered wait empty and keeps its slot', () => {
+    const html = render(<FirstResponse summary={summary} />)
+    expect(html.match(/flex h-full flex-1/g)).toHaveLength(2)
+    expect(html).toContain('height:0%')
+    expect(html).toContain('height:100%')
+  })
+
+  it('says there is no data rather than drawing zeros', () => {
+    const html = render(
+      <FirstResponse
+        summary={{ ...summary, replied: 0, unreplied: 0, medianMinutes: null, p90Minutes: null, byResponder: [] }}
+      />,
+    )
+    expect(html).not.toContain('min<')
+    expect(html).not.toContain('flex h-full flex-1')
   })
 })

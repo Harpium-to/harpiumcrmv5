@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { AGENT_GOAL_METRICS } from '@/lib/agents/goals'
 import {
   bucketForecast,
+  buildFirstResponse,
   buildGoals,
   buildOutcome,
   closedByDay,
@@ -12,6 +13,7 @@ import {
   num,
   twoSeriesByDay,
   UNASSIGNED,
+  type RawFirstResponse,
 } from './aggregate'
 import { fetchAllRows, type PageResult } from './fetch-all'
 import { dayKeyOf, previousRange, zonedCalendarDay } from './range'
@@ -363,6 +365,37 @@ async function loadConversationsByStatus(
   return groupBy(rows, (row) => row.status)
 }
 
+/** PostgREST / Postgres "no such function" — migration 048 not applied. */
+function isMissingFunction(error: { code?: string }): boolean {
+  return error.code === 'PGRST202' || error.code === '42883'
+}
+
+/**
+ * Time to first response, paired in SQL (`report_first_response`).
+ *
+ * Null when the function isn't there yet: the card then says why it is
+ * empty instead of showing a median of nothing. Any other error throws,
+ * for the same reason `detectCapabilities` rethrows — a network blip
+ * must not pass for "this database can't answer".
+ */
+async function loadFirstResponse(
+  db: DB,
+  accountId: string,
+  range: DateRange,
+): Promise<ReportBundle['firstResponse']> {
+  const { data, error } = await db.rpc('report_first_response', {
+    p_account_id: accountId,
+    p_from: range.fromIso,
+    p_to: range.toIso,
+    p_timezone: range.timezone,
+  })
+  if (error) {
+    if (isMissingFunction(error)) return null
+    throw error
+  }
+  return buildFirstResponse(data as RawFirstResponse, range)
+}
+
 // ------------------------------------------------------------
 // Agentes
 // ------------------------------------------------------------
@@ -558,6 +591,7 @@ export async function loadReportBundle(
     contacts,
     messagesByDay,
     conversationsByStatus,
+    firstResponse,
   ] = await Promise.all([
     db.from('accounts').select('default_currency').eq('id', accountId).maybeSingle(),
     loadClosedDeals(db, accountId, range, caps),
@@ -567,6 +601,7 @@ export async function loadReportBundle(
     loadContacts(db, accountId, range, caps),
     loadMessagesByDay(db, range),
     loadConversationsByStatus(db, accountId, range),
+    loadFirstResponse(db, accountId, range),
   ])
 
   const [dealsByOwner, agents] = await Promise.all([
@@ -608,6 +643,7 @@ export async function loadReportBundle(
       : [],
     messagesByDay,
     conversationsByStatus,
+    firstResponse,
     agents,
   }
 }

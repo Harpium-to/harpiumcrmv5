@@ -26,6 +26,9 @@ const KEY_LABELS: Record<string, string> = {
   next_month: 'Mês que vem',
   later: 'Mais adiante',
   undated: 'Sem data prevista',
+  // Who answered first.
+  agent: 'Pessoa',
+  bot: 'IA / fluxo',
   // Conversation status.
   open: 'Aberta',
   pending: 'Pendente',
@@ -76,6 +79,7 @@ export type ExportId =
   | 'contacts_by_segment'
   | 'messages_by_day'
   | 'conversations_by_status'
+  | 'first_response_by_day'
   | 'agent_runs'
   | 'agent_tasks'
   | 'agent_cost'
@@ -92,6 +96,7 @@ export const EXPORT_IDS: ExportId[] = [
   'contacts_by_segment',
   'messages_by_day',
   'conversations_by_status',
+  'first_response_by_day',
   'agent_runs',
   'agent_tasks',
   'agent_cost',
@@ -191,6 +196,20 @@ export function exportReport(
           bundle.conversationsByStatus,
           breakdownColumns('Status', null),
         ),
+      }
+    case 'first_response_by_day':
+      if (!bundle.firstResponse) return null
+      return {
+        filenamePart: 'primeira-resposta-por-dia',
+        csv: toCsv(bundle.firstResponse.byDay, [
+          { header: 'Dia', value: (r) => r.day },
+          { header: 'Esperas respondidas', value: (r) => r.replied },
+          // Empty, not 0: a day nobody wrote in has no wait to measure.
+          {
+            header: 'Mediana (min)',
+            value: (r) => (r.medianMinutes === null ? '' : r.medianMinutes),
+          },
+        ]),
       }
     case 'agent_runs':
       if (!bundle.agents) return null

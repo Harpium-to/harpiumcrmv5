@@ -5,6 +5,7 @@ import type {
   BreakdownRow,
   DayPoint,
   DealOutcome,
+  FirstResponseSummary,
   ForecastBucket,
   GoalAttainmentRow,
   TwoSeriesDayPoint,
@@ -334,4 +335,51 @@ export function buildGoals(input: GoalInputs): GoalAttainmentRow[] {
     if (a.measured !== b.measured) return a.measured ? -1 : 1
     return (a.ratio ?? 0) - (b.ratio ?? 0)
   })
+}
+
+// ------------------------------------------------------------
+// First response
+// ------------------------------------------------------------
+
+/** What `report_first_response` (migration 048) returns. */
+export interface RawFirstResponse {
+  replied: number
+  unreplied: number
+  median_seconds: number | null
+  p90_seconds: number | null
+  by_responder: { responder: string; replied: number; median_seconds: number | null }[]
+  by_day: { day: string; replied: number; median_seconds: number | null }[]
+}
+
+/** Seconds → minutes, one decimal: "0,4 min" is a real answer for a bot. */
+function toMinutes(seconds: number | null | undefined): number | null {
+  if (seconds === null || seconds === undefined) return null
+  const n = Number(seconds)
+  return Number.isFinite(n) ? Math.round(n / 6) / 10 : null
+}
+
+export function buildFirstResponse(
+  raw: RawFirstResponse,
+  range: DateRange,
+): FirstResponseSummary {
+  const byDay = new Map((raw.by_day ?? []).map((d) => [d.day, d]))
+  return {
+    replied: Number(raw.replied ?? 0),
+    unreplied: Number(raw.unreplied ?? 0),
+    medianMinutes: toMinutes(raw.median_seconds),
+    p90Minutes: toMinutes(raw.p90_seconds),
+    byResponder: (raw.by_responder ?? []).map((r) => ({
+      responder: r.responder,
+      replied: Number(r.replied),
+      medianMinutes: toMinutes(r.median_seconds),
+    })),
+    byDay: range.dayKeys.map((day) => {
+      const point = byDay.get(day)
+      return {
+        day,
+        replied: point ? Number(point.replied) : 0,
+        medianMinutes: point ? toMinutes(point.median_seconds) : null,
+      }
+    }),
+  }
 }
