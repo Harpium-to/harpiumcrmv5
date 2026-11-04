@@ -28,7 +28,10 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "extension:zip": "node scripts/build-extension-zip.mjs",
+    "predev": "npm run extension:zip",
     "dev": "next dev",
+    "prebuild": "npm run extension:zip",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

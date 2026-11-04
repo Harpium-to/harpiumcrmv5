@@ -120,3 +120,39 @@ export const AGENCY_CONSENT_TERMS_VERSION = '2026-11-04'
 
 /** Niches whose CRMs hold health data (sensitive under LGPD art. 11). */
 export const HEALTH_NICHES: readonly string[] = ['medical_clinic', 'dental_aesthetic']
+
+const AUDIT_TABLE_NOUN: Record<string, { one: string; gender: 'm' | 'f' }> = {
+  contacts: { one: 'contato', gender: 'm' },
+  deals: { one: 'negócio', gender: 'm' },
+  conversations: { one: 'conversa', gender: 'f' },
+  messages: { one: 'mensagem', gender: 'f' },
+  automations: { one: 'automação', gender: 'f' },
+  flows: { one: 'fluxo', gender: 'm' },
+  broadcasts: { one: 'disparo', gender: 'm' },
+  pipelines: { one: 'funil', gender: 'm' },
+  tags: { one: 'etiqueta', gender: 'f' },
+  custom_fields: { one: 'campo', gender: 'm' },
+  quick_replies: { one: 'resposta rápida', gender: 'f' },
+}
+
+/**
+ * Readable label for an agencia_auditoria action, including the
+ * '<table>_<insert|update|delete>' rows written in support mode (055).
+ * Unknown actions come back as-is rather than hidden.
+ */
+export function auditActionLabel(action: string): string {
+  const fixed: Record<string, string> = {
+    ...AUDIT_ACTION_LABEL,
+    leave_account: 'Saiu do CRM',
+    apply_template: 'Aplicou um modelo',
+    save_template: 'Salvou o CRM como modelo',
+    messages_insert: 'Enviou uma mensagem',
+  }
+  if (fixed[action]) return fixed[action]
+  const m = /^([a-z_]+)_(insert|update|delete)$/.exec(action)
+  const noun = m ? AUDIT_TABLE_NOUN[m[1]] : undefined
+  if (!m || !noun) return action
+  const article = noun.gender === 'f' ? 'uma' : 'um'
+  const verb = { insert: 'Criou', update: 'Alterou', delete: 'Excluiu' }[m[2] as 'insert' | 'update' | 'delete']
+  return `${verb} ${article} ${noun.one}`
+}

@@ -50,6 +50,7 @@
     "defaultAvatar": "Foto",
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
+    "menuExtension": "Extensão do Chrome",
     "menuSignOut": "Sair",
     "agentsTeam": "Equipe",
     "agentsLive": "Ao vivo",
@@ -1501,7 +1502,8 @@
       "members": "Membros da equipe",
       "api": "Chaves de API",
       "quick-replies": "Respostas rápidas",
-      "agencia": "Acesso da agência"
+      "agencia": "Acesso da agência",
+      "extensao": "Extensão do Chrome"
     },
     "groups": {
       "account": "Conta",

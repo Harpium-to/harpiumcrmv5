@@ -50,6 +50,7 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
+    "menuExtension": "Chrome extension",
     "menuSignOut": "Sign out",
     "agentsTeam": "Team",
     "agentsLive": "Live",
@@ -1501,7 +1502,8 @@
       "members": "Team members",
       "api": "API keys",
       "quick-replies": "Quick replies",
-      "agencia": "Agency access"
+      "agencia": "Agency access",
+      "extensao": "Chrome extension"
     },
     "groups": {
       "account": "Account",

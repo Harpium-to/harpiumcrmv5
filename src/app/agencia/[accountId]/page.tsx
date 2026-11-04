@@ -21,6 +21,7 @@ import { computeAlerts, computeHealth } from '@/lib/agencia/health'
 import { HealthCard } from './health-card'
 import { listTemplateApplications, listTemplates } from '@/lib/agencia/template-store'
 import { TemplatesPanel } from './templates-panel'
+import { EnterCrmButton } from './enter-crm'
 import { CRM_STATUS_LABEL, nicheLabel } from '@/lib/agencia/crm'
 import { PeriodTabs } from '../ui'
 import { CrmManagePanel } from './manage'
@@ -64,6 +65,16 @@ export default async function AgenciaAccountPage({
   const canEdit =
     myRole === 'super_admin' ||
     (myRole === 'manager' && lifecycle?.manager_user_id === userId)
+  // Support mode (Fase 6): what the owner's consent lets this operator
+  // be inside the CRM — mirrors agency_role_in() in the database.
+  const enterAs: 'admin' | 'viewer' | null =
+    lifecycle?.status === 'archived' || gate.level === null
+      ? null
+      : gate.level === 'full' && canEdit
+        ? 'admin'
+        : gate.level === 'read' || gate.level === 'full'
+          ? 'viewer'
+          : null
 
   // Audit this privileged view (non-blocking on failure).
   await logAgenciaAccess(admin, {
@@ -100,10 +111,13 @@ export default async function AgenciaAccountPage({
             {formatDate(account.createdAt)}
           </p>
         </div>
-        <PeriodTabs
-          basePath={`/agencia/${account.id}`}
-          current={windowDays}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {enterAs && <EnterCrmButton accountId={account.id} as={enterAs} />}
+          <PeriodTabs
+            basePath={`/agencia/${account.id}`}
+            current={windowDays}
+          />
+        </div>
       </div>
 
       {/* Headline stats */}

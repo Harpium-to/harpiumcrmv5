@@ -101,6 +101,15 @@ export async function requireApiKey(
     throw rateLimited(limit);
   }
 
+  // An archived CRM is gone for everyone (050); a suspended one is
+  // read-only — through the API (and the Chrome extension) as well.
+  if (row.account_status === 'archived') {
+    throw unauthorized();
+  }
+  if (row.account_status === 'suspended' && scope && !scope.endsWith(':read')) {
+    throw forbidden('Este CRM está suspenso: só leitura.');
+  }
+
   if (scope && !hasScope(row.scopes, scope)) {
     throw forbidden(`Esta chave de API não tem o escopo '${scope}'`);
   }

@@ -3,13 +3,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
 import { listAudit } from '@/lib/agencia/queries'
-import { AUDIT_ACTION_LABEL } from '@/lib/agencia/crm'
+import { auditActionLabel } from '@/lib/agencia/crm'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 50
 
-const ACTION_LABEL = AUDIT_ACTION_LABEL
 
 export default async function AgenciaAuditoriaPage({
   searchParams,
@@ -63,7 +62,7 @@ export default async function AgenciaAuditoriaPage({
                     </td>
                     <td className="px-4 py-3">{r.actorEmail ?? '—'}</td>
                     <td className="px-4 py-3">
-                      {ACTION_LABEL[r.action] ?? r.action}
+                      {auditActionLabel(r.action)}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {r.accountName ? (

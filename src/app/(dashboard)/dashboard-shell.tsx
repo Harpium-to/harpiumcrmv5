@@ -8,7 +8,7 @@ import { TopBar } from "@/components/layout/topbar";
 import { PageTransition } from "@/components/layout/page-transition";
 import { Glow } from "@/components/ui/glow";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
-import { CrmStatusBanner } from "@/components/layout/crm-status-banner";
+import { CrmContextBanner } from "@/components/layout/crm-context-banner";
 
 // Auth-gated dashboard shell. Extracted from the layout so the layout
 // itself can stay a server component and export metadata (noindex) —
@@ -83,7 +83,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-[5.25rem]" data-print="flatten">
         <div data-print="hide">
           <TopBar onOpenNav={() => setNavOpen(true)} />
-          <CrmStatusBanner accountId={profile?.account_id ?? null} />
+          <CrmContextBanner accountId={profile?.account_id ?? null} />
         </div>
         <main className="px-3 pt-2 pb-10 sm:px-4 sm:pb-14" data-print="flatten">
           {/* This one wrapper is what gives all ~20 dashboard routes

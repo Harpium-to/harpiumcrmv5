@@ -35,3 +35,21 @@ describe('CRM vocabulary', () => {
     expect(isAgencyAccessLevel('total')).toBe(false)
   })
 })
+
+describe('auditActionLabel', () => {
+  it('reads support-mode writes as sentences', async () => {
+    const { auditActionLabel } = await import('./crm')
+    expect(auditActionLabel('contacts_insert')).toBe('Criou um contato')
+    expect(auditActionLabel('automations_update')).toBe('Alterou uma automação')
+    expect(auditActionLabel('quick_replies_delete')).toBe('Excluiu uma resposta rápida')
+    expect(auditActionLabel('messages_insert')).toBe('Enviou uma mensagem')
+    expect(auditActionLabel('enter_account')).toBe('Entrou no CRM')
+    expect(auditActionLabel('leave_account')).toBe('Saiu do CRM')
+  })
+
+  it('shows an unknown action as-is', async () => {
+    const { auditActionLabel } = await import('./crm')
+    expect(auditActionLabel('robots_insert')).toBe('robots_insert')
+    expect(auditActionLabel('algo_novo')).toBe('algo_novo')
+  })
+})

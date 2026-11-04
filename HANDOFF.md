@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Dez
+**Nada do que foi construído funciona até isso acontecer.** Doze
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -22,6 +22,8 @@ migrations estão no repo e não foram aplicadas:
 | `051_consentimento_agencia.sql` | Fase 3 (ver §1C): histórico do consentimento, pedidos de acesso da agência, notificação ao dono, registro do que a agência fez | a tela "Acesso da agência" mostra só o nível; pedir acesso responde que falta a 051 |
 | `052_uso_plataforma.sql` | Fase 4 (ver §1D): dias de uso por membro (via heartbeat de presença) e `agencia_platform_usage()` | o painel mostra traços nas colunas de uso e explica que falta a 052 |
 | `053_modelos_nicho.sql` | Fase 5 (ver §1E): modelos por nicho (Clínica médica, Academia, Serviços), aplicar e salvar CRM como modelo | "Modelos" explica que falta a 053; Novo CRM cria sem modelo |
+| `054_extensao_chrome.sql` | 0B (ver §1F): chave pessoal da extensão para qualquer atendente | a tela da extensão oferece o download e diz que falta a 054 para conectar |
+| `055_modo_suporte.sql` | Fase 6 (ver §1G): sair do modo suporte e auditoria de cada alteração da agência dentro do CRM do cliente | entrar funciona (049); sair responde que falta a 055 e nada é auditado além da entrada |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -240,6 +242,54 @@ e renderização da visão do modelo e do bloco da ficha.
 
 ---
 
+## 1F. Extensão do Chrome visível no CRM (054)
+
+- **Menu do perfil › Extensão do Chrome** e **Configurações › Extensão
+  do Chrome** (grupo Conta: cada pessoa instala no próprio navegador).
+- **Instalar:** botão "Baixar extensão (.zip)" + os 4 passos. O `.zip`
+  é gerado por `scripts/build-extension-zip.mjs` antes de `next build`
+  e `next dev` (`prebuild` / `predev`) em `public/downloads/` (fora do
+  git). Node puro, sem dependência, reproduzível; o teste confere com
+  `unzip -t`. Quando a extensão estiver na Chrome Web Store, defina
+  `NEXT_PUBLIC_EXTENSION_STORE_URL` e o botão vira "Adicionar ao Chrome".
+- **Conectar:** "Gerar minha chave" cria uma chave **pessoal** (só
+  atendente ou acima; nunca a agência dentro do CRM) com exatamente os
+  escopos da extensão — fixados no banco. Mostra endereço do CRM e chave
+  para copiar, uma vez. Gerar outra revoga a anterior; sair do CRM ou
+  virar visualizador revoga sozinho. Status "Conectada · último uso".
+- **A API pública passou a respeitar o status do CRM** (brecha da
+  Fase 2): suspenso = só leitura também pela API; arquivado = chave
+  recusada (`src/lib/auth/api-context.ts`).
+- **Nome da extensão** continua "CRM Connector" no `manifest.json`.
+  Trocar para a marca da plataforma é decisão do dono.
+
+## 1G. Fase 6 — modo suporte (055)
+
+- **Ficha do CRM no console › "Entrar no CRM"**: aparece quando o dono
+  liberou Leitura ou Total; o rótulo diz com que papel (Total = admin
+  para super admin e gestor da carteira; o resto, leitura). Abre o CRM
+  do cliente como ele é, no `/dashboard`.
+- **Dentro do CRM**, uma faixa fixa: "Modo suporte: você está no CRM X
+  pela agência, como …. Tudo o que você alterar aqui fica registrado
+  para o dono", com **Sair do modo suporte** (volta ao console e ao CRM
+  da própria pessoa). A faixa lê `/api/account/context` (servidor), não
+  o espelho do perfil.
+- **Auditoria de cada alteração**: trigger em contatos, negócios,
+  conversas (criar/excluir), mensagens (enviar), automações, fluxos,
+  disparos, funis, etiquetas, campos e respostas rápidas grava
+  `<tabela>_<operação>` quando quem escreve é a agência. O dono lê em
+  Configurações › Acesso da agência ("Criou um contato", "Enviou uma
+  mensagem"…). Escritas feitas por rotas com service role não têm
+  usuário e não entram.
+- **Limite conhecido:** os membros do cliente não veem o nome de quem da
+  agência escreveu algo (a regra de perfis só mostra colegas do CRM).
+
+Testes: `supabase/tests/extensao.test.ts` (7) e `modo-suporte.test.ts`
+(7), ambos conferidos sabotando a migration; zip; API pública com CRM
+suspenso/arquivado; renderização da tela da extensão e da faixa.
+
+---
+
 ## 1. O que está pronto
 
 - **Design** — sistema de tokens em `globals.css`, acento dirige os
@@ -440,7 +490,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 1099 passando (inclui supabase/tests)
+npx vitest run                   # 1131 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 

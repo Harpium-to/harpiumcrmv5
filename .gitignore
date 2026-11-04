@@ -54,3 +54,6 @@ supabase/.temp
 
 # byproduto do bundle de edge functions do netlify
 deno.lock
+
+# pacote da extensão, gerado no build (scripts/build-extension-zip.mjs)
+/public/downloads/

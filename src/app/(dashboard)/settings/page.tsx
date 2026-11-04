@@ -19,6 +19,7 @@ import { DealsSettings } from '@/components/settings/deals-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { AgencyAccessPanel } from '@/components/settings/agency-access-panel';
+import { ExtensionPanel } from '@/components/settings/extension-panel';
 import {
   resolveSection,
   type SettingsSection,
@@ -59,6 +60,7 @@ export default function SettingsPage() {
     profile: <ProfileForm />,
     security: <SecurityPanel />,
     appearance: <AppearancePanel />,
+    extensao: <ExtensionPanel />,
     whatsapp: <WhatsAppConfig />,
     templates: <TemplateManager />,
     'quick-replies': <QuickRepliesManager />,

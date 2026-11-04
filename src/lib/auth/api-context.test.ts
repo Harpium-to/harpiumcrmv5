@@ -62,6 +62,39 @@ async function expectApiError(p: Promise<unknown>, code: string, status: number)
   });
 }
 
+describe("requireApiKey — CRM status (migration 050)", () => {
+  it("a suspended CRM still reads through the API", async () => {
+    findActiveKeyByHash.mockResolvedValue(
+      row({ scopes: ["contacts:read", "contacts:write"], account_status: "suspended" }),
+    );
+    await expect(
+      requireApiKey(reqWith(`Bearer ${KEY}`), "contacts:read"),
+    ).resolves.toMatchObject({ accountId: "acct-1" });
+  });
+
+  it("but every write is refused", async () => {
+    findActiveKeyByHash.mockResolvedValue(
+      row({ scopes: ["contacts:read", "contacts:write"], account_status: "suspended" }),
+    );
+    await expectApiError(
+      requireApiKey(reqWith(`Bearer ${KEY}`), "contacts:write"),
+      "forbidden",
+      403,
+    );
+  });
+
+  it("an archived CRM's keys stop working", async () => {
+    findActiveKeyByHash.mockResolvedValue(
+      row({ scopes: ["contacts:read"], account_status: "archived" }),
+    );
+    await expectApiError(
+      requireApiKey(reqWith(`Bearer ${KEY}`), "contacts:read"),
+      "unauthorized",
+      401,
+    );
+  });
+});
+
 describe("requireApiKey", () => {
   it("401s when no Authorization header is present", async () => {
     await expectApiError(requireApiKey(reqWith()), "unauthorized", 401);

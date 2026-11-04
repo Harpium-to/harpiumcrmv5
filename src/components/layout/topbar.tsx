@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
-import { LogOut, Menu, Settings as SettingsIcon, User } from "lucide-react";
+import { LogOut, Menu, Puzzle, Settings as SettingsIcon, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -172,6 +172,17 @@ export function TopBar({ onOpenNav }: TopBarProps) {
               >
                 <User className="size-4" />
                 {tb("menuProfile")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                render={
+                  <Link
+                    href="/settings?tab=extensao"
+                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+                  />
+                }
+              >
+                <Puzzle className="size-4" />
+                {tb("menuExtension")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 render={

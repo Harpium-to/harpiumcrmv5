@@ -17,7 +17,7 @@ import {
   AGENCY_ACCESS_DESCRIPTION,
   AGENCY_ACCESS_LABEL,
   AGENCY_ACCESS_LEVELS,
-  AUDIT_ACTION_LABEL,
+  auditActionLabel,
   HEALTH_NICHES,
   isAgencyAccessLevel,
   type AgencyAccessLevel,
@@ -464,7 +464,7 @@ export function AgencyAccessDetails({
                   <span>
                     <span className="font-medium">{a.by}</span>{' '}
                     <span className="text-muted-foreground">
-                      {(AUDIT_ACTION_LABEL[a.action] ?? a.action).toLowerCase()}
+                      {(auditActionLabel(a.action)).toLowerCase()}
                     </span>
                   </span>
                   <span className="text-muted-foreground shrink-0 text-xs">
