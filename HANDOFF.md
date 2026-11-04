@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Doze
+**Nada do que foi construído funciona até isso acontecer.** Treze
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -24,6 +24,7 @@ migrations estão no repo e não foram aplicadas:
 | `053_modelos_nicho.sql` | Fase 5 (ver §1E): modelos por nicho (Clínica médica, Academia, Serviços), aplicar e salvar CRM como modelo | "Modelos" explica que falta a 053; Novo CRM cria sem modelo |
 | `054_extensao_chrome.sql` | 0B (ver §1F): chave pessoal da extensão para qualquer atendente | a tela da extensão oferece o download e diz que falta a 054 para conectar |
 | `055_modo_suporte.sql` | Fase 6 (ver §1G): sair do modo suporte e auditoria de cada alteração da agência dentro do CRM do cliente | entrar funciona (049); sair responde que falta a 055 e nada é auditado além da entrada |
+| `056_agencia_totais.sql` | totais do console da agência contados no banco (ver §3.4) | o console pagina as linhas (certo até 100 mil; acima disso a tela falha em vez de mostrar número errado) |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -401,6 +402,19 @@ Coberto por `src/lib/dashboard/queries.test.ts`.
 
 `date-utils.test.ts` constrói datas locais (`new Date(2026, 4, 18)`).
 
+### 3.4 ~~O console da agência truncava em 1000 linhas~~ — corrigido
+
+`listAccountsOverview`, `getAgencyOverview`, `getAccountMetrics`,
+`getAccountDetail` e `getAccountBoard` (`src/lib/agencia/queries.ts`)
+somavam linhas em JS sem paginar: contatos, conversas, negócios e o
+gráfico de mensagens paravam de crescer quando a carteira inteira
+passava de 1000 linhas. Agora os totais vêm de
+`agencia_account_totals()` e `agencia_message_stats()` (056), que
+devolvem **um** jsonb — função que retorna linhas bateria no mesmo
+limite. Sem a 056, `src/lib/agencia/totals.ts` pagina com
+`fetchAllRows`. Negócios de um CRM e membros também paginam; o quadro
+busca nomes de contato em lotes de 200.
+
 ### 3.3 ~~Avatares órfãos no storage~~ — corrigido
 
 `src/lib/storage/avatars.ts`: depois que o perfil ou o agente salva, o
@@ -490,7 +504,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 1131 passando (inclui supabase/tests)
+npx vitest run                   # 1139 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 

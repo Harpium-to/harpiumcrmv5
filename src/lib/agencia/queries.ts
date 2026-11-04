@@ -3,16 +3,18 @@
 // `admin` client (RLS-bypassing), so these helpers must ONLY be called
 // from a context that already passed `requireAgencia()`/`loadAgencia()`.
 //
-// The overview deliberately avoids an N+1 over accounts: it pulls one
-// slim column set per domain table and tallies in JS. Fine for the
-// instance-wide operator view; revisit with a SQL view/RPC if account
-// counts grow into the thousands.
+// Totals across the portfolio are counted in SQL (migration 056, see
+// totals.ts): summing rows in JS stopped at PostgREST's 1000-row cap.
+// Every other multi-row read here pages with fetchAllRows or has an
+// explicit limit / range.
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { fetchAllRows } from '@/lib/reports/fetch-all'
 import type { CrmStatus } from './crm'
 import { loadAccountRows, loadPendingOwnerInvites } from './crms'
+import { loadAccountTotals, loadMessageStats } from './totals'
 
 interface Membership {
   user_id: string
@@ -30,19 +32,28 @@ async function loadMemberships(
   admin: SupabaseClient,
   accountId?: string,
 ): Promise<Membership[]> {
-  let q = admin.from('account_members').select('user_id, account_id, role')
-  if (accountId) q = q.eq('account_id', accountId)
-  const { data, error } = await q
-  if (!error) return data ?? []
-  if (!isMissingTable(error)) throw error
+  try {
+    return await fetchAllRows<Membership>((from, to) => {
+      let q = admin.from('account_members').select('user_id, account_id, role')
+      if (accountId) q = q.eq('account_id', accountId)
+      return q.order('account_id').order('user_id').range(from, to)
+    })
+  } catch (err) {
+    if (!isMissingTable(err as { code?: string; message?: string })) throw err
+  }
 
-  let legacy = admin.from('profiles').select('user_id, account_id, account_role')
-  if (accountId) legacy = legacy.eq('account_id', accountId)
-  const { data: rows, error: legacyErr } = await legacy
-  if (legacyErr) throw legacyErr
-  return (rows ?? [])
+  const rows = await fetchAllRows<{
+    user_id: string
+    account_id: string | null
+    account_role: string | null
+  }>((from, to) => {
+    let legacy = admin.from('profiles').select('user_id, account_id, account_role')
+    if (accountId) legacy = legacy.eq('account_id', accountId)
+    return legacy.order('user_id').range(from, to)
+  })
+  return rows
     .filter((r) => r.account_id && r.account_role)
-    .map((r) => ({ user_id: r.user_id, account_id: r.account_id, role: r.account_role }))
+    .map((r) => ({ user_id: r.user_id, account_id: r.account_id!, role: r.account_role! }))
 }
 
 export interface AccountOverview {
@@ -74,31 +85,18 @@ export interface AccountOverview {
 export async function listAccountsOverview(
   admin: SupabaseClient,
 ): Promise<AccountOverview[]> {
-  const [
-    accounts,
-    pendingOwners,
-    profilesRes,
-    memberships,
-    contactsRes,
-    conversationsRes,
-    dealsRes,
-  ] = await Promise.all([
+  const [accounts, pendingOwners, profiles, memberships, totals] = await Promise.all([
     loadAccountRows(admin),
     loadPendingOwnerInvites(admin),
-    admin.from('profiles').select('user_id, email'),
+    fetchAllRows<{ user_id: string; email: string | null }>((from, to) =>
+      admin.from('profiles').select('user_id, email').order('user_id').range(from, to),
+    ),
     loadMemberships(admin),
-    admin.from('contacts').select('account_id'),
-    admin.from('conversations').select('account_id, status'),
-    admin.from('deals').select('account_id, value, status'),
+    loadAccountTotals(admin),
   ])
 
-  if (profilesRes.error) throw profilesRes.error
-  if (contactsRes.error) throw contactsRes.error
-  if (conversationsRes.error) throw conversationsRes.error
-  if (dealsRes.error) throw dealsRes.error
-
   const emailByUser = new Map<string, string | null>()
-  for (const p of profilesRes.data ?? []) {
+  for (const p of profiles) {
     emailByUser.set(p.user_id, p.email ?? null)
   }
   const memberCount = tally(memberships, (m) => m.account_id)
@@ -109,24 +107,6 @@ export async function listAccountsOverview(
     if (m.role === 'owner') ownerByAccount.set(m.account_id, m.user_id)
   }
 
-  const contactCount = tally(contactsRes.data ?? [], (r) => r.account_id)
-
-  const openConversationCount = tally(
-    (conversationsRes.data ?? []).filter((c) => c.status !== 'closed'),
-    (r) => r.account_id,
-  )
-
-  const openDeals = (dealsRes.data ?? []).filter(
-    (d) => d.status !== 'won' && d.status !== 'lost',
-  )
-  const openDealCount = tally(openDeals, (r) => r.account_id)
-  const openDealValue = new Map<string, number>()
-  for (const d of openDeals) {
-    openDealValue.set(
-      d.account_id,
-      (openDealValue.get(d.account_id) ?? 0) + Number(d.value ?? 0),
-    )
-  }
 
   return accounts.map((a) => {
     const owner = ownerByAccount.get(a.id)
@@ -145,10 +125,10 @@ export async function listAccountsOverview(
       statusChangedAt: a.status_changed_at,
       createdAt: a.created_at,
       memberCount: memberCount.get(a.id) ?? 0,
-      contactCount: contactCount.get(a.id) ?? 0,
-      openConversationCount: openConversationCount.get(a.id) ?? 0,
-      openDealCount: openDealCount.get(a.id) ?? 0,
-      openDealValue: openDealValue.get(a.id) ?? 0,
+      contactCount: totals.get(a.id)?.contacts ?? 0,
+      openConversationCount: totals.get(a.id)?.openConversations ?? 0,
+      openDealCount: totals.get(a.id)?.openDeals ?? 0,
+      openDealValue: totals.get(a.id)?.openDealValue ?? 0,
     }
   })
 }
@@ -247,10 +227,15 @@ export async function getAccountDetail(
           .limit(10)
       : none,
     admin.from('pipelines').select('id, name').eq('account_id', accountId),
-    admin
-      .from('deals')
-      .select('id, stage_id, value, status')
-      .eq('account_id', accountId),
+    fetchAllRows<{ id: string; stage_id: string | null; value: unknown; status: string }>(
+      (from, to) =>
+        admin
+          .from('deals')
+          .select('id, stage_id, value, status')
+          .eq('account_id', accountId)
+          .order('id')
+          .range(from, to),
+    ).then((data) => ({ data, error: null })),
   ])
 
   if (profilesRes.error) throw profilesRes.error
@@ -421,9 +406,8 @@ export function parseMetricWindow(value: string | undefined): MetricWindow {
  * Agency-wide roll-up for the /agencia home band: totals come from
  * `listAccountsOverview` (summed in the page); this adds the
  * cross-account message volume, the activity ranking, and the
- * "went quiet" list — all from a single 30-day message pull (messages
- * has no account_id, so it's joined to its parent conversation).
- * Global scale for now; move to a SQL view/RPC if volume explodes.
+ * "went quiet" list. Messages are counted in SQL (agencia_message_stats,
+ * 056) — never pulled row by row.
  */
 export async function getAgencyOverview(
   admin: SupabaseClient,
@@ -443,92 +427,52 @@ export async function getAgencyOverview(
     dayKeys.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10))
   }
 
-  const [accountsRes, wonRes, msgsRes, convRes, waRes] = await Promise.all([
+  // accounts and whatsapp_config hold one row per CRM: well under the
+  // 1000-row cap at any plausible portfolio size.
+  const [accountsRes, won, stats, totals, waRes] = await Promise.all([
     admin.from('accounts').select('id, name'),
-    admin
-      .from('deals')
-      .select('value')
-      .eq('status', 'won')
-      .gte('updated_at', sinceWindow),
-    admin
-      .from('messages')
-      .select('sender_type, created_at, conversations!inner(account_id)')
-      .gte('created_at', sinceFetch),
-    admin
-      .from('conversations')
-      .select('account_id, status, assigned_agent_id')
-      .neq('status', 'closed'),
+    fetchAllRows<{ value: unknown }>((from, to) =>
+      admin
+        .from('deals')
+        .select('value')
+        .eq('status', 'won')
+        .gte('updated_at', sinceWindow)
+        .order('id')
+        .range(from, to),
+    ),
+    loadMessageStats(admin, sinceFetch, { countSince: sinceWindow }),
+    loadAccountTotals(admin),
     admin.from('whatsapp_config').select('account_id, status'),
   ])
 
   if (accountsRes.error) throw accountsRes.error
-  if (wonRes.error) throw wonRes.error
-  if (msgsRes.error) throw msgsRes.error
-  if (convRes.error) throw convRes.error
   if (waRes.error) throw waRes.error
 
   const nameById = new Map<string, string>()
   for (const a of accountsRes.data ?? []) nameById.set(a.id, a.name)
 
   const daily = new Map<string, { incoming: number; outgoing: number }>()
-  for (const k of dayKeys) daily.set(k, { incoming: 0, outgoing: 0 })
-
-  const msgCountByAccount = new Map<string, number>()
-  const activeIn14 = new Set<string>()
-
-  for (const m of (msgsRes.data ?? []) as Array<{
-    sender_type: string
-    created_at: string
-    conversations: { account_id: string } | { account_id: string }[] | null
-  }>) {
-    const conv = Array.isArray(m.conversations)
-      ? m.conversations[0]
-      : m.conversations
-    const accountId = conv?.account_id
-    const inbound = m.sender_type === 'customer'
-
-    const bucket = daily.get(m.created_at.slice(0, 10))
-    if (bucket) {
-      if (inbound) bucket.incoming++
-      else bucket.outgoing++
-    }
-
-    if (accountId) {
-      // Ranking counts messages within the selected window; inactivity
-      // uses the fixed 14-day threshold.
-      if (m.created_at >= sinceWindow) {
-        msgCountByAccount.set(
-          accountId,
-          (msgCountByAccount.get(accountId) ?? 0) + 1,
-        )
-      }
-      if (m.created_at >= since14) activeIn14.add(accountId)
-    }
+  for (const k of dayKeys) {
+    daily.set(k, stats.daily.get(k) ?? { incoming: 0, outgoing: 0 })
   }
 
-  const ranking = [...msgCountByAccount.entries()]
-    .map(([accountId, messageCount]) => ({
+  // Ranking counts messages within the selected window; inactivity
+  // uses the fixed 14-day threshold (last message vs. since14).
+  const activeIn14 = new Set<string>()
+  for (const [accountId, a] of stats.byAccount) {
+    if (a.lastAt && a.lastAt >= since14) activeIn14.add(accountId)
+  }
+
+  const ranking = [...stats.byAccount.entries()]
+    .filter(([, a]) => a.messages > 0)
+    .map(([accountId, a]) => ({
       accountId,
       name: nameById.get(accountId) ?? '—',
-      messageCount,
+      messageCount: a.messages,
     }))
     .sort((a, b) => b.messageCount - a.messageCount)
     .slice(0, RANKING_LIMIT)
 
-  // Backlog: open/pending conversations (status already filtered to
-  // non-closed) with no agent assigned, counted per account.
-  const backlogByAccount = new Map<string, number>()
-  for (const c of (convRes.data ?? []) as Array<{
-    account_id: string
-    assigned_agent_id: string | null
-  }>) {
-    if (!c.assigned_agent_id) {
-      backlogByAccount.set(
-        c.account_id,
-        (backlogByAccount.get(c.account_id) ?? 0) + 1,
-      )
-    }
-  }
 
   // An account counts as WhatsApp-connected only if it has a config row
   // whose status is 'connected'. Missing row or 'disconnected' → flagged.
@@ -545,7 +489,8 @@ export async function getAgencyOverview(
       accountId: a.id,
       name: a.name,
       inactive: !activeIn14.has(a.id),
-      backlog: backlogByAccount.get(a.id) ?? 0,
+      // Open/pending conversations with no agent assigned.
+      backlog: totals.get(a.id)?.openUnassigned ?? 0,
       whatsappDisconnected: !connected.has(a.id),
     }))
     .filter((a) => a.inactive || a.backlog > 0 || a.whatsappDisconnected)
@@ -558,11 +503,8 @@ export async function getAgencyOverview(
     )
 
   return {
-    wonDealCount30d: (wonRes.data ?? []).length,
-    wonDealValue30d: (wonRes.data ?? []).reduce(
-      (sum, d) => sum + Number(d.value ?? 0),
-      0,
-    ),
+    wonDealCount30d: won.length,
+    wonDealValue30d: won.reduce((sum, d) => sum + Number(d.value ?? 0), 0),
     dailyMessages: dayKeys.map((day) => ({ day, ...daily.get(day)! })),
     ranking,
     attention,
@@ -603,7 +545,7 @@ export async function getAccountMetrics(
     dayKeys.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10))
   }
 
-  const [contactsRes, convRes, msgsRes, dealsRes] = await Promise.all([
+  const [contactsRes, convRes, stats, deals] = await Promise.all([
     admin
       .from('contacts')
       .select('id', { count: 'exact', head: true })
@@ -614,36 +556,35 @@ export async function getAccountMetrics(
       .select('id', { count: 'exact', head: true })
       .eq('account_id', accountId)
       .gte('created_at', since),
-    admin
-      .from('messages')
-      .select('sender_type, created_at, conversations!inner(account_id)')
-      .eq('conversations.account_id', accountId)
-      .gte('created_at', since),
-    admin.from('deals').select('value, status').eq('account_id', accountId),
+    loadMessageStats(admin, since, { accountId }),
+    fetchAllRows<{ value: unknown; status: string }>((from, to) =>
+      admin
+        .from('deals')
+        .select('value, status')
+        .eq('account_id', accountId)
+        .order('id')
+        .range(from, to),
+    ),
   ])
 
   if (contactsRes.error) throw contactsRes.error
   if (convRes.error) throw convRes.error
-  if (msgsRes.error) throw msgsRes.error
-  if (dealsRes.error) throw dealsRes.error
 
   const daily = new Map<string, { incoming: number; outgoing: number }>()
-  for (const k of dayKeys) daily.set(k, { incoming: 0, outgoing: 0 })
-
-  let incomingMessages = 0
-  let outgoingMessages = 0
-  for (const m of (msgsRes.data ?? []) as { sender_type: string; created_at: string }[]) {
-    const inbound = m.sender_type === 'customer'
-    if (inbound) incomingMessages++
-    else outgoingMessages++
-    const bucket = daily.get(m.created_at.slice(0, 10))
-    if (bucket) {
-      if (inbound) bucket.incoming++
-      else bucket.outgoing++
-    }
+  for (const k of dayKeys) {
+    daily.set(k, stats.daily.get(k) ?? { incoming: 0, outgoing: 0 })
   }
 
-  const wonDeals = (dealsRes.data ?? []).filter((d) => d.status === 'won')
+  // Every message in the window, including any on a UTC day outside
+  // dayKeys' edges.
+  let incomingMessages = 0
+  let outgoingMessages = 0
+  for (const d of stats.daily.values()) {
+    incomingMessages += d.incoming
+    outgoingMessages += d.outgoing
+  }
+
+  const wonDeals = deals.filter((d) => d.status === 'won')
 
   return {
     windowDays,
@@ -896,6 +837,8 @@ export interface BoardStage {
   total: number
 }
 
+const CONTACT_LOOKUP_CHUNK = 200
+
 /**
  * Pipeline board for an account: every stage with its deals grouped
  * into columns, for a kanban-style read-only view.
@@ -904,15 +847,27 @@ export async function getAccountBoard(
   admin: SupabaseClient,
   accountId: string,
 ): Promise<{ stages: BoardStage[] }> {
-  const [pipelinesRes, dealsRes] = await Promise.all([
+  const [pipelinesRes, deals] = await Promise.all([
     admin.from('pipelines').select('id, name').eq('account_id', accountId),
-    admin
-      .from('deals')
-      .select('id, stage_id, title, value, currency, status, contact_id')
-      .eq('account_id', accountId),
+    fetchAllRows<{
+      id: string
+      stage_id: string | null
+      title: string
+      value: unknown
+      currency: string | null
+      status: string | null
+      contact_id: string | null
+    }>((from, to) =>
+      admin
+        .from('deals')
+        .select('id, stage_id, title, value, currency, status, contact_id')
+        .eq('account_id', accountId)
+        .order('id')
+        .range(from, to),
+    ),
   ])
   if (pipelinesRes.error) throw pipelinesRes.error
-  if (dealsRes.error) throw dealsRes.error
+  const dealsRes = { data: deals }
 
   const pipelineIds = (pipelinesRes.data ?? []).map((p) => p.id)
   if (pipelineIds.length === 0) return { stages: [] }
@@ -924,7 +879,7 @@ export async function getAccountBoard(
     .order('position', { ascending: true })
   if (stagesErr) throw stagesErr
 
-  // Contact names for the deals, resolved in one round trip.
+  // Contact names for the deals.
   const contactIds = Array.from(
     new Set(
       (dealsRes.data ?? [])
@@ -933,11 +888,12 @@ export async function getAccountBoard(
     ),
   )
   const nameById = new Map<string, string | null>()
-  if (contactIds.length > 0) {
+  // In chunks: every id travels in the URL, and a big board has many.
+  for (let i = 0; i < contactIds.length; i += CONTACT_LOOKUP_CHUNK) {
     const { data: contacts, error: cErr } = await admin
       .from('contacts')
       .select('id, name, phone')
-      .in('id', contactIds)
+      .in('id', contactIds.slice(i, i + CONTACT_LOOKUP_CHUNK))
     if (cErr) throw cErr
     for (const c of contacts ?? []) nameById.set(c.id, c.name ?? c.phone ?? null)
   }

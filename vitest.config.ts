@@ -27,5 +27,9 @@ export default defineConfig({
       META_APP_SECRET: "test-meta-app-secret",
     },
     clearMocks: true,
+    // supabase/tests build a database from every migration in a
+    // beforeAll; with all test files running in parallel that can take
+    // longer than the 10s default on a busy machine.
+    hookTimeout: 30_000,
   },
 });

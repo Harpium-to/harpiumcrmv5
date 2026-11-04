@@ -44,7 +44,20 @@ export interface World {
   miaPersonal: string
 }
 
+let base: Promise<World> | null = null
+
+/**
+ * A fresh, independent world. The first call in a test file builds it
+ * (all migrations + seeds, the slow part); later calls clone that
+ * database, so each describe still gets its own state.
+ */
 export async function buildWorld(): Promise<World> {
+  base ??= buildFreshWorld()
+  const world = await base
+  return { ...world, db: (await world.db.clone()) as PGlite }
+}
+
+async function buildFreshWorld(): Promise<World> {
   const db = await createDb()
   await applyMigrationsBefore(db, M049)
 
