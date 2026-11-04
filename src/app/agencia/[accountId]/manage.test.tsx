@@ -16,6 +16,7 @@ type Props = Parameters<typeof CrmManagePanel>[0]
 
 const base: Props = {
   accountId: 'acc-1',
+  name: 'Clínica Sol',
   status: 'onboarding',
   niche: 'medical_clinic',
   managerUserId: 'mgr-1',
@@ -41,6 +42,8 @@ const render = (over: Partial<Props> = {}) =>
 describe('CrmManagePanel', () => {
   it('a super admin edits everything, including archiving and the manager', () => {
     const html = render()
+    expect(html).toContain('id="crm-name"')
+    expect(html).toContain('value="Clínica Sol"')
     expect(html).toContain('Arquivado')
     expect(html).toContain('id="crm-manager"')
     expect(html).toContain('Salvar')

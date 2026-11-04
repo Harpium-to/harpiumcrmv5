@@ -31,6 +31,7 @@ const selectClass =
 
 export interface ManageProps {
   accountId: string
+  name: string
   status: CrmStatus
   niche: string | null
   managerUserId: string | null
@@ -50,6 +51,7 @@ export function CrmManagePanel(props: ManageProps) {
   const router = useRouter()
   const isSuper = props.myRole === 'super_admin'
 
+  const [name, setName] = useState(props.name)
   const [status, setStatus] = useState<CrmStatus>(props.status)
   const [niche, setNiche] = useState(props.niche ?? '')
   const [managerUserId, setManagerUserId] = useState(props.managerUserId ?? '')
@@ -62,6 +64,7 @@ export function CrmManagePanel(props: ManageProps) {
 
   const save = async () => {
     const patch: Record<string, unknown> = {}
+    if (name.trim() && name.trim() !== props.name) patch.name = name.trim()
     if (status !== props.status) patch.status = status
     if (niche !== (props.niche ?? '')) patch.niche = niche
     if (notes !== (props.notes ?? '')) patch.notes = notes
@@ -137,6 +140,19 @@ export function CrmManagePanel(props: ManageProps) {
                 : 'Este CRM não está na sua carteira. Só visualização.'}
             </p>
           )}
+          <div>
+            <Label htmlFor="crm-name" className="text-muted-foreground">
+              Nome do CRM
+            </Label>
+            <Input
+              id="crm-name"
+              value={name}
+              maxLength={120}
+              disabled={!props.canEdit}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 border-border bg-muted"
+            />
+          </div>
           <div>
             <Label htmlFor="crm-status" className="text-muted-foreground">
               Status

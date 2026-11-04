@@ -140,6 +140,7 @@ export default async function AgenciaAccountPage({
       {lifecycle && (
         <CrmManagePanel
           accountId={account.id}
+          name={lifecycle.name}
           status={lifecycle.status}
           niche={lifecycle.niche}
           managerUserId={lifecycle.manager_user_id}
