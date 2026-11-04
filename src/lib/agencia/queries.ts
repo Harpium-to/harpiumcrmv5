@@ -11,6 +11,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import type { CrmStatus } from './crm'
+import { loadAccountRows, loadPendingOwnerInvites } from './crms'
+
 interface Membership {
   user_id: string
   account_id: string
@@ -46,7 +49,14 @@ export interface AccountOverview {
   id: string
   name: string
   ownerUserId: string
+  /** Email of the member who owns it; null while the owner hasn't accepted. */
   ownerEmail: string | null
+  /** Open owner invitation (050), when there is one. */
+  pendingOwnerEmail: string | null
+  status: CrmStatus
+  niche: string | null
+  managerUserId: string | null
+  managerEmail: string | null
   createdAt: string
   memberCount: number
   contactCount: number
@@ -62,20 +72,24 @@ export interface AccountOverview {
 export async function listAccountsOverview(
   admin: SupabaseClient,
 ): Promise<AccountOverview[]> {
-  const [accountsRes, profilesRes, memberships, contactsRes, conversationsRes, dealsRes] =
-    await Promise.all([
-      admin
-        .from('accounts')
-        .select('id, name, owner_user_id, created_at')
-        .order('created_at', { ascending: true }),
-      admin.from('profiles').select('user_id, email'),
-      loadMemberships(admin),
-      admin.from('contacts').select('account_id'),
-      admin.from('conversations').select('account_id, status'),
-      admin.from('deals').select('account_id, value, status'),
-    ])
+  const [
+    accounts,
+    pendingOwners,
+    profilesRes,
+    memberships,
+    contactsRes,
+    conversationsRes,
+    dealsRes,
+  ] = await Promise.all([
+    loadAccountRows(admin),
+    loadPendingOwnerInvites(admin),
+    admin.from('profiles').select('user_id, email'),
+    loadMemberships(admin),
+    admin.from('contacts').select('account_id'),
+    admin.from('conversations').select('account_id, status'),
+    admin.from('deals').select('account_id, value, status'),
+  ])
 
-  if (accountsRes.error) throw accountsRes.error
   if (profilesRes.error) throw profilesRes.error
   if (contactsRes.error) throw contactsRes.error
   if (conversationsRes.error) throw conversationsRes.error
@@ -86,6 +100,12 @@ export async function listAccountsOverview(
     emailByUser.set(p.user_id, p.email ?? null)
   }
   const memberCount = tally(memberships, (m) => m.account_id)
+  // The owner is whoever holds the owner membership. accounts.owner_user_id
+  // can be the agency's placeholder until the client accepts (050).
+  const ownerByAccount = new Map<string, string>()
+  for (const m of memberships) {
+    if (m.role === 'owner') ownerByAccount.set(m.account_id, m.user_id)
+  }
 
   const contactCount = tally(contactsRes.data ?? [], (r) => r.account_id)
 
@@ -106,18 +126,28 @@ export async function listAccountsOverview(
     )
   }
 
-  return (accountsRes.data ?? []).map((a) => ({
-    id: a.id,
-    name: a.name,
-    ownerUserId: a.owner_user_id,
-    ownerEmail: emailByUser.get(a.owner_user_id) ?? null,
-    createdAt: a.created_at,
-    memberCount: memberCount.get(a.id) ?? 0,
-    contactCount: contactCount.get(a.id) ?? 0,
-    openConversationCount: openConversationCount.get(a.id) ?? 0,
-    openDealCount: openDealCount.get(a.id) ?? 0,
-    openDealValue: openDealValue.get(a.id) ?? 0,
-  }))
+  return accounts.map((a) => {
+    const owner = ownerByAccount.get(a.id)
+    return {
+      id: a.id,
+      name: a.name,
+      ownerUserId: owner ?? a.owner_user_id,
+      ownerEmail: owner ? (emailByUser.get(owner) ?? null) : null,
+      pendingOwnerEmail: pendingOwners.get(a.id)?.email ?? null,
+      status: a.status,
+      niche: a.niche,
+      managerUserId: a.manager_user_id,
+      managerEmail: a.manager_user_id
+        ? (emailByUser.get(a.manager_user_id) ?? null)
+        : null,
+      createdAt: a.created_at,
+      memberCount: memberCount.get(a.id) ?? 0,
+      contactCount: contactCount.get(a.id) ?? 0,
+      openConversationCount: openConversationCount.get(a.id) ?? 0,
+      openDealCount: openDealCount.get(a.id) ?? 0,
+      openDealValue: openDealValue.get(a.id) ?? 0,
+    }
+  })
 }
 
 export interface AccountContactRow {
@@ -215,9 +245,13 @@ export async function getAccountDetail(
   if (pipelinesRes.error) throw pipelinesRes.error
   if (dealsRes.error) throw dealsRes.error
 
-  const ownerEmail =
-    (profilesRes.data ?? []).find((p) => p.user_id === account.owner_user_id)
-      ?.email ?? null
+  // The owner membership, not accounts.owner_user_id: for a CRM the
+  // agency created that is a placeholder until the client accepts (050).
+  const ownerId = memberships.find((m) => m.role === 'owner')?.user_id
+  const ownerEmail = ownerId
+    ? ((profilesRes.data ?? []).find((p) => p.user_id === ownerId)?.email ??
+      null)
+    : null
 
   // Resolve contact names for the recent conversations in one round trip.
   const convContactIds = Array.from(

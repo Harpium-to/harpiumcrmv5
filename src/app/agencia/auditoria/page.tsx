@@ -3,16 +3,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
 import { listAudit } from '@/lib/agencia/queries'
+import { AUDIT_ACTION_LABEL } from '@/lib/agencia/crm'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 50
 
-const ACTION_LABEL: Record<string, string> = {
-  view_account: 'Abriu a conta',
-  view_conversation: 'Abriu uma conversa',
-  export_contacts: 'Exportou contatos',
-}
+const ACTION_LABEL = AUDIT_ACTION_LABEL
 
 export default async function AgenciaAuditoriaPage({
   searchParams,

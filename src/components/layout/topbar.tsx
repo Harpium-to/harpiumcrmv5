@@ -13,6 +13,7 @@ import { activeNavItem, NAV_SECTIONS } from "@/lib/nav";
 import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 import { AgentPulseChip } from "@/components/agents/agent-pulse-chip";
 import { ModeToggle } from "@/components/layout/mode-toggle";
+import { CrmMenuItems } from "@/components/layout/crm-menu-items";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -160,6 +161,7 @@ export function TopBar({ onOpenNav }: TopBarProps) {
                 </p>
               </div>
               <DropdownMenuSeparator className="bg-border" />
+              <CrmMenuItems />
               <DropdownMenuItem
                 render={
                   <Link

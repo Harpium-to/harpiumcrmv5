@@ -1,135 +1,23 @@
 // ============================================================
 // Migration 049 — platform access foundation.
 //
-// Every world is built the way production will see it: migrations
-// 001–048, users and a shared CRM created under the OLD model, then
-// 049 applied twice (idempotency), then new signups under the new
-// model. Each describe gets its own world so scenarios can't leak
-// state into each other.
+// See world.ts for how each world is built. Each describe gets its
+// own world so scenarios can't leak state into each other. Later
+// migrations are applied too, so these assert what 049 guarantees
+// as it stands today.
 // ============================================================
 
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { PGlite } from '@electric-sql/pglite'
 
+import { activeAccountOf, asUser, errorCode, inviteAndRedeem, signUp, sql } from './harness'
 import {
-  activeAccountOf,
-  applyMigration,
-  applyMigrationsBefore,
-  asUser,
-  createDb,
-  errorCode,
-  inviteAndRedeem,
-  signUp,
-  sql,
-} from './harness'
-
-const M049 = '049_plataforma_acesso.sql'
-
-const U = {
-  alice: '00000000-0000-4000-8000-0000000000a1', // owner of A
-  bob: '00000000-0000-4000-8000-0000000000b2', // agent in A
-  carol: '00000000-0000-4000-8000-0000000000c3', // viewer in A
-  dave: '00000000-0000-4000-8000-0000000000d4', // owner of D
-  agus: '00000000-0000-4000-8000-0000000000a5', // agency super_admin (pre-049)
-  eve: '00000000-0000-4000-8000-0000000000e6', // signs up between the two 049 runs
-  sara: '00000000-0000-4000-8000-0000000000f7', // agency support
-  mel: '00000000-0000-4000-8000-000000000108', // agency manager
-  mia: '00000000-0000-4000-8000-000000000119', // member of A and D
-  otto: '00000000-0000-4000-8000-00000000012a', // outsider
-}
-
-interface World {
-  db: PGlite
-  A: string
-  D: string
-  E: string
-  miaPersonal: string
-}
-
-async function buildWorld(): Promise<World> {
-  const db = await createDb()
-  await applyMigrationsBefore(db, M049)
-
-  // ---- old model (pre-049) ----
-  for (const [name, id] of [
-    ['Alice', U.alice],
-    ['Bob', U.bob],
-    ['Carol', U.carol],
-    ['Dave', U.dave],
-    ['Agus', U.agus],
-  ] as const) {
-    await signUp(db, id, name)
-  }
-  const A = (await activeAccountOf(db, U.alice))!
-  const D = (await activeAccountOf(db, U.dave))!
-  await inviteAndRedeem(db, A, U.bob, 'agent')
-  await inviteAndRedeem(db, A, U.carol, 'viewer')
-  await sql(
-    db,
-    `INSERT INTO contacts (user_id, account_id, phone, name) VALUES
-       ($1, $2, '5511900000001', 'Ana'),
-       ($3, $4, '5511900000002', 'Duda')`,
-    [U.alice, A, U.dave, D],
-  )
-  await sql(db, `INSERT INTO agencia_membros (user_id, label) VALUES ($1, 'Agus')`, [
-    U.agus,
-  ])
-
-  // ---- 049, twice, with a signup in between ----
-  await applyMigration(db, M049)
-  await signUp(db, U.eve, 'Eve')
-  const E = (await activeAccountOf(db, U.eve))!
-  await applyMigration(db, M049)
-
-  // ---- new model ----
-  for (const [name, id] of [
-    ['Sara', U.sara],
-    ['Mel', U.mel],
-    ['Mia', U.mia],
-    ['Otto', U.otto],
-  ] as const) {
-    await signUp(db, id, name)
-  }
-  await sql(
-    db,
-    `INSERT INTO agencia_membros (user_id, label, role) VALUES
-       ($1, 'Sara', 'support'), ($2, 'Mel', 'manager')`,
-    [U.sara, U.mel],
-  )
-  const miaPersonal = (await activeAccountOf(db, U.mia))!
-  await inviteAndRedeem(db, A, U.mia, 'agent')
-  await inviteAndRedeem(db, D, U.mia, 'viewer')
-
-  return { db, A, D, E, miaPersonal }
-}
-
-async function contactNames(db: PGlite, userId: string): Promise<string[]> {
-  const rows = await asUser<{ name: string }>(
-    db,
-    userId,
-    'SELECT name FROM contacts ORDER BY name',
-  )
-  return rows.map((r) => r.name)
-}
-
-function insertContact(db: PGlite, userId: string, accountId: string, phone: string) {
-  return asUser(
-    db,
-    userId,
-    `INSERT INTO contacts (user_id, account_id, phone, name)
-     VALUES (auth.uid(), $1, $2, 'Novo')`,
-    [accountId, phone],
-  )
-}
-
-async function context(db: PGlite, userId: string) {
-  const rows = await asUser<{ ctx: Record<string, unknown> | null }>(
-    db,
-    userId,
-    'SELECT current_account_context() AS ctx',
-  )
-  return rows[0].ctx
-}
+  buildWorld,
+  contactNames,
+  context,
+  insertContact,
+  U,
+  type World,
+} from './world'
 
 // ------------------------------------------------------------
 
@@ -311,6 +199,11 @@ describe('049 — agency access follows the CRM owner’s consent', () => {
     expect(await context(w.db, U.agus)).toMatchObject({ role: 'admin' })
     await insertContact(w.db, U.agus, w.D, '5511922222222')
 
+    // Since 050 a manager operates only CRMs in their portfolio.
+    await sql(w.db, 'UPDATE accounts SET manager_user_id = $1 WHERE id = $2', [
+      U.mel,
+      w.D,
+    ])
     await asUser(w.db, U.mel, 'SELECT set_active_account($1)', [w.D])
     expect(await context(w.db, U.mel)).toMatchObject({ role: 'admin' })
 

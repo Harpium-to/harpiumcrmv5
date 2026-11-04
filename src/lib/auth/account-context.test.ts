@@ -14,12 +14,14 @@ describe("parseAccountContext", () => {
         account_name: "Clínica X",
         role: "owner",
         via_agency: false,
+        status: "onboarding",
       }),
     ).toEqual({
       accountId: "a1",
       role: "owner",
       account: { id: "a1", name: "Clínica X" },
       viaAgency: false,
+      status: "onboarding",
     });
   });
 
@@ -32,6 +34,12 @@ describe("parseAccountContext", () => {
         via_agency: true,
       })?.viaAgency,
     ).toBe(true);
+  });
+
+  it("reads a context from before migration 050 as active", () => {
+    expect(
+      parseAccountContext({ account_id: "a1", role: "agent" })?.status,
+    ).toBe("active");
   });
 
   it("treats SQL NULL as no active CRM", () => {

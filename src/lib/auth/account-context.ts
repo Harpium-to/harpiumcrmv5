@@ -11,6 +11,7 @@
 // ============================================================
 
 import { isAccountRole, type AccountRole } from "./roles";
+import { toCrmStatus, type CrmStatus } from "@/lib/agencia/crm";
 
 export interface ResolvedAccount {
   accountId: string;
@@ -18,6 +19,8 @@ export interface ResolvedAccount {
   account: { id: string; name: string };
   /** True when access comes from the agency consent, not a membership. */
   viaAgency: boolean;
+  /** CRM lifecycle status (050). 'active' before 050 is applied. */
+  status: CrmStatus;
 }
 
 /**
@@ -39,6 +42,7 @@ export function parseAccountContext(value: unknown): ResolvedAccount | null {
       name: typeof v.account_name === "string" ? v.account_name : "",
     },
     viaAgency: v.via_agency === true,
+    status: toCrmStatus(v.status),
   };
 }
 

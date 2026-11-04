@@ -10,7 +10,15 @@ import {
   parseMetricWindow,
   type AccountMetrics,
 } from '@/lib/agencia/queries'
+import {
+  getAgencyAccessLevel,
+  listAgencyOperators,
+  loadAccountRows,
+  loadPendingOwnerInvites,
+} from '@/lib/agencia/crms'
+import { CRM_STATUS_LABEL, nicheLabel } from '@/lib/agencia/crm'
 import { PeriodTabs } from '../ui'
+import { CrmManagePanel } from './manage'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,12 +32,21 @@ export default async function AgenciaAccountPage({
 }) {
   const { accountId } = await params
   const windowDays = parseMetricWindow((await searchParams).dias)
-  const { admin, userId } = await requireAgencia()
-  const [detail, metrics] = await Promise.all([
-    getAccountDetail(admin, accountId),
-    getAccountMetrics(admin, accountId, windowDays),
-  ])
+  const { admin, userId, role: myRole } = await requireAgencia()
+  const [detail, metrics, lifecycleRows, pendingOwners, agencyLevel, operators] =
+    await Promise.all([
+      getAccountDetail(admin, accountId),
+      getAccountMetrics(admin, accountId, windowDays),
+      loadAccountRows(admin, accountId),
+      loadPendingOwnerInvites(admin, accountId),
+      getAgencyAccessLevel(admin, accountId),
+      listAgencyOperators(admin),
+    ])
   if (!detail) notFound()
+  const lifecycle = lifecycleRows[0]
+  const canEdit =
+    myRole === 'super_admin' ||
+    (myRole === 'manager' && lifecycle?.manager_user_id === userId)
 
   // Audit this privileged view (non-blocking on failure).
   await logAgenciaAccess(admin, {
@@ -52,9 +69,17 @@ export default async function AgenciaAccountPage({
             <ArrowLeft className="h-4 w-4" />
             Todas as contas
           </Link>
-          <h1 className="mt-2 text-2xl font-bold">{account.name}</h1>
+          <h1 className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-bold">
+            {account.name}
+            {lifecycle && lifecycle.status !== 'active' && (
+              <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                {CRM_STATUS_LABEL[lifecycle.status]}
+              </span>
+            )}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {account.ownerEmail ?? 'sem dono'} · criada em{' '}
+            {account.ownerEmail ?? 'sem dono'}
+            {lifecycle?.niche && <> · {nicheLabel(lifecycle.niche)}</>} · criado em{' '}
             {formatDate(account.createdAt)}
           </p>
         </div>
@@ -80,6 +105,22 @@ export default async function AgenciaAccountPage({
           value={formatAmount(stats.openDealValue)}
         />
       </div>
+
+      {lifecycle && (
+        <CrmManagePanel
+          accountId={account.id}
+          status={lifecycle.status}
+          niche={lifecycle.niche}
+          managerUserId={lifecycle.manager_user_id}
+          notes={lifecycle.notes}
+          ownerEmail={account.ownerEmail}
+          pendingOwner={pendingOwners.get(account.id) ?? null}
+          agencyLevel={agencyLevel}
+          operators={operators}
+          myRole={myRole}
+          canEdit={canEdit}
+        />
+      )}
 
       {/* Analysis — 30-day window */}
       <Section title={`Análise · últimos ${metrics.windowDays} dias`}>

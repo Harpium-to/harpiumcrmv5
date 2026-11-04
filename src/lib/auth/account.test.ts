@@ -79,9 +79,8 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: () => createClient(),
 }));
 
-const { getCurrentAccount, UnauthorizedError, ForbiddenError } = await import(
-  "./account"
-);
+const { getCurrentAccount, requireRole, UnauthorizedError, ForbiddenError } =
+  await import("./account");
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -148,6 +147,30 @@ describe("getCurrentAccount — migration 049 applied", () => {
     const err = await getCurrentAccount().catch((e) => e);
     expect(err).toBeInstanceOf(ForbiddenError);
     expect(err.message).toBe("Você não está em nenhum CRM");
+  });
+
+  it("a suspended CRM reads but refuses writes, and says why", async () => {
+    const { client } = makeClient({
+      user: { id: "user-1" },
+      rpc: {
+        data: {
+          account_id: "acct-1",
+          account_name: "Clínica X",
+          role: "owner",
+          status: "suspended",
+          via_agency: false,
+        },
+        error: null,
+      },
+      byTable: {},
+    });
+    createClient.mockReturnValue(client);
+    await expect(requireRole("viewer")).resolves.toMatchObject({
+      status: "suspended",
+    });
+    await expect(requireRole("agent")).rejects.toThrow(
+      "Este CRM está suspenso: só leitura. Fale com a agência.",
+    );
   });
 
   it("fails closed on any other RPC error instead of falling back", async () => {

@@ -31,6 +31,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { hasMinRole, isAccountRole, type AccountRole } from "./roles";
 import { isMissingFunction, parseAccountContext } from "./account-context";
+import type { CrmStatus } from "@/lib/agencia/crm";
 
 // ------------------------------------------------------------
 // Errors
@@ -95,6 +96,8 @@ export interface AccountContext {
    * owner granted, not through a membership. Always false before 049.
    */
   viaAgency: boolean;
+  /** CRM lifecycle status (050). Suspended means read-only. */
+  status: CrmStatus;
 }
 
 /**
@@ -207,6 +210,7 @@ async function legacyAccountContext(
     role: data.account_role,
     account: { id: account.id, name: account.name },
     viaAgency: false,
+    status: "active",
   };
 }
 
@@ -219,6 +223,13 @@ async function legacyAccountContext(
  */
 export async function requireRole(min: AccountRole): Promise<AccountContext> {
   const ctx = await getCurrentAccount();
+  // A suspended CRM is read-only for everyone; the database refuses
+  // the write anyway (050), this just says why in words.
+  if (ctx.status === "suspended" && min !== "viewer") {
+    throw new ForbiddenError(
+      "Este CRM está suspenso: só leitura. Fale com a agência.",
+    );
+  }
   if (!hasMinRole(ctx.role, min)) {
     throw new ForbiddenError(
       `This action requires the '${min}' role or higher`,

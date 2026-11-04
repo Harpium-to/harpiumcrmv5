@@ -5,7 +5,9 @@ import {
   MessageSquare,
   Contact,
   Coins,
+  Plus,
   TrendingUp,
+  UserRoundPlus,
 } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
@@ -15,7 +17,17 @@ import {
   parseMetricWindow,
   type AgencyOverview,
 } from '@/lib/agencia/queries'
+import { getPlatformSettings, listPendingSignups } from '@/lib/agencia/crms'
+import {
+  CRM_STATUSES,
+  CRM_STATUS_LABEL,
+  isCrmStatus,
+  nicheLabel,
+  type CrmStatus,
+} from '@/lib/agencia/crm'
+import { hasAgenciaRole } from '@/lib/agencia/roles'
 import { PeriodTabs } from './ui'
+import { PlatformSettings } from './platform-settings'
 
 // Reads live account data through the service role on every request.
 export const dynamic = 'force-dynamic'
@@ -23,18 +35,42 @@ export const dynamic = 'force-dynamic'
 export default async function AgenciaHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ dias?: string }>
+  searchParams: Promise<{ dias?: string; status?: string }>
 }) {
-  const windowDays = parseMetricWindow((await searchParams).dias)
+  const sp = await searchParams
+  const windowDays = parseMetricWindow(sp.dias)
+  // No filter = everything but archived.
+  const statusFilter: CrmStatus | null = isCrmStatus(sp.status) ? sp.status : null
   // Defence in depth: the layout already gated, but a page can execute
   // even as the layout redirects, so we re-verify and get the client.
-  const { admin } = await requireAgencia()
-  const [accounts, overview] = await Promise.all([
+  const { admin, role } = await requireAgencia()
+  const [allAccounts, rawOverview, pendingSignups, platform] = await Promise.all([
     listAccountsOverview(admin),
     getAgencyOverview(admin, windowDays),
+    listPendingSignups(admin),
+    getPlatformSettings(admin),
   ])
 
-  const totals = accounts.reduce(
+  // Archived CRMs drop out of every number and list unless asked for.
+  const archived = new Set(
+    allAccounts.filter((a) => a.status === 'archived').map((a) => a.id),
+  )
+  const live = allAccounts.filter((a) => a.status !== 'archived')
+  const accounts = statusFilter
+    ? allAccounts.filter((a) => a.status === statusFilter)
+    : live
+  const overview: AgencyOverview = {
+    ...rawOverview,
+    ranking: rawOverview.ranking.filter((r) => !archived.has(r.accountId)),
+    attention: rawOverview.attention.filter((a) => !archived.has(a.accountId)),
+  }
+  const countByStatus = new Map<CrmStatus, number>()
+  for (const a of allAccounts) {
+    countByStatus.set(a.status, (countByStatus.get(a.status) ?? 0) + 1)
+  }
+  const canCreate = hasAgenciaRole(role, 'manager')
+
+  const totals = live.reduce(
     (acc, a) => ({
       contacts: acc.contacts + a.contactCount,
       conversations: acc.conversations + a.openConversationCount,
@@ -50,15 +86,63 @@ export default async function AgenciaHomePage({
         <div>
           <h1 className="text-2xl font-bold">Visão da agência</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Panorama somado de todas as contas · últimos {windowDays} dias
+            Panorama somado de todos os CRMs · últimos {windowDays} dias
           </p>
         </div>
-        <PeriodTabs basePath="/agencia" current={windowDays} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodTabs
+            basePath="/agencia"
+            current={windowDays}
+            params={{ status: statusFilter ?? undefined }}
+          />
+          {canCreate && (
+            <Link
+              href="/agencia/novo"
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4" />
+              Novo CRM
+            </Link>
+          )}
+        </div>
       </div>
+
+      {/* Aguardando liberação */}
+      {pendingSignups.length > 0 && (
+        <Section title={`Aguardando liberação · ${pendingSignups.length}`}>
+          <ul className="divide-y divide-border">
+            {pendingSignups.map((p) => (
+              <li
+                key={p.userId}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">{p.name ?? p.email ?? p.userId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.email} · cadastro em {formatDate(p.createdAt)}
+                    {p.invitedTo && <> · já convidado para {p.invitedTo}</>}
+                  </p>
+                </div>
+                {canCreate && !p.invitedTo && p.email && (
+                  <Link
+                    href={`/agencia/novo?email=${encodeURIComponent(p.email)}${
+                      p.name ? `&nome=${encodeURIComponent(p.name)}` : ''
+                    }`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs hover:bg-muted"
+                  >
+                    <UserRoundPlus className="h-3.5 w-3.5" />
+                    Criar CRM para esta pessoa
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       {/* Totais da carteira */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Tile label="Contas" value={accounts.length.toLocaleString()} />
+        <Tile label="CRMs" value={live.length.toLocaleString()} />
         <Tile label="Contatos" value={totals.contacts.toLocaleString()} />
         <Tile
           label="Conversas abertas"
@@ -156,12 +240,31 @@ export default async function AgenciaHomePage({
         </Section>
       </div>
 
-      {/* Grade de contas */}
+      {/* Grade de CRMs */}
       <div>
-        <h2 className="mb-3 text-lg font-semibold">Contas dos clientes</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">CRMs dos clientes</h2>
+          <div className="flex flex-wrap gap-1.5">
+            <StatusPill
+              href={statusHref(null, windowDays)}
+              active={statusFilter === null}
+              label="Todos"
+              count={live.length}
+            />
+            {CRM_STATUSES.map((s) => (
+              <StatusPill
+                key={s}
+                href={statusHref(s, windowDays)}
+                active={statusFilter === s}
+                label={CRM_STATUS_LABEL[s]}
+                count={countByStatus.get(s) ?? 0}
+              />
+            ))}
+          </div>
+        </div>
         {accounts.length === 0 ? (
           <p className="rounded-lg border border-border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
-            Nenhuma conta encontrada.
+            Nenhum CRM {statusFilter ? `com status ${CRM_STATUS_LABEL[statusFilter]}` : 'ainda'}.
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -177,8 +280,25 @@ export default async function AgenciaHomePage({
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {a.ownerEmail ?? 'sem dono'}
+                    {a.ownerEmail ??
+                      (a.pendingOwnerEmail
+                        ? `convite pendente: ${a.pendingOwnerEmail}`
+                        : 'sem dono')}
                   </p>
+                  {(a.status !== 'active' || a.niche) && (
+                    <p className="mt-2 flex flex-wrap gap-1.5">
+                      {a.status !== 'active' && (
+                        <Badge tone={STATUS_TONE[a.status]}>
+                          {CRM_STATUS_LABEL[a.status]}
+                        </Badge>
+                      )}
+                      {a.niche && (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {nicheLabel(a.niche)}
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
                   <Stat icon={Contact} label="Contatos" value={a.contactCount} />
@@ -195,8 +315,56 @@ export default async function AgenciaHomePage({
           </div>
         )}
       </div>
+
+      {role === 'super_admin' && platform.autoPersonalAccount !== null && (
+        <Section title="Plataforma">
+          <PlatformSettings autoPersonalAccount={platform.autoPersonalAccount} />
+        </Section>
+      )}
     </div>
   )
+}
+
+const STATUS_TONE: Record<CrmStatus, 'red' | 'blue' | 'amber'> = {
+  onboarding: 'blue',
+  active: 'blue',
+  suspended: 'red',
+  archived: 'amber',
+}
+
+function statusHref(status: CrmStatus | null, dias: number): string {
+  const sp = new URLSearchParams({ dias: String(dias) })
+  if (status) sp.set('status', status)
+  return `/agencia?${sp.toString()}`
+}
+
+function StatusPill({
+  href,
+  active,
+  label,
+  count,
+}: {
+  href: string
+  active: boolean
+  label: string
+  count: number
+}) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-full border px-3 py-1 text-xs ${
+        active
+          ? 'border-primary bg-primary/10 text-primary'
+          : 'border-border text-muted-foreground hover:bg-muted'
+      }`}
+    >
+      {label} · {count}
+    </Link>
+  )
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('pt-BR')
 }
 
 function Tile({ label, value }: { label: string; value: string }) {

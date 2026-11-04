@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Seis
+**Nada do que foi construído funciona até isso acontecer.** Sete
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -18,6 +18,7 @@ migrations estão no repo e não foram aplicadas:
 | `047_instagram_channel.sql` | canal Instagram, `conversations.channel` | Instagram não aparece; inbox inalterado |
 | `048_report_first_response.sql` | função `report_first_response` + índice `messages(conversation_id, created_at, id)` | o cartão "Tempo de primeira resposta" em `/relatorios` explica que falta a migration |
 | `049_plataforma_acesso.sql` | Fase 1 da plataforma (ver §1A): vários CRMs por usuário, consentimento de acesso da agência por CRM, papéis da agência | o app usa o caminho antigo (um CRM por usuário, agência sem papéis) — mesmo comportamento de antes |
+| `050_ciclo_vida_crm.sql` | Fase 2 (ver §1B): a agência cria CRMs e convida o dono, status (implantação / ativo / suspenso / arquivado), carteira do gestor, convite preso a um e-mail | "Novo CRM" e a gestão do CRM respondem que falta a 050; o resto funciona como na 049 |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -88,6 +89,43 @@ migrations no PGlite, cria usuários no modelo antigo, aplica a 049 duas
 vezes e cobre cada combinação papel × nível. Foram conferidos
 sabotando a migration (tirar a regra do CRM ativo, tirar o limite do
 suporte): 5 testes quebram.
+
+---
+
+## 1B. Fase 2 — ciclo de vida do CRM (050)
+
+- **A agência cria o CRM** em `/agencia/novo`: nome, e-mail do dono,
+  nicho, gestor responsável, nível de acesso proposto, observações. O
+  CRM nasce **em implantação**, com um **convite de dono preso àquele
+  e-mail** (vale 14 dias). O link aparece uma vez; se a pessoa já tem
+  login, também vê o convite dentro do sistema, sem o link.
+- **Dono provisório.** Webhooks gravam linhas com
+  `accounts.owner_user_id` (colunas `user_id` são NOT NULL), então um
+  CRM criado pela agência usa **quem o criou** como ponteiro até o
+  cliente aceitar. Não é participação e não dá acesso. O dono de
+  verdade é quem tem papel `owner` em `account_members` — o console já
+  lê assim.
+- **Status** aplicado no banco (`is_account_member`): suspenso = todo
+  mundo só lê (mensagens continuam chegando por webhook); arquivado =
+  some para todos, e quem estava nele é movido para outro CRM. Só a
+  agência muda status, nicho, gestor e notas (`agencia_update_account`,
+  com trigger que barra a sessão do cliente — nem o dono altera).
+- **Carteira do gestor:** gestor só opera (admin) os CRMs em que é o
+  responsável; nos outros, mesmo com acesso Total, só lê. Arquivar e
+  trocar o gestor é só super admin.
+- **Cadastro sem CRM:** `/aguardando` mostra os convites para o e-mail
+  da pessoa e o botão de aceitar. O console lista quem está aguardando
+  com "Criar CRM para esta pessoa". A chave "Cadastro novo cria um CRM
+  pessoal" fica no fim de `/agencia` (super admin). **Continua ligada**
+  até alguém desligar.
+- **Trocar de CRM** e **Painel da agência** ficam no menu do perfil.
+- **Convite de dono para um CRM existente** (ficha do CRM → "Convidar
+  o dono" / "Passar a propriedade"): é como se monta o caso real — o
+  CRM da Harpium com o dono definitivo.
+
+Testes: `supabase/tests/ciclo-vida.test.ts` (17 casos, conferidos
+sabotando a migration) e renderização do painel de gestão e da tela de
+espera.
 
 ---
 
@@ -271,7 +309,9 @@ Eu errei metade destas antes de olhar o código ao redor.
 13. **Quem está num CRM é `account_members`, não `profiles.account_id`**
     (049). `profiles.account_id` é só o CRM aberto agora. Para listar
     membros, contar usuários de um CRM ou checar participação, leia
-    `account_members`. E não confie em `profiles.account_role` no
+    `account_members`. O mesmo vale para "quem é o dono": é o membro
+    com papel `owner`, não `accounts.owner_user_id` (050 usa esse campo
+    como ponteiro provisório da agência). E não confie em `profiles.account_role` no
     servidor: use `getCurrentAccount()`, que pergunta ao banco e
     acompanha um acesso temporário da agência expirando.
 
@@ -289,7 +329,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 956 passando (inclui supabase/tests)
+npx vitest run                   # 992 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 

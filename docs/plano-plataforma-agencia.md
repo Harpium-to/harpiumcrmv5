@@ -3,10 +3,10 @@
 Documento de planejamento. Escrito em 04/11/2026 sobre a branch
 `feat/agencia-supervisao-ptbr`.
 
-**Andamento:** Fase 1 implementada em 04/11/2026 (migration
-`049_plataforma_acesso.sql`, ainda **não aplicada** no Supabase). As
-demais fases não começaram. Detalhes do que a 049 muda em
-`HANDOFF.md` §1A.
+**Andamento (04/11/2026):** Fases 1 e 2 implementadas (migrations
+`049_plataforma_acesso.sql` e `050_ciclo_vida_crm.sql`, ainda **não
+aplicadas** no Supabase). As demais fases não começaram. Detalhes em
+`HANDOFF.md` §1A e §1B.
 
 ---
 
@@ -448,7 +448,7 @@ testes novos para as regras de acesso.
 | **0. Pré-requisito** | Aplicar as migrations 044–048 pendentes (ver `HANDOFF.md` §0). Backup do banco. | — |
 | **0B. Extensão visível** (seção 7A) | Menu do perfil + seção em Configurações, `.zip` para baixar, chave pessoal da extensão gerada por qualquer atendente, status de conexão, revogação ao remover membro. | — (independente) |
 | **1. Fundação de acesso** ✅ | `account_members`, CRM ativo, nova `is_account_member`, papéis da agência, `account_agency_access`, convite de dono, cadastro sem CRM automático. **Sem mudança visível** para clientes atuais. Testes de RLS no PGlite cobrindo cada combinação papel × nível. | 0 |
-| **2. Ciclo de vida do CRM** | "Novo CRM" no console, convite de dono, status, tela "Aguardando liberação", seletor/trocador de CRM, login direcionando por papel. Montar o caso real: CRM Harpium com `marcelarruda2013@gmail.com` como dono. | 1 |
+| **2. Ciclo de vida do CRM** ✅ | "Novo CRM" no console, convite de dono, status, tela "Aguardando liberação", seletor/trocador de CRM, login direcionando por papel. Montar o caso real: CRM Harpium com `marcelarruda2013@gmail.com` como dono. | 1 |
 | **3. Consentimento** | Tela "Acesso da agência" do cliente, pedidos de nível, acesso temporário, log de acessos visível ao cliente, console respeitando nível (tela + servidor + RLS). | 1 |
 | **4. Painel da Plataforma** | `account_usage_daily` + cron, nota de saúde, tabela de CRMs com filtros, alertas novos, último acesso. | 1 (dados), 2 (status) |
 | **5. Modelos por nicho** | `crm_templates`, aplicar na criação e em CRM existente, 3 modelos iniciais (Clínica médica, Academia, Genérico), editor no console, "salvar CRM como modelo". | 2 |

@@ -52,12 +52,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import {
+  AGENCY_ACCESS_DESCRIPTION,
+  AGENCY_ACCESS_LABEL,
+  isAgencyAccessLevel,
+} from '@/lib/agencia/crm';
 
 interface PeekOk {
   ok: true;
   account_name: string;
-  role: 'admin' | 'agent' | 'viewer';
+  role: 'owner' | 'admin' | 'agent' | 'viewer';
   expires_at: string;
+  /** Masked email the invitation is bound to (050), if any. */
+  email_hint?: string | null;
+  /** Owner invitations: what the agency will see in this CRM (050). */
+  agency_level?: string | null;
 }
 interface PeekFail {
   ok: false;
@@ -66,6 +75,7 @@ interface PeekFail {
 type PeekResult = PeekOk | PeekFail;
 
 const ROLE_LABEL: Record<PeekOk['role'], string> = {
+  owner: 'Dono',
   admin: 'Administrador',
   agent: 'Atendente',
   viewer: 'Leitor',
@@ -310,7 +320,22 @@ export default function JoinPage() {
           day: 'numeric',
         })}
         .
+        {peek.email_hint && (
+          <>
+            {' '}
+            Este convite é para{' '}
+            <span className="text-foreground">{peek.email_hint}</span>.
+          </>
+        )}
       </CardDescription>
+      {peek.role === 'owner' && isAgencyAccessLevel(peek.agency_level) && (
+        <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-left text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            Acesso da agência a este CRM: {AGENCY_ACCESS_LABEL[peek.agency_level]}.
+          </span>{' '}
+          {AGENCY_ACCESS_DESCRIPTION[peek.agency_level]}
+        </p>
+      )}
     </CardHeader>
   );
 

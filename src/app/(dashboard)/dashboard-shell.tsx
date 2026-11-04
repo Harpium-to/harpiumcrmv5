@@ -8,13 +8,14 @@ import { TopBar } from "@/components/layout/topbar";
 import { PageTransition } from "@/components/layout/page-transition";
 import { Glow } from "@/components/ui/glow";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
+import { CrmStatusBanner } from "@/components/layout/crm-status-banner";
 
 // Auth-gated dashboard shell. Extracted from the layout so the layout
 // itself can stay a server component and export metadata (noindex) —
 // client components can't export Next's metadata object.
 
 function DashboardShellInner({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, profile, profileLoading } = useAuth();
   const router = useRouter();
 
   // Nav drawer state — only used on mobile. On lg+ the rail is always
@@ -28,6 +29,14 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, router]);
 
+  // Signed in with no CRM (049: signup without a personal CRM, or
+  // removed from the last one) — nothing here can load. Only act on a
+  // profile that actually loaded; a failed fetch leaves it null.
+  const noCrm = !!user && !profileLoading && !!profile && !profile.account_id;
+  useEffect(() => {
+    if (noCrm) router.replace("/aguardando");
+  }, [noCrm, router]);
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -39,7 +48,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) return null;
+  if (!user || noCrm) return null;
 
   return (
     // One scroll container for the whole workspace. The rail floats
@@ -74,6 +83,7 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-[5.25rem]" data-print="flatten">
         <div data-print="hide">
           <TopBar onOpenNav={() => setNavOpen(true)} />
+          <CrmStatusBanner accountId={profile?.account_id ?? null} />
         </div>
         <main className="px-3 pt-2 pb-10 sm:px-4 sm:pb-14" data-print="flatten">
           {/* This one wrapper is what gives all ~20 dashboard routes
