@@ -11,6 +11,37 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+interface Membership {
+  user_id: string
+  account_id: string
+  role: string
+}
+
+/**
+ * Who belongs to which CRM. Since migration 049 that is
+ * `account_members` (a user can be in several CRMs, and
+ * `profiles.account_id` is only the one they have open). Before 049
+ * the table doesn't exist and the profile row is the membership.
+ */
+async function loadMemberships(
+  admin: SupabaseClient,
+  accountId?: string,
+): Promise<Membership[]> {
+  let q = admin.from('account_members').select('user_id, account_id, role')
+  if (accountId) q = q.eq('account_id', accountId)
+  const { data, error } = await q
+  if (!error) return data ?? []
+  if (!isMissingTable(error)) throw error
+
+  let legacy = admin.from('profiles').select('user_id, account_id, account_role')
+  if (accountId) legacy = legacy.eq('account_id', accountId)
+  const { data: rows, error: legacyErr } = await legacy
+  if (legacyErr) throw legacyErr
+  return (rows ?? [])
+    .filter((r) => r.account_id && r.account_role)
+    .map((r) => ({ user_id: r.user_id, account_id: r.account_id, role: r.account_role }))
+}
+
 export interface AccountOverview {
   id: string
   name: string
@@ -31,13 +62,14 @@ export interface AccountOverview {
 export async function listAccountsOverview(
   admin: SupabaseClient,
 ): Promise<AccountOverview[]> {
-  const [accountsRes, profilesRes, contactsRes, conversationsRes, dealsRes] =
+  const [accountsRes, profilesRes, memberships, contactsRes, conversationsRes, dealsRes] =
     await Promise.all([
       admin
         .from('accounts')
         .select('id, name, owner_user_id, created_at')
         .order('created_at', { ascending: true }),
-      admin.from('profiles').select('user_id, account_id, email'),
+      admin.from('profiles').select('user_id, email'),
+      loadMemberships(admin),
       admin.from('contacts').select('account_id'),
       admin.from('conversations').select('account_id, status'),
       admin.from('deals').select('account_id, value, status'),
@@ -50,11 +82,10 @@ export async function listAccountsOverview(
   if (dealsRes.error) throw dealsRes.error
 
   const emailByUser = new Map<string, string | null>()
-  const memberCount = new Map<string, number>()
   for (const p of profilesRes.data ?? []) {
     emailByUser.set(p.user_id, p.email ?? null)
-    memberCount.set(p.account_id, (memberCount.get(p.account_id) ?? 0) + 1)
   }
+  const memberCount = tally(memberships, (m) => m.account_id)
 
   const contactCount = tally(contactsRes.data ?? [], (r) => r.account_id)
 
@@ -145,6 +176,9 @@ export async function getAccountDetail(
   if (accountErr) throw accountErr
   if (!account) return null
 
+  const memberships = await loadMemberships(admin, accountId)
+  const memberIds = memberships.map((m) => m.user_id)
+
   const [
     profilesRes,
     contactsRes,
@@ -154,8 +188,8 @@ export async function getAccountDetail(
   ] = await Promise.all([
     admin
       .from('profiles')
-      .select('user_id, email, account_role')
-      .eq('account_id', accountId),
+      .select('user_id, email')
+      .in('user_id', [...new Set([...memberIds, account.owner_user_id])]),
     admin
       .from('contacts')
       .select('id, name, phone, email, created_at')
@@ -266,9 +300,11 @@ export async function getAccountDetail(
       ownerEmail,
       createdAt: account.created_at,
     },
-    members: (profilesRes.data ?? []).map((p) => ({
-      email: p.email ?? null,
-      role: p.account_role ?? '—',
+    members: memberships.map((m) => ({
+      email:
+        (profilesRes.data ?? []).find((p) => p.user_id === m.user_id)?.email ??
+        null,
+      role: m.role ?? '—',
     })),
     stats: {
       contactCount: contactCountRes.count ?? 0,

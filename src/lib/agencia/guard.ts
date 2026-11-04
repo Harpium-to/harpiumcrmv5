@@ -24,12 +24,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { createClient } from '@/lib/supabase/server'
 import { ForbiddenError, UnauthorizedError } from '@/lib/auth/account'
+import { isMissingFunction } from '@/lib/auth/account-context'
 import { supabaseAdmin } from './admin-client'
+import { hasAgenciaRole, isAgenciaRole, type AgenciaRole } from './roles'
 
 export type AgenciaGate =
   | { status: 'unauthed' }
   | { status: 'forbidden'; userId: string }
-  | { status: 'ok'; userId: string; admin: SupabaseClient }
+  | { status: 'ok'; userId: string; role: AgenciaRole; admin: SupabaseClient }
 
 /**
  * Resolve the caller's agency status without throwing.
@@ -62,7 +64,30 @@ export async function loadAgencia(): Promise<AgenciaGate> {
     return { status: 'forbidden', userId: user.id }
   }
 
-  return { status: 'ok', userId: user.id, admin: supabaseAdmin() }
+  return {
+    status: 'ok',
+    userId: user.id,
+    role: await loadAgenciaRole(supabase),
+    admin: supabaseAdmin(),
+  }
+}
+
+/**
+ * The caller's platform role (migration 049). Before 049 there are no
+ * roles and every agency member has always had full power, so a
+ * missing function reads as super_admin. Any other failure — or a
+ * value this code doesn't know — reads as the least privileged role.
+ */
+async function loadAgenciaRole(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<AgenciaRole> {
+  const { data, error } = await supabase.rpc('agencia_role')
+  if (error) {
+    if (isMissingFunction(error)) return 'super_admin'
+    console.error('[loadAgencia] agencia_role rpc error:', error)
+    return 'support'
+  }
+  return isAgenciaRole(data) ? data : 'support'
 }
 
 /**
@@ -70,8 +95,9 @@ export async function loadAgencia(): Promise<AgenciaGate> {
  * `UnauthorizedError` (no session) or `ForbiddenError` (not an agency
  * member); on success returns the caller id + service-role client.
  */
-export async function requireAgencia(): Promise<{
+export async function requireAgencia(minRole: AgenciaRole = 'support'): Promise<{
   userId: string
+  role: AgenciaRole
   admin: SupabaseClient
 }> {
   const gate = await loadAgencia()
@@ -81,5 +107,8 @@ export async function requireAgencia(): Promise<{
   if (gate.status === 'forbidden') {
     throw new ForbiddenError('Acesso restrito à agência')
   }
-  return { userId: gate.userId, admin: gate.admin }
+  if (!hasAgenciaRole(gate.role, minRole)) {
+    throw new ForbiddenError('Seu papel na agência não permite esta ação')
+  }
+  return { userId: gate.userId, role: gate.role, admin: gate.admin }
 }

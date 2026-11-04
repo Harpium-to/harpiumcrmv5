@@ -13,6 +13,9 @@ export default defineConfig({
       // working out which chat is open from someone else's DOM — runs
       // in the same test command as everything else.
       "extension/**/*.test.js",
+      // RLS and SECURITY DEFINER functions, run on the real migrations
+      // in PGlite (Postgres in WASM) — see supabase/tests/harness.ts.
+      "supabase/tests/**/*.test.ts",
     ],
     // Dummy secrets — encryption.ts / webhook-signature.ts read these
     // at module load. Tests never hit a real Meta/Supabase service, so

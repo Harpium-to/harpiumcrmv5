@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Cinco
+**Nada do que foi construído funciona até isso acontecer.** Seis
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -17,6 +17,7 @@ migrations estão no repo e não foram aplicadas:
 | `046_deal_close_timestamp.sql` | data real de fechamento de negócio | relatórios usam `updated_at` e se marcam como aproximados |
 | `047_instagram_channel.sql` | canal Instagram, `conversations.channel` | Instagram não aparece; inbox inalterado |
 | `048_report_first_response.sql` | função `report_first_response` + índice `messages(conversation_id, created_at, id)` | o cartão "Tempo de primeira resposta" em `/relatorios` explica que falta a migration |
+| `049_plataforma_acesso.sql` | Fase 1 da plataforma (ver §1A): vários CRMs por usuário, consentimento de acesso da agência por CRM, papéis da agência | o app usa o caminho antigo (um CRM por usuário, agência sem papéis) — mesmo comportamento de antes |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -33,6 +34,60 @@ A 048 cria um índice em `messages`. Sem `CONCURRENTLY` (o SQL editor
 roda tudo numa transação), então ela trava escrita em `messages` pelo
 tempo de construir o índice — em conta pequena é instantâneo, em conta
 grande rode fora do horário de pico.
+
+**A 049 mexe na função de que todas as regras de acesso dependem**
+(`is_account_member`). Faça backup antes, aplique fora do horário de
+pico, e depois confira: entrar com um dono, um atendente e um
+visualizador de clientes diferentes, cada um vê só o próprio CRM; a
+lista de membros em Configurações continua igual; `/agencia/membros`
+mostra o papel de cada um (os membros atuais viram Super admin).
+
+---
+
+## 1A. Fase 1 da plataforma — o que a 049 muda
+
+Plano completo em `docs/plano-plataforma-agencia.md`. A Fase 1 é só
+fundação: **nenhuma tela de cliente muda.**
+
+- **`account_members`** é a fonte de verdade de quem está em qual CRM.
+  Um usuário pode estar em vários. `profiles.account_id` passou a
+  significar **o CRM aberto agora**, e `profiles.account_role` é só um
+  espelho do papel nesse CRM, para a UI do cliente.
+- **O RLS só enxerga o CRM ativo.** `is_account_member()` exige que o
+  alvo seja o CRM ativo *e* que a pessoa seja membro (ou agência com
+  consentimento). Isso evita que uma consulta sem `.eq('account_id')`
+  misture dados de dois CRMs.
+- **Consentimento da agência por CRM** (`account_agency_access`):
+  `metrics` (nada linha a linha) / `read` (≈ visualizador) / `full`
+  (≈ admin, nunca dono), mais acesso temporário que expira sozinho. Só
+  o **dono** muda (`set_agency_access`). CRMs que já existiam começam em
+  `read` (o que o console já mostra hoje); CRMs novos em `metrics`.
+- **Papéis da agência** (`agencia_membros.role`): `super_admin`,
+  `manager`, `support`. Os atuais viraram super_admin; novos começam
+  em support. Suporte nunca passa de leitura.
+- **RPCs novas:** `current_account_context` (o que `getCurrentAccount`
+  usa), `list_my_accounts`, `set_active_account` (registra na
+  auditoria quando é a agência entrando), `set_agency_access`.
+- **Convite de dono** existe, mas só o service role cria (um admin não
+  consegue se promover a dono por convite).
+- **Cadastro** continua criando um CRM pessoal, atrás da flag
+  `platform_settings.auto_personal_account`. A Fase 2 desliga junto com
+  a tela "Aguardando liberação".
+- **Apagar um CRM não apaga mais os perfis** de quem estava nele (a FK
+  da 017 era `ON DELETE CASCADE`).
+- **Upload de mídia** (chat-media, flow-media) passou a exigir papel de
+  atendente ou acima.
+
+O **console `/agencia` ainda lê tudo pelo service role**, sem olhar o
+nível de consentimento. Isso é a Fase 3. Até lá, o consentimento só vale
+para quem entra num CRM pelo caminho do RLS (`set_active_account`), que
+ainda não tem tela.
+
+Testes: `supabase/tests/plataforma-acesso.test.ts` roda as 49
+migrations no PGlite, cria usuários no modelo antigo, aplica a 049 duas
+vezes e cobre cada combinação papel × nível. Foram conferidos
+sabotando a migration (tirar a regra do CRM ativo, tirar o limite do
+suporte): 5 testes quebram.
 
 ---
 
@@ -213,6 +268,20 @@ Eu errei metade destas antes de olhar o código ao redor.
     reais (contraste, croma, separação sob daltonismo). Se mudar,
     revalide — verde/vermelho reprova.
 
+13. **Quem está num CRM é `account_members`, não `profiles.account_id`**
+    (049). `profiles.account_id` é só o CRM aberto agora. Para listar
+    membros, contar usuários de um CRM ou checar participação, leia
+    `account_members`. E não confie em `profiles.account_role` no
+    servidor: use `getCurrentAccount()`, que pergunta ao banco e
+    acompanha um acesso temporário da agência expirando.
+
+14. **Regra de acesso nova = teste no PGlite.** `supabase/tests/`
+    roda as migrations de verdade. Mexeu em policy, RPC `SECURITY
+    DEFINER` ou `is_account_member`, acrescente o caso lá. Função que
+    recebe um id de usuário arbitrário precisa de `REVOKE ... FROM
+    PUBLIC, anon, authenticated`: o Supabase concede `EXECUTE`
+    explicitamente a esses papéis, e `FROM PUBLIC` sozinho não tira.
+
 ---
 
 ## 5. Como verificar
@@ -220,7 +289,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 882 passando
+npx vitest run                   # 956 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 
