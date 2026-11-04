@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Oito
+**Nada do que foi construído funciona até isso acontecer.** Nove
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -20,6 +20,7 @@ migrations estão no repo e não foram aplicadas:
 | `049_plataforma_acesso.sql` | Fase 1 da plataforma (ver §1A): vários CRMs por usuário, consentimento de acesso da agência por CRM, papéis da agência | o app usa o caminho antigo (um CRM por usuário, agência sem papéis) — mesmo comportamento de antes |
 | `050_ciclo_vida_crm.sql` | Fase 2 (ver §1B): a agência cria CRMs e convida o dono, status (implantação / ativo / suspenso / arquivado), carteira do gestor, convite preso a um e-mail | "Novo CRM" e a gestão do CRM respondem que falta a 050; o resto funciona como na 049 |
 | `051_consentimento_agencia.sql` | Fase 3 (ver §1C): histórico do consentimento, pedidos de acesso da agência, notificação ao dono, registro do que a agência fez | a tela "Acesso da agência" mostra só o nível; pedir acesso responde que falta a 051 |
+| `052_uso_plataforma.sql` | Fase 4 (ver §1D): dias de uso por membro (via heartbeat de presença) e `agencia_platform_usage()` | o painel mostra traços nas colunas de uso e explica que falta a 052 |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -163,6 +164,42 @@ só é barrado pela checagem de dono de `decide_agency_access_request`
 
 Corrigido de passagem: a seção "Respostas rápidas" de Configurações
 não tinha chave de tradução (`Settings.sections.quick-replies`).
+
+---
+
+## 1D. Fase 4 — painel da plataforma (052)
+
+- **`/agencia` virou o Painel da plataforma**: números da carteira
+  (ativos, em implantação, em risco, sem acesso há 7+ dias, suspensos,
+  pessoas ativas, mensagens, ganhos — cada um filtra a tabela ao
+  clicar), "Precisam de atenção", "Quem mais usa · quem menos usa",
+  volume de mensagens e a **tabela de CRMs** com nota de saúde e
+  tendência, último acesso, pessoas ativas, mensagens da semana com a
+  variação, canal e alertas. Filtros por status, nicho, gestor, "só em
+  risco" e "sem acesso"; ordena por saúde (pior primeiro), uso, último
+  acesso ou nome. A ficha de cada CRM ganhou "Uso e saúde", com a nota
+  decomposta.
+- **De onde vem "uso":** `touch_presence()` (o heartbeat de presença
+  que o app já manda a cada ~30 s) grava um dia em
+  `account_activity_days` para cada membro com o CRM aberto e em
+  primeiro plano. A agência dentro de um CRM de cliente **não conta**.
+  Datas em horário de São Paulo. O histórico começa no dia em que a 052
+  for aplicada (antes, só o último heartbeat de cada um).
+- **`agencia_platform_usage()`** calcula tudo numa consulta, sob
+  demanda (sem cron). Só agregados: aparece em qualquer nível de
+  consentimento. Só o service role chama. Se o volume crescer muito,
+  guarde a saída dela numa tabela diária e leia de lá.
+- **Nota de saúde e alertas** ficam em TypeScript
+  (`src/lib/agencia/health.ts`), com os pesos do plano e testes que
+  dizem para que serve cada um. Ajuste ali. A tendência compara com a
+  mesma nota uma semana antes.
+- **Ainda não medido:** tempo de primeira resposta na nota (a função da
+  048 é por CRM; a nota usa "conversas sem resposta há 24h+"), uso dos
+  relatórios, token de canal perto de vencer.
+
+Testes: `supabase/tests/uso.test.ts` (11 casos, conferidos sabotando a
+migration), `health.test.ts`, `panel.test.ts` e renderização da tabela
+e do cartão de saúde.
 
 ---
 
@@ -366,7 +403,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 1024 passando (inclui supabase/tests)
+npx vitest run                   # 1065 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 

@@ -9,7 +9,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { isMissingTable } from '@/lib/auth/account-context'
+import { isMissingFunction, isMissingTable } from '@/lib/auth/account-context'
 import {
   isAgencyAccessLevel,
   toCrmStatus,
@@ -17,6 +17,7 @@ import {
   type CrmStatus,
 } from './crm'
 import { isAgenciaRole, type AgenciaRole } from './roles'
+import { parseUsageRow, type CrmUsage } from './health'
 
 /** Postgres / PostgREST "column does not exist". */
 export function isMissingColumn(err: { code?: string } | null): boolean {
@@ -32,6 +33,7 @@ export interface AccountRow {
   niche: string | null
   manager_user_id: string | null
   notes: string | null
+  status_changed_at: string | null
 }
 
 /** accounts with the 050 fields, or their pre-050 defaults. */
@@ -41,7 +43,9 @@ export async function loadAccountRows(
 ): Promise<AccountRow[]> {
   let q = admin
     .from('accounts')
-    .select('id, name, owner_user_id, created_at, status, niche, manager_user_id, notes')
+    .select(
+      'id, name, owner_user_id, created_at, status, niche, manager_user_id, notes, status_changed_at',
+    )
     .order('created_at', { ascending: true })
   if (accountId) q = q.eq('id', accountId)
   const { data, error } = await q
@@ -63,6 +67,7 @@ export async function loadAccountRows(
     niche: null,
     manager_user_id: null,
     notes: null,
+    status_changed_at: null,
   }))
 }
 
@@ -245,4 +250,46 @@ export async function getAgencyAccessLevel(
   })
   if (error) return null
   return isAgencyAccessLevel(data) ? data : null
+}
+
+/** agencia_platform_usage() by CRM; null before migration 052. */
+export async function loadPlatformUsage(
+  admin: SupabaseClient,
+): Promise<Map<string, CrmUsage> | null> {
+  const { data, error } = await admin.rpc('agencia_platform_usage')
+  if (error) {
+    if (isMissingFunction(error)) return null
+    throw error
+  }
+  const out = new Map<string, CrmUsage>()
+  for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+    const u = parseUsageRow(r)
+    out.set(u.accountId, u)
+  }
+  return out
+}
+
+/** Every CRM's consent level (049); empty before it. */
+export async function loadConsentLevels(
+  admin: SupabaseClient,
+): Promise<Map<string, AgencyAccessLevel>> {
+  const { data, error } = await admin
+    .from('account_agency_access')
+    .select('account_id, level, temp_level, temp_until')
+  const out = new Map<string, AgencyAccessLevel>()
+  if (error) {
+    if (isMissingTable(error)) return out
+    throw error
+  }
+  const now = Date.now()
+  for (const r of data ?? []) {
+    const temp =
+      r.temp_level && r.temp_until && new Date(r.temp_until).getTime() > now
+        ? r.temp_level
+        : null
+    const rank = (l: string | null) => (l === 'full' ? 2 : l === 'read' ? 1 : 0)
+    const effective = rank(temp) > rank(r.level) ? temp : r.level
+    if (isAgencyAccessLevel(effective)) out.set(r.account_id, effective)
+  }
+  return out
 }

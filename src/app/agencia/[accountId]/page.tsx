@@ -15,7 +15,10 @@ import {
   listAgencyOperators,
   loadAccountRows,
   loadPendingOwnerInvites,
+  loadPlatformUsage,
 } from '@/lib/agencia/crms'
+import { computeAlerts, computeHealth } from '@/lib/agencia/health'
+import { HealthCard } from './health-card'
 import { CRM_STATUS_LABEL, nicheLabel } from '@/lib/agencia/crm'
 import { PeriodTabs } from '../ui'
 import { CrmManagePanel } from './manage'
@@ -35,13 +38,14 @@ export default async function AgenciaAccountPage({
   const { admin, userId, role: myRole } = await requireAgencia()
   // Consent decides whether personal data is read at all (Fase 3).
   const gate = await loadConsentGate(admin, accountId, { userId, role: myRole })
-  const [detail, metrics, lifecycleRows, pendingOwners, operators] =
+  const [detail, metrics, lifecycleRows, pendingOwners, operators, usageMap] =
     await Promise.all([
       getAccountDetail(admin, accountId, { personal: gate.allowed }),
       getAccountMetrics(admin, accountId, windowDays),
       loadAccountRows(admin, accountId),
       loadPendingOwnerInvites(admin, accountId),
       listAgencyOperators(admin),
+      loadPlatformUsage(admin),
     ])
   if (!detail) notFound()
   const lifecycle = lifecycleRows[0]
@@ -121,6 +125,21 @@ export default async function AgenciaAccountPage({
           operators={operators}
           myRole={myRole}
           canEdit={canEdit}
+        />
+      )}
+
+      {usageMap?.get(account.id) && lifecycle && (
+        <HealthCard
+          usage={usageMap.get(account.id)!}
+          health={
+            lifecycle.status === 'active' || lifecycle.status === 'onboarding'
+              ? computeHealth(usageMap.get(account.id)!)
+              : null
+          }
+          alerts={computeAlerts(usageMap.get(account.id)!, {
+            status: lifecycle.status,
+            since: lifecycle.status_changed_at ?? lifecycle.created_at,
+          })}
         />
       )}
 

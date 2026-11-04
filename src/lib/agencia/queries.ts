@@ -57,6 +57,8 @@ export interface AccountOverview {
   niche: string | null
   managerUserId: string | null
   managerEmail: string | null
+  /** When the status last changed (050); null before. */
+  statusChangedAt: string | null
   createdAt: string
   memberCount: number
   contactCount: number
@@ -140,6 +142,7 @@ export async function listAccountsOverview(
       managerEmail: a.manager_user_id
         ? (emailByUser.get(a.manager_user_id) ?? null)
         : null,
+      statusChangedAt: a.status_changed_at,
       createdAt: a.created_at,
       memberCount: memberCount.get(a.id) ?? 0,
       contactCount: contactCount.get(a.id) ?? 0,
