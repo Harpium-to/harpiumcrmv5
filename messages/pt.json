@@ -1486,7 +1486,8 @@
       "step4_3": "Cole a <strong class=\"text-foreground\">URL de callback do webhook</strong> de cima",
       "step4_4": "Digite o mesmo <strong class=\"text-foreground\">Token de verificação</strong> que você definiu aqui",
       "step4_5": "Inscreva-se no campo de webhook \"messages\"",
-      "metaDocs": "Documentação da API do WhatsApp da Meta"
+      "metaDocs": "Documentação da API do WhatsApp da Meta",
+      "webhookVerifyTokenKeep": "Já existe um token salvo: deixe em branco para mantê-lo."
     },
     "sections": {
       "overview": "Visão geral",

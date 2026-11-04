@@ -101,11 +101,29 @@ export async function GET() {
 
   // 1. Phone metadata
   try {
-    await verifyPhoneNumber({
+    const phoneInfo = await verifyPhoneNumber({
       phoneNumberId: config.phone_number_id,
       accessToken,
     })
     checks.phone_metadata_ok = true
+
+    // A number can be live without our /register ever running: Meta's
+    // test numbers come registered and have no PIN to register with.
+    // Meta itself says so through `platform_type`, so trust it and
+    // record the fact — otherwise the screen warns forever about a
+    // number that is receiving messages fine.
+    if (!checks.locally_marked_registered && phoneInfo.platform_type === 'CLOUD_API') {
+      const registeredAt = new Date().toISOString()
+      const { error: markError } = await supabase
+        .from('whatsapp_config')
+        .update({ registered_at: registeredAt, last_registration_error: null })
+        .eq('account_id', accountId)
+      if (!markError) {
+        checks.locally_marked_registered = true
+        config.registered_at = registeredAt
+        config.last_registration_error = null
+      }
+    }
   } catch (err) {
     errors.push(
       `Falha ao verificar os dados do número: ${err instanceof Error ? err.message : String(err)}`,
