@@ -1,7 +1,8 @@
 // ============================================================
 // POST /api/agencia/crms — the agency creates a client CRM.
 //
-// Body: { name, ownerEmail, niche?, accessLevel?, managerUserId?, notes? }
+// Body: { name, ownerEmail, niche?, accessLevel?, managerUserId?, notes?,
+//         templateId? }
 //
 // The CRM starts in onboarding, with the agency access level the
 // agency proposes (the owner sees it before accepting) and an owner
@@ -16,6 +17,7 @@ import { NextResponse } from 'next/server'
 import { requireAgencia } from '@/lib/agencia/guard'
 import { isAgencyAccessLevel, isCrmNiche } from '@/lib/agencia/crm'
 import { newOwnerInvite, ownerInviteLink } from '@/lib/agencia/owner-invite'
+import { describeApplySummary } from '@/lib/agencia/templates'
 import { toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { rpcErrorToResponse } from '@/lib/supabase/rpc-error'
@@ -42,6 +44,8 @@ export async function POST(request: Request) {
         ? body.managerUserId
         : null
     const notes = typeof body?.notes === 'string' ? body.notes.trim() : ''
+    const templateId =
+      typeof body?.templateId === 'string' && body.templateId ? body.templateId : null
 
     if (!name || name.length > MAX_NAME) {
       return NextResponse.json(
@@ -79,9 +83,24 @@ export async function POST(request: Request) {
       })
     }
 
+    // The template goes in right after: the CRM is in onboarding, so the
+    // agency may still write into it. Not in the same transaction — if
+    // it fails the CRM exists without it, and the page can apply it.
+    let template: { text: string } | { error: string } | null = null
+    if (templateId) {
+      const applied = await supabase.rpc('agencia_apply_template', {
+        p_account_id: accountId,
+        p_template_id: templateId,
+      })
+      template = applied.error
+        ? { error: applied.error.message ?? 'Falha ao aplicar o modelo' }
+        : { text: describeApplySummary((applied.data ?? {}) as Record<string, unknown>) }
+    }
+
     return NextResponse.json(
       {
         accountId,
+        template,
         invite: {
           ...ownerInviteLink(request, invite.token, 'POST /api/agencia/crms'),
           email: ownerEmail,

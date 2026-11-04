@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 
 import { loadAgencia } from '@/lib/agencia/guard'
 import { listAgencyOperators } from '@/lib/agencia/crms'
+import { listTemplates } from '@/lib/agencia/template-store'
 import { hasAgenciaRole } from '@/lib/agencia/roles'
 import { NovoCrmForm } from './form'
 
@@ -20,7 +21,10 @@ export default async function NovoCrmPage({
   if (!hasAgenciaRole(gate.role, 'manager')) redirect('/agencia')
 
   const { email, nome } = await searchParams
-  const operators = await listAgencyOperators(gate.admin)
+  const [operators, templates] = await Promise.all([
+    listAgencyOperators(gate.admin),
+    listTemplates(gate.admin),
+  ])
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -40,6 +44,15 @@ export default async function NovoCrmPage({
       </div>
       <NovoCrmForm
         operators={operators}
+        templates={(templates ?? [])
+          .filter((t) => t.active)
+          .map((t) => ({
+            id: t.id,
+            name: t.name,
+            niche: t.niche,
+            suggestedAccess: t.suggestedAccess,
+            counts: t.counts,
+          }))}
         myRole={gate.role}
         myUserId={gate.userId}
         initialEmail={email ?? ''}

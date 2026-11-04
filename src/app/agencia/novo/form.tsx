@@ -17,20 +17,31 @@ import {
   type AgencyAccessLevel,
 } from '@/lib/agencia/crm'
 import type { AgencyOperator } from '@/lib/agencia/crms'
+import { describeCounts, type TemplateCounts } from '@/lib/agencia/templates'
 import { AGENCIA_ROLE_LABEL, type AgenciaRole } from '@/lib/agencia/roles'
 import { InviteLink, type OwnerInviteResult } from '../invite-link'
+
+export interface TemplateOption {
+  id: string
+  name: string
+  niche: string | null
+  suggestedAccess: AgencyAccessLevel
+  counts: TemplateCounts
+}
 
 const selectClass =
   'mt-1 h-9 w-full rounded-md border border-border bg-muted px-2 text-sm text-foreground'
 
 export function NovoCrmForm({
   operators,
+  templates,
   myRole,
   myUserId,
   initialEmail,
   initialName,
 }: {
   operators: AgencyOperator[]
+  templates: TemplateOption[]
   myRole: AgenciaRole
   myUserId: string
   initialEmail: string
@@ -45,11 +56,33 @@ export function NovoCrmForm({
     myRole === 'manager' ? myUserId : '',
   )
   const [notes, setNotes] = useState('')
+  const [templateId, setTemplateId] = useState('')
+  // Once the operator picks a template or a level by hand, choosing a
+  // niche stops overriding them.
+  const [templateTouched, setTemplateTouched] = useState(false)
+  const [accessTouched, setAccessTouched] = useState(false)
   const [saving, setSaving] = useState(false)
   const [created, setCreated] = useState<{
     accountId: string
     invite: OwnerInviteResult
+    template: { text: string } | { error: string } | null
   } | null>(null)
+
+  const chosen = templates.find((t) => t.id === templateId) ?? null
+
+  const pickTemplate = (id: string) => {
+    setTemplateId(id)
+    const t = templates.find((x) => x.id === id)
+    if (t && !accessTouched) setAccessLevel(t.suggestedAccess)
+  }
+
+  const pickNiche = (value: string) => {
+    setNiche(value)
+    if (!templateTouched) {
+      const match = templates.find((t) => t.niche === value)
+      pickTemplate(match?.id ?? '')
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +98,7 @@ export function NovoCrmForm({
           accessLevel,
           managerUserId: managerUserId || null,
           notes,
+          templateId: templateId || null,
         }),
       })
       const json = await res.json()
@@ -81,6 +115,17 @@ export function NovoCrmForm({
   if (created) {
     return (
       <div className="space-y-4">
+        {created.template && 'text' in created.template && (
+          <p className="rounded-xl border border-border bg-card px-4 py-3 text-sm">
+            <span className="font-medium">Modelo aplicado.</span> {created.template.text}
+          </p>
+        )}
+        {created.template && 'error' in created.template && (
+          <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
+            O CRM foi criado, mas o modelo não foi aplicado: {created.template.error} Dá
+            para aplicar de novo na página do CRM.
+          </p>
+        )}
         <InviteLink invite={created.invite} />
         <div className="flex flex-wrap gap-2">
           <Link href={`/agencia/${created.accountId}`}>
@@ -137,7 +182,7 @@ export function NovoCrmForm({
           <select
             id="crm-niche"
             value={niche}
-            onChange={(e) => setNiche(e.target.value)}
+            onChange={(e) => pickNiche(e.target.value)}
             className={selectClass}
           >
             <option value="">Sem nicho</option>
@@ -147,6 +192,32 @@ export function NovoCrmForm({
               </option>
             ))}
           </select>
+        </div>
+        <div className="sm:col-span-2">
+          <Label htmlFor="crm-template" className="text-muted-foreground">
+            Modelo
+          </Label>
+          <select
+            id="crm-template"
+            value={templateId}
+            onChange={(e) => {
+              setTemplateTouched(true)
+              pickTemplate(e.target.value)
+            }}
+            className={selectClass}
+          >
+            <option value="">Sem modelo (CRM vazio)</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {chosen
+              ? `Vai criar: ${describeCounts(chosen.counts)}. Automações chegam desligadas.`
+              : 'Funil, etiquetas, campos, respostas rápidas e automações prontos para o ramo.'}
+          </p>
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="crm-manager" className="text-muted-foreground">
@@ -191,7 +262,10 @@ export function NovoCrmForm({
                 name="access-level"
                 value={level}
                 checked={accessLevel === level}
-                onChange={() => setAccessLevel(level)}
+                onChange={() => {
+                  setAccessTouched(true)
+                  setAccessLevel(level)
+                }}
                 className="sr-only"
               />
               <span className="font-medium">{AGENCY_ACCESS_LABEL[level]}</span>

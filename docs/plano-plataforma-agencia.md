@@ -3,10 +3,9 @@
 Documento de planejamento. Escrito em 04/11/2026 sobre a branch
 `feat/agencia-supervisao-ptbr`.
 
-**Andamento (04/11/2026):** Fases 1 a 4 implementadas (migrations 049
-a 052, ainda **não aplicadas** no Supabase). Faltam 0B (extensão), 5
-(modelos por nicho), 6 (modo suporte) e 7. Detalhes em `HANDOFF.md`
-§1A a §1D.
+**Andamento (04/11/2026):** Fases 1 a 5 implementadas (migrations 049
+a 053, ainda **não aplicadas** no Supabase). Faltam 0B (extensão), 6
+(modo suporte) e 7. Detalhes em `HANDOFF.md` §1A a §1E.
 
 ---
 
@@ -451,7 +450,7 @@ testes novos para as regras de acesso.
 | **2. Ciclo de vida do CRM** ✅ | "Novo CRM" no console, convite de dono, status, tela "Aguardando liberação", seletor/trocador de CRM, login direcionando por papel. Montar o caso real: CRM Harpium com `marcelarruda2013@gmail.com` como dono. | 1 |
 | **3. Consentimento** ✅ | Tela "Acesso da agência" do cliente, pedidos de nível, acesso temporário, log de acessos visível ao cliente, console respeitando nível (tela + servidor + RLS). | 1 |
 | **4. Painel da Plataforma** ✅ | `account_usage_daily` + cron, nota de saúde, tabela de CRMs com filtros, alertas novos, último acesso. | 1 (dados), 2 (status) |
-| **5. Modelos por nicho** | `crm_templates`, aplicar na criação e em CRM existente, 3 modelos iniciais (Clínica médica, Academia, Genérico), editor no console, "salvar CRM como modelo". | 2 |
+| **5. Modelos por nicho** ✅ | `crm_templates`, aplicar na criação e em CRM existente, 3 modelos iniciais (Clínica médica, Academia, Genérico), editor no console, "salvar CRM como modelo". | 2 |
 | **6. Modo suporte** | "Entrar no CRM" para nível Total, com faixa no topo e auditoria de cada ação. | 1, 3 |
 | **7. Depois** | Planos e limites por CRM (usuários, números, agentes), cobrança, marca por CRM, carteira por gestor. | — |
 
@@ -479,7 +478,8 @@ comportamento antigo, para a Fase 2.
 4. **Equipe da agência:** só super_admin por enquanto · 3 papéis com
    carteira por gestor (**recomendado se houver mais de 2 pessoas na
    equipe**).
-5. **Primeiros nichos:** quais 3 entram na fase 5?
+5. **Primeiros nichos:** ~~quais 3 entram na fase 5?~~ Decidido: Clínica
+   médica, Academia e Serviços.
 6. **Planos e cobrança:** fora desta etapa (**recomendado**) · já
    prever limites por plano.
 7. **CRMs que já existem hoje no banco:** quais são clientes reais,

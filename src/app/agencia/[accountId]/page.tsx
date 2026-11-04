@@ -19,6 +19,8 @@ import {
 } from '@/lib/agencia/crms'
 import { computeAlerts, computeHealth } from '@/lib/agencia/health'
 import { HealthCard } from './health-card'
+import { listTemplateApplications, listTemplates } from '@/lib/agencia/template-store'
+import { TemplatesPanel } from './templates-panel'
 import { CRM_STATUS_LABEL, nicheLabel } from '@/lib/agencia/crm'
 import { PeriodTabs } from '../ui'
 import { CrmManagePanel } from './manage'
@@ -38,14 +40,24 @@ export default async function AgenciaAccountPage({
   const { admin, userId, role: myRole } = await requireAgencia()
   // Consent decides whether personal data is read at all (Fase 3).
   const gate = await loadConsentGate(admin, accountId, { userId, role: myRole })
-  const [detail, metrics, lifecycleRows, pendingOwners, operators, usageMap] =
-    await Promise.all([
+  const [
+    detail,
+    metrics,
+    lifecycleRows,
+    pendingOwners,
+    operators,
+    usageMap,
+    templates,
+    applications,
+  ] = await Promise.all([
       getAccountDetail(admin, accountId, { personal: gate.allowed }),
       getAccountMetrics(admin, accountId, windowDays),
       loadAccountRows(admin, accountId),
       loadPendingOwnerInvites(admin, accountId),
       listAgencyOperators(admin),
       loadPlatformUsage(admin),
+      listTemplates(admin),
+      listTemplateApplications(admin, accountId),
     ])
   if (!detail) notFound()
   const lifecycle = lifecycleRows[0]
@@ -125,6 +137,20 @@ export default async function AgenciaAccountPage({
           operators={operators}
           myRole={myRole}
           canEdit={canEdit}
+        />
+      )}
+
+      {templates !== null && lifecycle && lifecycle.status !== 'archived' && (
+        <TemplatesPanel
+          accountId={account.id}
+          templates={templates
+            .filter((t) => t.active)
+            .map((t) => ({ id: t.id, name: t.name, counts: t.counts }))}
+          applications={applications}
+          canEdit={canEdit}
+          canApplyNow={lifecycle.status === 'onboarding' || gate.level === 'full'}
+          canSave={lifecycle.status === 'onboarding' || gate.level !== 'metrics'}
+          isSuper={myRole === 'super_admin'}
         />
       )}
 

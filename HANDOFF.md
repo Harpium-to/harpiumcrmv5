@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Nove
+**Nada do que foi construído funciona até isso acontecer.** Dez
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -21,6 +21,7 @@ migrations estão no repo e não foram aplicadas:
 | `050_ciclo_vida_crm.sql` | Fase 2 (ver §1B): a agência cria CRMs e convida o dono, status (implantação / ativo / suspenso / arquivado), carteira do gestor, convite preso a um e-mail | "Novo CRM" e a gestão do CRM respondem que falta a 050; o resto funciona como na 049 |
 | `051_consentimento_agencia.sql` | Fase 3 (ver §1C): histórico do consentimento, pedidos de acesso da agência, notificação ao dono, registro do que a agência fez | a tela "Acesso da agência" mostra só o nível; pedir acesso responde que falta a 051 |
 | `052_uso_plataforma.sql` | Fase 4 (ver §1D): dias de uso por membro (via heartbeat de presença) e `agencia_platform_usage()` | o painel mostra traços nas colunas de uso e explica que falta a 052 |
+| `053_modelos_nicho.sql` | Fase 5 (ver §1E): modelos por nicho (Clínica médica, Academia, Serviços), aplicar e salvar CRM como modelo | "Modelos" explica que falta a 053; Novo CRM cria sem modelo |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -200,6 +201,42 @@ não tinha chave de tradução (`Settings.sections.quick-replies`).
 Testes: `supabase/tests/uso.test.ts` (11 casos, conferidos sabotando a
 migration), `health.test.ts`, `panel.test.ts` e renderização da tabela
 e do cartão de saúde.
+
+---
+
+## 1E. Fase 5 — modelos por nicho (053)
+
+- **Três modelos do sistema**, escolhidos pelo dono: **Clínica médica**
+  (acesso sugerido: Métricas — dados de saúde), **Academia / Studio**
+  (Leitura) e **Serviços / Agência** (Total). Cada um traz funil com
+  etapas, etiquetas, campos, respostas rápidas e duas automações. O
+  conteúdo está na própria migration, em português.
+- **Na criação do CRM** (`/agencia/novo`) o modelo é pré-selecionado
+  pelo nicho e já propõe o nível de acesso sugerido (se o operador não
+  mexeu à mão). É aplicado logo depois da criação; se falhar, o CRM fica
+  criado e a página diz para aplicar de novo.
+- **Na ficha do CRM**: histórico do que foi aplicado, "Aplicar" e
+  "Salvar como modelo". Aplicar é **aditivo** (o que já existe com o
+  mesmo nome fica como está) e **mexe no CRM do cliente**, então só vale
+  em implantação ou com acesso Total. Salvar copia só a estrutura —
+  nunca contatos ou conversas — e exige mais que Métricas.
+- **Automações chegam sempre desligadas.** Passos referenciam etiquetas
+  e funis **pelo nome**; viram ids ao aplicar e voltam a nome ao salvar.
+  Só passos que viajam entre CRMs são aceitos (nada que aponte para uma
+  pessoa, um template da Meta, um webhook ou um campo por id).
+- **`/agencia/modelos`**: lista, visão legível de cada modelo e editor
+  (super admin) — nome, descrição, nicho, acesso sugerido, ativo, e o
+  conteúdo em JSON validado por `parseTemplateContent`
+  (`src/lib/agencia/templates.ts`), o mesmo validador que a API usa e
+  que os testes rodam contra os três modelos da migration.
+- **Ficou de fora**: vocabulário por nicho ("paciente" / "aluno"),
+  agentes de IA no modelo, campos de tipo diferente de texto (o app só
+  edita texto hoje — as opções sugeridas ficam guardadas no campo),
+  lembrete de consulta (não há agenda no sistema).
+
+Testes: `supabase/tests/modelos.test.ts` (15 casos, conferidos
+sabotando a migration), `templates.test.ts`, `template-store.test.ts`
+e renderização da visão do modelo e do bloco da ficha.
 
 ---
 
@@ -403,7 +440,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 1065 passando (inclui supabase/tests)
+npx vitest run                   # 1099 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 
