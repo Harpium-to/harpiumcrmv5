@@ -193,11 +193,18 @@ export interface AccountDetail {
  * Full supervision view of a single account: header, members, headline
  * stats, pipeline (stages with deal roll-ups), and recent
  * contacts/conversations. Returns null when the account id is unknown.
+ *
+ * `personal: false` (the CRM owner granted the agency only metrics,
+ * Fase 3) skips every read of personal data: no recent contacts or
+ * conversations are fetched, and members come back without emails.
  */
 export async function getAccountDetail(
   admin: SupabaseClient,
   accountId: string,
+  opts: { personal?: boolean } = {},
 ): Promise<AccountDetail | null> {
+  const personal = opts.personal ?? true
+  const none = Promise.resolve({ data: [], error: null })
   const { data: account, error: accountErr } = await admin
     .from('accounts')
     .select('id, name, owner_user_id, created_at')
@@ -220,18 +227,22 @@ export async function getAccountDetail(
       .from('profiles')
       .select('user_id, email')
       .in('user_id', [...new Set([...memberIds, account.owner_user_id])]),
-    admin
-      .from('contacts')
-      .select('id, name, phone, email, created_at')
-      .eq('account_id', accountId)
-      .order('created_at', { ascending: false })
-      .limit(10),
-    admin
-      .from('conversations')
-      .select('id, contact_id, status, last_message_text, last_message_at')
-      .eq('account_id', accountId)
-      .order('last_message_at', { ascending: false, nullsFirst: false })
-      .limit(10),
+    personal
+      ? admin
+          .from('contacts')
+          .select('id, name, phone, email, created_at')
+          .eq('account_id', accountId)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      : none,
+    personal
+      ? admin
+          .from('conversations')
+          .select('id, contact_id, status, last_message_text, last_message_at')
+          .eq('account_id', accountId)
+          .order('last_message_at', { ascending: false, nullsFirst: false })
+          .limit(10)
+      : none,
     admin.from('pipelines').select('id, name').eq('account_id', accountId),
     admin
       .from('deals')
@@ -335,9 +346,10 @@ export async function getAccountDetail(
       createdAt: account.created_at,
     },
     members: memberships.map((m) => ({
-      email:
-        (profilesRes.data ?? []).find((p) => p.user_id === m.user_id)?.email ??
-        null,
+      email: personal
+        ? ((profilesRes.data ?? []).find((p) => p.user_id === m.user_id)
+            ?.email ?? null)
+        : null,
       role: m.role ?? '—',
     })),
     stats: {

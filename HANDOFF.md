@@ -7,7 +7,7 @@ dos commits `a2b3c3d` e `7fc745c` na branch `feat/agencia-supervisao-ptbr`.
 
 ## 0. O passo bloqueante: aplicar as migrations
 
-**Nada do que foi construído funciona até isso acontecer.** Sete
+**Nada do que foi construído funciona até isso acontecer.** Oito
 migrations estão no repo e não foram aplicadas:
 
 | Migration | O que entrega | Sem ela |
@@ -19,6 +19,7 @@ migrations estão no repo e não foram aplicadas:
 | `048_report_first_response.sql` | função `report_first_response` + índice `messages(conversation_id, created_at, id)` | o cartão "Tempo de primeira resposta" em `/relatorios` explica que falta a migration |
 | `049_plataforma_acesso.sql` | Fase 1 da plataforma (ver §1A): vários CRMs por usuário, consentimento de acesso da agência por CRM, papéis da agência | o app usa o caminho antigo (um CRM por usuário, agência sem papéis) — mesmo comportamento de antes |
 | `050_ciclo_vida_crm.sql` | Fase 2 (ver §1B): a agência cria CRMs e convida o dono, status (implantação / ativo / suspenso / arquivado), carteira do gestor, convite preso a um e-mail | "Novo CRM" e a gestão do CRM respondem que falta a 050; o resto funciona como na 049 |
+| `051_consentimento_agencia.sql` | Fase 3 (ver §1C): histórico do consentimento, pedidos de acesso da agência, notificação ao dono, registro do que a agência fez | a tela "Acesso da agência" mostra só o nível; pedir acesso responde que falta a 051 |
 
 Elas são idempotentes e foram escritas para rodar em ordem. Cada
 superfície degrada sozinha enquanto isso — nada quebra, só não existe.
@@ -126,6 +127,42 @@ suporte): 5 testes quebram.
 Testes: `supabase/tests/ciclo-vida.test.ts` (17 casos, conferidos
 sabotando a migration) e renderização do painel de gestão e da tela de
 espera.
+
+---
+
+## 1C. Fase 3 — consentimento do cliente (051)
+
+- **O console respeita o nível.** Contatos, inbox, conversa, quadro do
+  funil, exportação e os blocos de contatos/conversas recentes da ficha
+  checam o consentimento **antes de ler** (`loadConsentGate` em
+  `src/lib/agencia/consent.ts`). Em Métricas nada pessoal é lido — nem
+  e-mails da equipe do cliente — e a página mostra o motivo e o
+  formulário de pedido. Antes da 049 não há consentimento e o console
+  funciona como sempre; qualquer outra falha ao ler o nível fecha em
+  Métricas.
+- **Pedido de acesso** (super admin, ou gestor da carteira): nível,
+  duração (permanente / 24 h / 3 dias / 7 dias) e motivo. O dono recebe
+  uma notificação que abre direto a tela certa. Um pedido novo cancela
+  o anterior; pedir o que já está liberado é recusado.
+- **Configurações › Acesso da agência** (cliente): nível atual com a
+  descrição de cada um, troca de nível e acesso temporário (só o dono,
+  e funciona mesmo com o CRM suspenso), pedido pendente com Liberar /
+  Recusar, aviso de LGPD em CRMs de saúde, e — para dono e admins —
+  **o que a agência fez ali, com o nome de quem fez**, e o histórico
+  de mudanças de nível.
+- **Histórico do consentimento** (`account_agency_access_log`) é
+  gravado por trigger: nenhum caminho muda o nível sem registro. Cada
+  mudança leva a versão do texto aceito
+  (`AGENCY_CONSENT_TERMS_VERSION` em `src/lib/agencia/crm.ts` — suba a
+  versão se mudar o texto das descrições).
+
+Testes: `supabase/tests/consentimento.test.ts` (14 casos). A sabotagem
+achou um buraco no próprio teste — um atendente **negando** um pedido
+só é barrado pela checagem de dono de `decide_agency_access_request`
+(aprovar falha por outro caminho) — e o caso foi acrescentado.
+
+Corrigido de passagem: a seção "Respostas rápidas" de Configurações
+não tinha chave de tradução (`Settings.sections.quick-replies`).
 
 ---
 
@@ -329,7 +366,7 @@ Eu errei metade destas antes de olhar o código ao redor.
 ```bash
 npx tsc --noEmit                 # precisa sair limpo
 npx eslint .                     # 0 erros (43 warnings pré-existentes)
-npx vitest run                   # 992 passando (inclui supabase/tests)
+npx vitest run                   # 1024 passando (inclui supabase/tests)
 npx next build                   # precisa compilar
 ```
 

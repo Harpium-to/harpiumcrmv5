@@ -22,7 +22,9 @@ import {
 } from '@/lib/agencia/crm'
 import type { AgencyOperator, PendingOwnerInvite } from '@/lib/agencia/crms'
 import { AGENCIA_ROLE_LABEL, type AgenciaRole } from '@/lib/agencia/roles'
+import type { ConsentGate } from '@/lib/agencia/consent'
 import { InviteLink, type OwnerInviteResult } from '../invite-link'
+import { RequestAccessForm } from './request-access'
 
 const selectClass =
   'mt-1 h-9 w-full rounded-md border border-border bg-muted px-2 text-sm text-foreground disabled:opacity-60'
@@ -36,6 +38,8 @@ export interface ManageProps {
   ownerEmail: string | null
   pendingOwner: PendingOwnerInvite | null
   agencyLevel: AgencyAccessLevel | null
+  /** Pending request / who may ask (Fase 3). */
+  gate?: ConsentGate
   operators: AgencyOperator[]
   myRole: AgenciaRole
   /** super_admin, or a manager whose portfolio has this CRM. */
@@ -266,6 +270,17 @@ export function CrmManagePanel(props: ManageProps) {
               <p className="mt-0.5 text-muted-foreground">
                 Indisponível (exige a migration 049)
               </p>
+            )}
+            {props.gate && props.agencyLevel && props.status !== 'archived' && (
+              <div className="mt-3 border-t border-border pt-3">
+                <RequestAccessForm
+                  accountId={props.accountId}
+                  currentLevel={props.agencyLevel}
+                  pending={props.gate.pending}
+                  canRequest={props.gate.canRequest}
+                  hasOwner={props.gate.hasOwner}
+                />
+              </div>
             )}
           </div>
 

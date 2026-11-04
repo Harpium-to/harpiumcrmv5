@@ -200,7 +200,10 @@ export interface Conversation {
 // Notifications (migration 027)
 // ============================================================
 
-export type NotificationType = 'conversation_assigned';
+export type NotificationType =
+  | 'conversation_assigned'
+  /** The agency asked the CRM owner for more access (051). */
+  | 'agency_access_request';
 
 export interface Notification {
   id: string;

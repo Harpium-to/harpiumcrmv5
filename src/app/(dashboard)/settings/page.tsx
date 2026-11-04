@@ -18,6 +18,7 @@ import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel'
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
+import { AgencyAccessPanel } from '@/components/settings/agency-access-panel';
 import {
   resolveSection,
   type SettingsSection,
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
     members: <MembersTab />,
+    agencia: <AgencyAccessPanel />,
     api: <ApiKeysSettings />,
   };
 

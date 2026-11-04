@@ -20,3 +20,32 @@ export interface MyInvitation {
   expiresAt: string
   agencyLevel: string | null
 }
+
+/** GET /api/account/agency-access */
+export type AgencyAccessView =
+  | { available: false }
+  | {
+      available: true
+      level: 'metrics' | 'read' | 'full'
+      tempLevel: 'read' | 'full' | null
+      tempUntil: string | null
+      effectiveLevel: 'metrics' | 'read' | 'full'
+      pending: {
+        id: string
+        level: 'read' | 'full'
+        tempHours: number | null
+        reason: string | null
+        createdAt: string
+      } | null
+      canDecide: boolean
+      canSeeLog: boolean
+      niche: string | null
+      history: {
+        level: string
+        tempLevel: string | null
+        tempUntil: string | null
+        by: string
+        at: string
+      }[]
+      activity: { at: string; action: string; by: string }[]
+    }

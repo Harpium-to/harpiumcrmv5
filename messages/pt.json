@@ -1499,7 +1499,9 @@
       "fields": "Campos e etiquetas",
       "deals": "Negócios e moeda",
       "members": "Membros da equipe",
-      "api": "Chaves de API"
+      "api": "Chaves de API",
+      "quick-replies": "Respostas rápidas",
+      "agencia": "Acesso da agência"
     },
     "groups": {
       "account": "Conta",

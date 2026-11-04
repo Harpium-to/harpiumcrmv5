@@ -10,8 +10,8 @@ import {
   parseMetricWindow,
   type AccountMetrics,
 } from '@/lib/agencia/queries'
+import { loadConsentGate } from '@/lib/agencia/consent'
 import {
-  getAgencyAccessLevel,
   listAgencyOperators,
   loadAccountRows,
   loadPendingOwnerInvites,
@@ -33,13 +33,14 @@ export default async function AgenciaAccountPage({
   const { accountId } = await params
   const windowDays = parseMetricWindow((await searchParams).dias)
   const { admin, userId, role: myRole } = await requireAgencia()
-  const [detail, metrics, lifecycleRows, pendingOwners, agencyLevel, operators] =
+  // Consent decides whether personal data is read at all (Fase 3).
+  const gate = await loadConsentGate(admin, accountId, { userId, role: myRole })
+  const [detail, metrics, lifecycleRows, pendingOwners, operators] =
     await Promise.all([
-      getAccountDetail(admin, accountId),
+      getAccountDetail(admin, accountId, { personal: gate.allowed }),
       getAccountMetrics(admin, accountId, windowDays),
       loadAccountRows(admin, accountId),
       loadPendingOwnerInvites(admin, accountId),
-      getAgencyAccessLevel(admin, accountId),
       listAgencyOperators(admin),
     ])
   if (!detail) notFound()
@@ -115,7 +116,8 @@ export default async function AgenciaAccountPage({
           notes={lifecycle.notes}
           ownerEmail={account.ownerEmail}
           pendingOwner={pendingOwners.get(account.id) ?? null}
-          agencyLevel={agencyLevel}
+          agencyLevel={gate.level}
+          gate={gate}
           operators={operators}
           myRole={myRole}
           canEdit={canEdit}
@@ -176,7 +178,9 @@ export default async function AgenciaAccountPage({
           title="Contatos recentes"
           action={{ href: `/agencia/${account.id}/contatos`, label: 'Ver todos →' }}
         >
-          {recentContacts.length === 0 ? (
+          {!gate.allowed ? (
+            <Empty>O dono liberou só Métricas: contatos não aparecem.</Empty>
+          ) : recentContacts.length === 0 ? (
             <Empty>Nenhum contato.</Empty>
           ) : (
             <ul className="divide-y divide-border">
@@ -198,7 +202,9 @@ export default async function AgenciaAccountPage({
           title="Inbox recente"
           action={{ href: `/agencia/${account.id}/inbox`, label: 'Ver tudo →' }}
         >
-          {recentConversations.length === 0 ? (
+          {!gate.allowed ? (
+            <Empty>O dono liberou só Métricas: conversas não aparecem.</Empty>
+          ) : recentConversations.length === 0 ? (
             <Empty>Nenhuma conversa.</Empty>
           ) : (
             <ul className="divide-y divide-border">
@@ -237,7 +243,7 @@ export default async function AgenciaAccountPage({
               key={i}
               className="flex items-center justify-between px-4 py-3 text-sm"
             >
-              <span>{m.email ?? '—'}</span>
+              <span>{m.email ?? (gate.allowed ? '—' : 'e-mail oculto (Métricas)')}</span>
               <span className="text-xs text-muted-foreground">{m.role}</span>
             </li>
           ))}

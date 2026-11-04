@@ -103,8 +103,20 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   create_account: 'Criou o CRM',
   invite_owner: 'Convidou o dono',
   update_account: 'Alterou os dados do CRM',
+  request_access: 'Pediu mais acesso',
   status_onboarding: 'Mudou para Em implantação',
   status_active: 'Ativou o CRM',
   status_suspended: 'Suspendeu o CRM',
   status_archived: 'Arquivou o CRM',
 }
+
+/**
+ * Version of the consent text the owner agrees to when choosing a
+ * level, stored with every change (account_agency_access.terms_version
+ * and its history). Bump it whenever AGENCY_ACCESS_DESCRIPTION or the
+ * consent copy in settings changes meaningfully.
+ */
+export const AGENCY_CONSENT_TERMS_VERSION = '2026-11-04'
+
+/** Niches whose CRMs hold health data (sensitive under LGPD art. 11). */
+export const HEALTH_NICHES: readonly string[] = ['medical_clinic', 'dental_aesthetic']

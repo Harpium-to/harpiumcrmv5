@@ -1,6 +1,8 @@
 import { Download } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
+import { loadConsentGate } from '@/lib/agencia/consent'
+import { ConsentWall } from '../consent-wall'
 import { listAccountContacts } from '@/lib/agencia/queries'
 import { BackToAccount, Pager, SearchForm, parsePage } from '../parts'
 
@@ -18,7 +20,12 @@ export default async function AgenciaContatosPage({
   const page = parsePage(sp.page)
   const q = sp.q?.trim() || undefined
 
-  const { admin } = await requireAgencia()
+  const { admin, userId, role } = await requireAgencia()
+  // Consent first: nothing personal is read when the owner granted metrics.
+  const gate = await loadConsentGate(admin, accountId, { userId, role })
+  if (!gate.allowed) {
+    return <ConsentWall accountId={accountId} gate={gate} what="os contatos" />
+  }
   const { rows, total, pageSize } = await listAccountContacts(admin, accountId, {
     page,
     q,
