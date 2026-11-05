@@ -57,6 +57,7 @@ import { CustomFieldsManager } from '@/components/contacts/custom-fields-manager
 import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import { useTranslations } from 'next-intl';
+import { HelpTip } from '@/components/help/help-tip';
 
 const PAGE_SIZE = 25;
 
@@ -360,6 +361,7 @@ export default function ContactsPage() {
               {t('customFieldsBtn')}
             </Button>
           )}
+          {canEditSettings && <HelpTip id="contacts.customFields" />}
           <GatedButton
             variant="outline"
             canAct={canEdit}

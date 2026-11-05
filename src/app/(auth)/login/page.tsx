@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TextReveal } from "@/components/ui/text-reveal";
-import { MessageSquare, UsersRound } from "lucide-react";
+import { AUTH_CARD_ENTER, AUTH_SCREEN_CLASS, AuthBrand } from "@/components/brand/auth-brand";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless it sits under a Suspense boundary. We split the form into
@@ -75,18 +75,15 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <Card className="fx-page w-full max-w-md border-border bg-card">
+    <div className={AUTH_SCREEN_CLASS}>
+      <AuthBrand />
+      <Card
+        {...AUTH_CARD_ENTER}
+        className="w-full max-w-md border-border bg-card/80 backdrop-blur-xl"
+      >
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            {inviteToken ? (
-              <UsersRound className="h-6 w-6 text-primary" />
-            ) : (
-              <MessageSquare className="h-6 w-6 text-primary" />
-            )}
-          </div>
           <CardTitle className="text-xl text-foreground">
-            <TextReveal delay={120}>
+            <TextReveal delay={1250}>
               {inviteToken ? t('titleAccept') : t('titleWelcome')}
             </TextReveal>
           </CardTitle>

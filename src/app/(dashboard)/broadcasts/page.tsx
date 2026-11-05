@@ -18,6 +18,7 @@ import { useCan } from '@/hooks/use-can';
 import { GatedButton } from '@/components/ui/gated-button';
 import { getBroadcastStatus } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
+import { HelpTip } from '@/components/help/help-tip';
 
 /**
  * Poll cadence while any broadcast is sending. Kept modest so we don't
@@ -183,8 +184,9 @@ export default function BroadcastsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t('title')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
             {t('subtitle')}
+            <HelpTip id="broadcasts.template" />
           </p>
         </div>
         <GatedButton

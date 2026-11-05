@@ -41,7 +41,8 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
-    "reports": "Reports"
+    "reports": "Reports",
+    "help": "Help"
   },
   "TopBar": {
     "openMenu": "Open menu",

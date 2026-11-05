@@ -41,7 +41,8 @@
     "menuProfile": "Perfil",
     "menuSettings": "Configurações",
     "menuSignOut": "Sair",
-    "reports": "Relatórios"
+    "reports": "Relatórios",
+    "help": "Ajuda"
   },
   "TopBar": {
     "openMenu": "Abrir menu",

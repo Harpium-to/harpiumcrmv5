@@ -13,6 +13,7 @@ import { activeNavItem, NAV_SECTIONS } from "@/lib/nav";
 import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 import { AgentPulseChip } from "@/components/agents/agent-pulse-chip";
 import { ModeToggle } from "@/components/layout/mode-toggle";
+import { PageHelp } from "@/components/help/page-help";
 import { CrmMenuItems } from "@/components/layout/crm-menu-items";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -120,6 +121,7 @@ export function TopBar({ onOpenNav }: TopBarProps) {
         {/* ---- Right: live status + account ---- */}
         <div className="flex shrink-0 items-center gap-2">
           <AgentPulseChip className="hidden sm:inline-flex" />
+          <PageHelp />
           <ModeToggle />
 
           <DropdownMenu>
