@@ -249,13 +249,14 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Em developers.facebook.com, crie um app do tipo Empresa e adicione o caso de uso Conectar-se com clientes pelo WhatsApp.",
       "Na Etapa 1 do WhatsApp, anote o ID do número de telefone e o ID da conta do WhatsApp Business.",
       "Em business.facebook.com › Usuários do sistema, crie um usuário administrador, dê a ele acesso ao app e à conta do WhatsApp e gere um token sem validade com as permissões whatsapp_business_messaging e whatsapp_business_management.",
-      "No CRM, em Configurações › WhatsApp, cole os dois IDs e o token, invente um token de verificação e salve.",
+      "No CRM, em Configurações › WhatsApp, cole os dois IDs e o token, invente um token de verificação e um PIN de 6 dígitos e salve.",
       "Na Meta, em Configurar webhooks, cole a URL de callback mostrada no CRM e o mesmo token de verificação. Clique em Verificar e salvar e assine o campo messages.",
       "Publique o app na Meta. Enquanto ele estiver em desenvolvimento, as mensagens reais não chegam.",
-      "Clique em Verificar com a Meta no CRM e mande uma mensagem de teste.",
+      "Clique em Verificar com a Meta no CRM. O número de teste não recebe a primeira mensagem: crie um contato com o seu celular, envie o modelo hello_world e responda pelo WhatsApp.",
     ],
     tips: [
       "O token de acesso (começa com EAA) e o token de verificação são coisas diferentes. Nunca cole o token de acesso no campo de verificação.",
+      "Se o CRM envia mas não recebe, a Chave Secreta do app na hospedagem (META_APP_SECRET) não é a do app da Meta ligado ao número.",
     ],
   },
   {
@@ -303,7 +304,7 @@ export const HELP_TIPS = {
   },
   "whatsapp.pin": {
     title: "PIN de verificação em duas etapas",
-    body: "Só para números reais: os 6 dígitos definidos no WhatsApp Manager. O número de teste da Meta não tem PIN. Deixe em branco.",
+    body: "Registra o número na Meta para receber mensagens. Em número real, use os 6 dígitos da verificação em duas etapas. No número de teste da Meta, invente 6 dígitos e anote: eles viram o PIN do número.",
     topic: "whatsapp-oficial",
   },
   "whatsapp.webhookUrl": {

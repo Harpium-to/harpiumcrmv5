@@ -367,7 +367,8 @@
         "deals": "Negócios",
         "noTags": "Nenhuma etiqueta",
         "noDeals": "Nenhum negócio",
-        "addNotePlaceholder": "Adicionar uma nota..."
+        "addNotePlaceholder": "Adicionar uma nota...",
+        "tags": "Etiquetas"
       },
       "actions": {
         "edit": "Editar",
@@ -377,6 +378,7 @@
       "contactInfo": "Informações do contato",
       "unnamed": "Desconhecido",
       "contactDetailsDesc": "Detalhes do contato",
+      "name": "Nome",
       "phone": "Telefone",
       "email": "E-mail",
       "company": "Empresa",
@@ -1441,7 +1443,7 @@
       "unknownDate": "desconhecido",
       "lastAttemptFailed": "A última tentativa falhou com: ",
       "retryHint": "Digite (ou corrija) o PIN de verificação em 2 etapas abaixo e clique em Salvar configuração para tentar novamente.",
-      "noRegistrationHint": "Este número foi salvo antes de existir o acompanhamento de registro, ou o registro foi ignorado. Digite o PIN de verificação em 2 etapas abaixo e clique em Salvar configuração para inscrevê-lo.",
+      "noRegistrationHint": "O número ainda não está registrado na Meta para receber mensagens. Digite um PIN de 6 dígitos abaixo, cole o token de acesso de novo e clique em Salvar configuração. Em número real, use o PIN da verificação em duas etapas. No número de teste da Meta, invente um: ele vira o PIN do número.",
       "diagnosticLastRun": "Diagnóstico — última execução: ",
       "live": "ativo",
       "notLive": "não ativo",
@@ -1458,7 +1460,7 @@
       "twoStepPin": "PIN de verificação em duas etapas",
       "optional": "(opcional)",
       "pinPlaceholder": "PIN de 6 dígitos do Meta WhatsApp Manager",
-      "pinHint": "Necessário apenas para conectar mensagens recebidas de um número de produção. Defina-o no Meta Business Manager → Contas do WhatsApp → Números de telefone → Verificação em duas etapas e cole-o aqui para que o sistema possa inscrever o número — caso contrário, a Meta encaminha os eventos recebidos para o último app que reivindicou o número (o sintoma que atinge segundos números sob uma WABA compartilhada). Números de teste da Meta não têm PIN e já vêm registrados — deixe em branco para eles. Deixar em branco também mantém um registro existente intacto.",
+      "pinHint": "Registra o número na Meta para receber mensagens. Em número real, use os 6 dígitos da verificação em duas etapas (WhatsApp Manager › Números de telefone). No número de teste da Meta, invente 6 dígitos e anote: eles viram o PIN do número. Deixe em branco quando o número já estiver registrado; o registro atual é mantido.",
       "webhookTitle": "Configuração do webhook",
       "webhookDesc": "Use esta URL como o callback de webhook no Painel de Apps da Meta.",
       "webhookUrl": "URL de callback do webhook",
