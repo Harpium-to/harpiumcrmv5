@@ -10,7 +10,21 @@ import {
   parseMetricWindow,
   type AccountMetrics,
 } from '@/lib/agencia/queries'
+import { loadConsentGate } from '@/lib/agencia/consent'
+import {
+  listAgencyOperators,
+  loadAccountRows,
+  loadPendingOwnerInvites,
+  loadPlatformUsage,
+} from '@/lib/agencia/crms'
+import { computeAlerts, computeHealth } from '@/lib/agencia/health'
+import { HealthCard } from './health-card'
+import { listTemplateApplications, listTemplates } from '@/lib/agencia/template-store'
+import { TemplatesPanel } from './templates-panel'
+import { EnterCrmButton } from './enter-crm'
+import { CRM_STATUS_LABEL, nicheLabel } from '@/lib/agencia/crm'
 import { PeriodTabs } from '../ui'
+import { CrmManagePanel } from './manage'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,12 +38,43 @@ export default async function AgenciaAccountPage({
 }) {
   const { accountId } = await params
   const windowDays = parseMetricWindow((await searchParams).dias)
-  const { admin, userId } = await requireAgencia()
-  const [detail, metrics] = await Promise.all([
-    getAccountDetail(admin, accountId),
-    getAccountMetrics(admin, accountId, windowDays),
-  ])
+  const { admin, userId, role: myRole } = await requireAgencia()
+  // Consent decides whether personal data is read at all (Fase 3).
+  const gate = await loadConsentGate(admin, accountId, { userId, role: myRole })
+  const [
+    detail,
+    metrics,
+    lifecycleRows,
+    pendingOwners,
+    operators,
+    usageMap,
+    templates,
+    applications,
+  ] = await Promise.all([
+      getAccountDetail(admin, accountId, { personal: gate.allowed }),
+      getAccountMetrics(admin, accountId, windowDays),
+      loadAccountRows(admin, accountId),
+      loadPendingOwnerInvites(admin, accountId),
+      listAgencyOperators(admin),
+      loadPlatformUsage(admin),
+      listTemplates(admin),
+      listTemplateApplications(admin, accountId),
+    ])
   if (!detail) notFound()
+  const lifecycle = lifecycleRows[0]
+  const canEdit =
+    myRole === 'super_admin' ||
+    (myRole === 'manager' && lifecycle?.manager_user_id === userId)
+  // Support mode (Fase 6): what the owner's consent lets this operator
+  // be inside the CRM — mirrors agency_role_in() in the database.
+  const enterAs: 'admin' | 'viewer' | null =
+    lifecycle?.status === 'archived' || gate.level === null
+      ? null
+      : gate.level === 'full' && canEdit
+        ? 'admin'
+        : gate.level === 'read' || gate.level === 'full'
+          ? 'viewer'
+          : null
 
   // Audit this privileged view (non-blocking on failure).
   await logAgenciaAccess(admin, {
@@ -52,16 +97,27 @@ export default async function AgenciaAccountPage({
             <ArrowLeft className="h-4 w-4" />
             Todas as contas
           </Link>
-          <h1 className="mt-2 text-2xl font-bold">{account.name}</h1>
+          <h1 className="mt-2 flex flex-wrap items-center gap-2 text-2xl font-bold">
+            {account.name}
+            {lifecycle && lifecycle.status !== 'active' && (
+              <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                {CRM_STATUS_LABEL[lifecycle.status]}
+              </span>
+            )}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {account.ownerEmail ?? 'sem dono'} · criada em{' '}
+            {account.ownerEmail ?? 'sem dono'}
+            {lifecycle?.niche && <> · {nicheLabel(lifecycle.niche)}</>} · criado em{' '}
             {formatDate(account.createdAt)}
           </p>
         </div>
-        <PeriodTabs
-          basePath={`/agencia/${account.id}`}
-          current={windowDays}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {enterAs && <EnterCrmButton accountId={account.id} as={enterAs} />}
+          <PeriodTabs
+            basePath={`/agencia/${account.id}`}
+            current={windowDays}
+          />
+        </div>
       </div>
 
       {/* Headline stats */}
@@ -80,6 +136,53 @@ export default async function AgenciaAccountPage({
           value={formatAmount(stats.openDealValue)}
         />
       </div>
+
+      {lifecycle && (
+        <CrmManagePanel
+          accountId={account.id}
+          name={lifecycle.name}
+          status={lifecycle.status}
+          niche={lifecycle.niche}
+          managerUserId={lifecycle.manager_user_id}
+          notes={lifecycle.notes}
+          ownerEmail={account.ownerEmail}
+          pendingOwner={pendingOwners.get(account.id) ?? null}
+          agencyLevel={gate.level}
+          gate={gate}
+          operators={operators}
+          myRole={myRole}
+          canEdit={canEdit}
+        />
+      )}
+
+      {templates !== null && lifecycle && lifecycle.status !== 'archived' && (
+        <TemplatesPanel
+          accountId={account.id}
+          templates={templates
+            .filter((t) => t.active)
+            .map((t) => ({ id: t.id, name: t.name, counts: t.counts }))}
+          applications={applications}
+          canEdit={canEdit}
+          canApplyNow={lifecycle.status === 'onboarding' || gate.level === 'full'}
+          canSave={lifecycle.status === 'onboarding' || gate.level !== 'metrics'}
+          isSuper={myRole === 'super_admin'}
+        />
+      )}
+
+      {usageMap?.get(account.id) && lifecycle && (
+        <HealthCard
+          usage={usageMap.get(account.id)!}
+          health={
+            lifecycle.status === 'active' || lifecycle.status === 'onboarding'
+              ? computeHealth(usageMap.get(account.id)!)
+              : null
+          }
+          alerts={computeAlerts(usageMap.get(account.id)!, {
+            status: lifecycle.status,
+            since: lifecycle.status_changed_at ?? lifecycle.created_at,
+          })}
+        />
+      )}
 
       {/* Analysis — 30-day window */}
       <Section title={`Análise · últimos ${metrics.windowDays} dias`}>
@@ -135,7 +238,9 @@ export default async function AgenciaAccountPage({
           title="Contatos recentes"
           action={{ href: `/agencia/${account.id}/contatos`, label: 'Ver todos →' }}
         >
-          {recentContacts.length === 0 ? (
+          {!gate.allowed ? (
+            <Empty>O dono liberou só Métricas: contatos não aparecem.</Empty>
+          ) : recentContacts.length === 0 ? (
             <Empty>Nenhum contato.</Empty>
           ) : (
             <ul className="divide-y divide-border">
@@ -157,7 +262,9 @@ export default async function AgenciaAccountPage({
           title="Inbox recente"
           action={{ href: `/agencia/${account.id}/inbox`, label: 'Ver tudo →' }}
         >
-          {recentConversations.length === 0 ? (
+          {!gate.allowed ? (
+            <Empty>O dono liberou só Métricas: conversas não aparecem.</Empty>
+          ) : recentConversations.length === 0 ? (
             <Empty>Nenhuma conversa.</Empty>
           ) : (
             <ul className="divide-y divide-border">
@@ -196,7 +303,7 @@ export default async function AgenciaAccountPage({
               key={i}
               className="flex items-center justify-between px-4 py-3 text-sm"
             >
-              <span>{m.email ?? '—'}</span>
+              <span>{m.email ?? (gate.allowed ? '—' : 'e-mail oculto (Métricas)')}</span>
               <span className="text-xs text-muted-foreground">{m.role}</span>
             </li>
           ))}

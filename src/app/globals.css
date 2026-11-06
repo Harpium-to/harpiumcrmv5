@@ -448,7 +448,82 @@ html[data-theme="rose"] {
   }
 }
 
+/* The Harpium mark on the auth screens (HarpiumMark animated). The
+ * outline draws itself, the metal fills in behind it, then the mark
+ * settles into a slow float with a light passing over it now and
+ * then — alive, but quiet enough to sit next to a form. */
+@keyframes hm-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes hm-fill {
+  from {
+    fill-opacity: 0;
+  }
+  to {
+    fill-opacity: 1;
+  }
+}
+
+@keyframes hm-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes hm-sheen {
+  0%,
+  55% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(820px);
+  }
+}
+
+@keyframes hm-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
 @layer components {
+  .hm-animated {
+    animation: hm-float 6s ease-in-out 2s infinite;
+  }
+
+  .hm-animated .hm-body {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    fill-opacity: 0;
+    animation:
+      hm-draw 1.6s cubic-bezier(0.65, 0, 0.35, 1) 0.15s forwards,
+      hm-fill 0.9s ease-out 1.25s forwards;
+  }
+
+  .hm-animated .hm-sheen {
+    animation: hm-sheen 5.5s ease-in-out 2.2s infinite;
+  }
+
+  .hm-halo {
+    animation: hm-halo 6s ease-in-out infinite;
+  }
+
   /* Scroll-in reveal. `Reveal` renders the element pending (hidden),
    * then flips data-reveal to "shown" once it intersects. Kept as
    * two states rather than toggling a class so the hidden style is
@@ -668,7 +743,9 @@ html[data-theme="rose"] {
   .fx-shimmer,
   .fx-halo,
   .fx-blink > *,
-  .fx-landed {
+  .fx-landed,
+  .hm-animated,
+  .hm-halo {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
@@ -677,6 +754,16 @@ html[data-theme="rose"] {
 
   .fx-glow {
     opacity: 0.12 !important;
+  }
+
+  .hm-animated .hm-body {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+    fill-opacity: 1 !important;
+  }
+
+  .hm-animated .hm-sheen {
+    display: none;
   }
 
   .fx-lift {

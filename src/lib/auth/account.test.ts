@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// getCurrentAccount resolves the caller's account context. The
-// regression this file guards (issue #294): account loading must NOT
-// depend on a PostgREST embedded FK join (`accounts!inner`), because a
+// getCurrentAccount resolves the caller's account context.
+//
+// Since migration 049 it asks the database (`current_account_context`
+// RPC) for the active CRM and the effective role. When that function
+// doesn't exist yet (049 not applied) it falls back to the pre-049
+// lookup, which carries the regression this file has always guarded
+// (issue #294): no PostgREST embedded FK join (`accounts!inner`) — a
 // stale schema cache makes that embed fail hard and blanks the whole
-// context. It must instead read the profile and then the account with
-// two plain point queries.
+// context — but two plain point queries.
 
 // ------------------------------------------------------------
 // Chainable Supabase query-builder mock. Each `.from(table)` hands back
@@ -18,12 +21,17 @@ interface BuilderCall {
   eqArgs: [string, unknown][];
 }
 
+// Pre-049 database: the context RPC doesn't exist.
+const RPC_MISSING = { data: null, error: { code: "PGRST202" } };
+
 function makeClient(opts: {
   user: { id: string } | null;
   userErr?: unknown;
+  rpc?: { data: unknown; error: unknown };
   byTable: Record<string, { data: unknown; error: unknown }>;
 }) {
   const calls: BuilderCall[] = [];
+  const rpcCalls: string[] = [];
 
   const from = (table: string) => {
     const call: BuilderCall = { table, eqArgs: [] };
@@ -48,7 +56,12 @@ function makeClient(opts: {
 
   return {
     calls,
+    rpcCalls,
     client: {
+      rpc: (fn: string) => {
+        rpcCalls.push(fn);
+        return Promise.resolve(opts.rpc ?? RPC_MISSING);
+      },
       auth: {
         getUser: () =>
           Promise.resolve({
@@ -66,15 +79,120 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: () => createClient(),
 }));
 
-const { getCurrentAccount, UnauthorizedError, ForbiddenError } = await import(
-  "./account"
-);
+const { getCurrentAccount, requireRole, UnauthorizedError, ForbiddenError } =
+  await import("./account");
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("getCurrentAccount", () => {
+describe("getCurrentAccount — migration 049 applied", () => {
+  it("trusts the database's active CRM and effective role", async () => {
+    const { client, calls, rpcCalls } = makeClient({
+      user: { id: "user-1" },
+      rpc: {
+        data: {
+          account_id: "acct-1",
+          account_name: "Clínica X",
+          role: "agent",
+          via_agency: false,
+        },
+        error: null,
+      },
+      byTable: {},
+    });
+    createClient.mockReturnValue(client);
+
+    const ctx = await getCurrentAccount();
+
+    expect(rpcCalls).toEqual(["current_account_context"]);
+    expect(calls).toEqual([]); // no profile/account reads
+    expect(ctx).toMatchObject({
+      userId: "user-1",
+      accountId: "acct-1",
+      role: "agent",
+      account: { id: "acct-1", name: "Clínica X" },
+      viaAgency: false,
+    });
+  });
+
+  it("carries an agency session through as viaAgency", async () => {
+    const { client } = makeClient({
+      user: { id: "agency-1" },
+      rpc: {
+        data: {
+          account_id: "acct-9",
+          account_name: "Academia Y",
+          role: "viewer",
+          via_agency: true,
+        },
+        error: null,
+      },
+      byTable: {},
+    });
+    createClient.mockReturnValue(client);
+    await expect(getCurrentAccount()).resolves.toMatchObject({
+      role: "viewer",
+      viaAgency: true,
+    });
+  });
+
+  it("rejects a caller with no active CRM (RPC returns null)", async () => {
+    const { client } = makeClient({
+      user: { id: "user-1" },
+      rpc: { data: null, error: null },
+      byTable: {},
+    });
+    createClient.mockReturnValue(client);
+    const err = await getCurrentAccount().catch((e) => e);
+    expect(err).toBeInstanceOf(ForbiddenError);
+    expect(err.message).toBe("Você não está em nenhum CRM");
+  });
+
+  it("a suspended CRM reads but refuses writes, and says why", async () => {
+    const { client } = makeClient({
+      user: { id: "user-1" },
+      rpc: {
+        data: {
+          account_id: "acct-1",
+          account_name: "Clínica X",
+          role: "owner",
+          status: "suspended",
+          via_agency: false,
+        },
+        error: null,
+      },
+      byTable: {},
+    });
+    createClient.mockReturnValue(client);
+    await expect(requireRole("viewer")).resolves.toMatchObject({
+      status: "suspended",
+    });
+    await expect(requireRole("agent")).rejects.toThrow(
+      "Este CRM está suspenso: só leitura. Fale com a agência.",
+    );
+  });
+
+  it("fails closed on any other RPC error instead of falling back", async () => {
+    const { client, calls } = makeClient({
+      user: { id: "user-1" },
+      rpc: { data: null, error: { code: "57014" } },
+      byTable: {
+        profiles: {
+          data: { account_id: "acct-1", account_role: "owner" },
+          error: null,
+        },
+      },
+    });
+    createClient.mockReturnValue(client);
+    await expect(getCurrentAccount()).rejects.toThrow(
+      "Não consegui carregar os dados da conta",
+    );
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("getCurrentAccount — before migration 049 (fallback)", () => {
   it("resolves context via a plain accounts lookup, not an embedded join", async () => {
     const { client, calls } = makeClient({
       user: { id: "user-1" },
@@ -95,6 +213,7 @@ describe("getCurrentAccount", () => {
       accountId: "acct-1",
       role: "owner",
       account: { id: "acct-1", name: "Acme" },
+      viaAgency: false,
     });
 
     // Two queries: profiles by user_id, then accounts by id. Neither

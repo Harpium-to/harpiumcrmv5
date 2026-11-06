@@ -1,3 +1,6 @@
+import { NextResponse } from 'next/server'
+
+import { consentAllowsRows, loadConsent } from '@/lib/agencia/consent'
 import { requireAgencia } from '@/lib/agencia/guard'
 import { logAgenciaAccess } from '@/lib/agencia/queries'
 import { toErrorResponse } from '@/lib/auth/account'
@@ -17,6 +20,14 @@ export async function GET(
   try {
     const { accountId } = await params
     const { admin, userId } = await requireAgencia()
+
+    // The owner's consent decides; the service role would not stop us.
+    if (!consentAllowsRows(await loadConsent(admin, accountId))) {
+      return NextResponse.json(
+        { error: 'O dono deste CRM liberou só Métricas para a agência.' },
+        { status: 403 },
+      )
+    }
 
     await logAgenciaAccess(admin, {
       actorUserId: userId,

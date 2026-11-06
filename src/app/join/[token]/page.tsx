@@ -52,12 +52,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import {
+  AGENCY_ACCESS_DESCRIPTION,
+  AGENCY_ACCESS_LABEL,
+  isAgencyAccessLevel,
+} from '@/lib/agencia/crm';
 
 interface PeekOk {
   ok: true;
   account_name: string;
-  role: 'admin' | 'agent' | 'viewer';
+  role: 'owner' | 'admin' | 'agent' | 'viewer';
   expires_at: string;
+  /** Masked email the invitation is bound to (050), if any. */
+  email_hint?: string | null;
+  /** Owner invitations: what the agency will see in this CRM (050). */
+  agency_level?: string | null;
 }
 interface PeekFail {
   ok: false;
@@ -66,6 +75,7 @@ interface PeekFail {
 type PeekResult = PeekOk | PeekFail;
 
 const ROLE_LABEL: Record<PeekOk['role'], string> = {
+  owner: 'Dono',
   admin: 'Administrador',
   agent: 'Atendente',
   viewer: 'Leitor',
@@ -102,10 +112,10 @@ export default function JoinPage() {
     undefined, // undefined = unknown / still loading; null = signed out
   );
   const [accepting, setAccepting] = useState(false);
-  // `redeem_invitation` returns 409 when the caller's current account
-  // has domain data, or they're already a member of a shared account.
-  // A transient toast wasn't enough — the user has no actionable next
-  // step. Surface a blocking modal that walks them through it.
+  // `redeem_invitation` returns 409 when the caller is already a member
+  // of this CRM (migration 049; before it, also when their current
+  // account had data or was shared). A transient toast wasn't enough —
+  // surface a modal with the two ways forward.
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -175,15 +185,12 @@ export default function JoinPage() {
         const payload = (await res.json().catch(() => ({}))) as {
           error?: string;
         };
-        // 409 = caller already has data / is in another shared
-        // account. The redeem RPC's error message is descriptive
-        // enough to show directly; we open a modal so the user has
-        // a clear next-action (sign out → use different email)
-        // rather than a 3-second toast.
+        // 409 = caller is already in this CRM. The redeem RPC's
+        // message is descriptive enough to show directly; the modal
+        // offers the next step instead of a 3-second toast.
         if (res.status === 409) {
           setConflictMessage(
-            payload.error ||
-              'Você já está em outra conta. Entre com outro e-mail para participar desta.',
+            payload.error || 'Você já faz parte deste CRM.',
           );
         } else {
           toast.error(payload.error || 'Falha ao aceitar o convite');
@@ -313,7 +320,22 @@ export default function JoinPage() {
           day: 'numeric',
         })}
         .
+        {peek.email_hint && (
+          <>
+            {' '}
+            Este convite é para{' '}
+            <span className="text-foreground">{peek.email_hint}</span>.
+          </>
+        )}
       </CardDescription>
+      {peek.role === 'owner' && isAgencyAccessLevel(peek.agency_level) && (
+        <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-left text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            Acesso da agência a este CRM: {AGENCY_ACCESS_LABEL[peek.agency_level]}.
+          </span>{' '}
+          {AGENCY_ACCESS_DESCRIPTION[peek.agency_level]}
+        </p>
+      )}
     </CardHeader>
   );
 
@@ -342,17 +364,17 @@ export default function JoinPage() {
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              Ao aceitar, seu login passa para{' '}
-              <span className="text-muted-foreground">{peek.account_name}</span>. A conta
-              pessoal vazia criada no cadastro será removida.
+              Ao aceitar, você entra em{' '}
+              <span className="text-muted-foreground">{peek.account_name}</span>. Os
+              outros CRMs em que você já trabalha continuam disponíveis; só uma conta
+              pessoal vazia, criada no cadastro, é removida.
             </p>
           </CardContent>
         </Card>
 
         {/* Conflict modal — opens when the redeem endpoint returns 409
-            (caller already in a shared account or has domain data).
-            Blocks the flow until the user picks a recovery action so
-            they aren't stuck retrying an inevitable failure. */}
+            (caller already in this CRM). Blocks the flow until the user
+            picks a way forward so they aren't stuck retrying. */}
         <Dialog
           open={conflictMessage !== null}
           onOpenChange={(open) => {
@@ -363,7 +385,7 @@ export default function JoinPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-popover-foreground">
                 <AlertTriangle className="size-4 text-amber-400" />
-                Não é possível entrar em {peek.account_name} com esta conta
+                Não foi possível aceitar o convite para {peek.account_name}
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
                 {conflictMessage}
@@ -371,21 +393,21 @@ export default function JoinPage() {
             </DialogHeader>
             <div className="space-y-2 py-2 text-xs text-muted-foreground">
               <p>
-                Para entrar em{' '}
+                Se você já faz parte de{' '}
                 <span className="text-popover-foreground">{peek.account_name}</span>,
-                saia e cadastre-se de novo com outro endereço de e-mail.
-                O link do convite continua valendo enquanto não
-                expirar.
+                é só abrir o painel. Se o convite era para outro e-mail, saia e
+                entre com ele: o link continua valendo enquanto não expirar.
               </p>
             </div>
             <DialogFooter className="bg-popover border-border">
-              <Button
-                variant="outline"
-                onClick={() => setConflictMessage(null)}
-                className="border-border text-popover-foreground hover:bg-muted"
-              >
-                Continuar conectado
-              </Button>
+              <Link href="/dashboard">
+                <Button
+                  variant="outline"
+                  className="w-full border-border text-popover-foreground hover:bg-muted"
+                >
+                  Abrir o painel
+                </Button>
+              </Link>
               <Button
                 onClick={handleSignOutAndRetry}
                 disabled={signingOut}

@@ -22,6 +22,12 @@ export interface ApiKeyRow {
   scopes: string[];
   expires_at: string | null;
   revoked_at: string | null;
+  /**
+   * The CRM's lifecycle status (migration 050). Absent / 'active'
+   * before 050. Archived keys don't authenticate; suspended CRMs are
+   * read-only through the API too.
+   */
+  account_status?: string;
 }
 
 /**
@@ -53,7 +59,22 @@ export async function findActiveKeyByHash(
     return null;
   }
 
-  return data as ApiKeyRow;
+  return { ...(data as ApiKeyRow), account_status: await getAccountStatus(data.account_id) };
+}
+
+/**
+ * accounts.status, or 'active' when the column doesn't exist yet (050
+ * not applied) or can't be read — the key already proved itself, and
+ * failing every API call over a status read would be worse.
+ */
+async function getAccountStatus(accountId: string): Promise<string> {
+  const { data, error } = await supabaseAdmin()
+    .from('accounts')
+    .select('status')
+    .eq('id', accountId)
+    .maybeSingle();
+  if (error || !data) return 'active';
+  return typeof data.status === 'string' ? data.status : 'active';
 }
 
 /**

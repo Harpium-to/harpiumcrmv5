@@ -4,6 +4,7 @@ import {
   Bot,
   ChartColumn,
   GitBranch,
+  LifeBuoy,
   LayoutDashboard,
   Magnet,
   MessageSquare,
@@ -63,6 +64,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio, group: "build" },
   { href: "/canais", labelKey: "channels", icon: Plug, group: "build" },
   { href: "/settings", labelKey: "settings", icon: Settings, group: "system" },
+  { href: "/ajuda", labelKey: "help", icon: LifeBuoy, group: "system" },
 ];
 
 export const NAV_GROUPS: NavItem["group"][] = ["work", "build", "system"];

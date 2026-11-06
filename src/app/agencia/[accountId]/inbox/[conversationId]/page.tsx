@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Paperclip } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
+import { loadConsentGate } from '@/lib/agencia/consent'
+import { ConsentWall } from '../../consent-wall'
 import {
   getConversationThread,
   logAgenciaAccess,
@@ -17,7 +19,12 @@ export default async function AgenciaConversationPage({
   params: Promise<{ accountId: string; conversationId: string }>
 }) {
   const { accountId, conversationId } = await params
-  const { admin, userId } = await requireAgencia()
+  const { admin, userId, role } = await requireAgencia()
+  // Consent first: no message is read (or access logged) without it.
+  const gate = await loadConsentGate(admin, accountId, { userId, role })
+  if (!gate.allowed) {
+    return <ConsentWall accountId={accountId} gate={gate} what="as conversas" />
+  }
   const thread = await getConversationThread(admin, accountId, conversationId)
   if (!thread) notFound()
 

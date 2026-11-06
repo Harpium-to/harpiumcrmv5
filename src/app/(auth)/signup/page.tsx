@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUTH_CARD_ENTER, AUTH_SCREEN_CLASS, AuthBrand } from "@/components/brand/auth-brand";
 import {
   Card,
   CardContent,
@@ -14,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MessageSquare, CheckCircle, UsersRound } from "lucide-react";
+import { CheckCircle, UsersRound } from "lucide-react";
 
 // `useSearchParams` opts the component out of static prerendering
 // unless wrapped in Suspense — same pattern as /login.
@@ -91,8 +92,9 @@ function SignupPageInner() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <Card className="fx-page w-full max-w-md border-border bg-card">
+      <div className={AUTH_SCREEN_CLASS}>
+        <AuthBrand />
+        <Card {...AUTH_CARD_ENTER} className="w-full max-w-md border-border bg-card/80 backdrop-blur-xl">
           <CardHeader className="items-center text-center">
             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <CheckCircle className="h-6 w-6 text-primary" />
@@ -128,16 +130,15 @@ function SignupPageInner() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <Card className="fx-page w-full max-w-md border-border bg-card">
+    <div className={AUTH_SCREEN_CLASS}>
+      <AuthBrand />
+      <Card {...AUTH_CARD_ENTER} className="w-full max-w-md border-border bg-card/80 backdrop-blur-xl">
         <CardHeader className="items-center text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-            {inviteToken ? (
+          {inviteToken ? (
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <UsersRound className="h-6 w-6 text-primary" />
-            ) : (
-              <MessageSquare className="h-6 w-6 text-primary" />
-            )}
-          </div>
+            </div>
+          ) : null}
           <CardTitle className="text-xl text-foreground">
             {inviteToken ? "Criar conta e entrar" : "Criar conta"}
           </CardTitle>

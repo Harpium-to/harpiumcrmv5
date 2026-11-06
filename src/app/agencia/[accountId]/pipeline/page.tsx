@@ -1,4 +1,6 @@
 import { requireAgencia } from '@/lib/agencia/guard'
+import { loadConsentGate } from '@/lib/agencia/consent'
+import { ConsentWall } from '../consent-wall'
 import { getAccountBoard, type BoardDeal } from '@/lib/agencia/queries'
 import { BackToAccount } from '../parts'
 
@@ -10,7 +12,12 @@ export default async function AgenciaPipelinePage({
   params: Promise<{ accountId: string }>
 }) {
   const { accountId } = await params
-  const { admin } = await requireAgencia()
+  const { admin, userId, role } = await requireAgencia()
+  // Deal titles and contact names are personal data: consent first.
+  const gate = await loadConsentGate(admin, accountId, { userId, role })
+  if (!gate.allowed) {
+    return <ConsentWall accountId={accountId} gate={gate} what="os negócios do funil" />
+  }
   const { stages } = await getAccountBoard(admin, accountId)
 
   return (

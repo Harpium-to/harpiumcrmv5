@@ -38,9 +38,15 @@ export default async function AgenciaLayout({
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
               <Building2 className="h-5 w-5 text-primary" />
             </span>
-            <span className="text-lg font-semibold">Agência · Super-visão</span>
+            <span className="text-lg font-semibold">Agência · Plataforma</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
+            <Link
+              href="/agencia/modelos"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Modelos
+            </Link>
             <Link
               href="/agencia/marca"
               className="text-muted-foreground hover:text-foreground"
