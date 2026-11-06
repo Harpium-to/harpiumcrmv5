@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { fold, matchesKeyword, pickAgent } from './routing'
+import {
+  agentsForChannel,
+  fold,
+  matchesKeyword,
+  pickAgent,
+  speaksOn,
+} from './routing'
 import type { Agent } from './types'
 
 function agent(over: Partial<Agent> & { id: string }): Agent {
@@ -137,5 +143,79 @@ describe('pickAgent', () => {
 
   it('returns null when nothing matches and there is no fallback', () => {
     expect(pickAgent([sales, billing], 'bom dia')).toBeNull()
+  })
+})
+
+describe('speaksOn', () => {
+  it('covers exactly the channels ticked on the agent', () => {
+    expect(speaksOn(['whatsapp'], 'whatsapp')).toBe(true)
+    expect(speaksOn(['whatsapp'], 'instagram')).toBe(false)
+    expect(speaksOn(['whatsapp', 'instagram'], 'instagram')).toBe(true)
+  })
+
+  it('reads an empty list as no channel at all, not every channel', () => {
+    // A researcher or prospector: the form says "Vazio significa que
+    // ele não fala com cliente", so it must never answer a customer.
+    expect(speaksOn([], 'whatsapp')).toBe(false)
+    expect(speaksOn([], 'instagram')).toBe(false)
+  })
+})
+
+describe('agentsForChannel', () => {
+  const whatsappDesk = agent({
+    id: 'wa-desk',
+    channels: ['whatsapp'],
+    isFallback: true,
+  })
+  const instagramSales = agent({
+    id: 'ig-sales',
+    channels: ['instagram'],
+    keywords: ['preço'],
+    priority: 30,
+  })
+  const everywhere = agent({
+    id: 'both',
+    channels: ['whatsapp', 'instagram'],
+    keywords: ['boleto'],
+    priority: 20,
+  })
+  const researcher = agent({
+    id: 'researcher',
+    channels: [],
+    keywords: ['preço'],
+    priority: 99,
+  })
+  const team = [whatsappDesk, instagramSales, everywhere, researcher]
+
+  it('keeps only the agents that speak on the thread’s channel', () => {
+    expect(agentsForChannel(team, 'whatsapp').map((a) => a.id)).toEqual([
+      'wa-desk',
+      'both',
+    ])
+    expect(agentsForChannel(team, 'instagram').map((a) => a.id)).toEqual([
+      'ig-sales',
+      'both',
+    ])
+  })
+
+  it('never hands a thread to an agent with no channels', () => {
+    // Highest priority and a matching keyword, but it talks to nobody.
+    for (const channel of ['whatsapp', 'instagram']) {
+      const picked = pickAgent(agentsForChannel(team, channel), 'qual o preço?')
+      expect(picked?.agent.id).not.toBe('researcher')
+    }
+  })
+
+  it('keeps a WhatsApp-only fallback off Instagram', () => {
+    // On Instagram nothing matches "bom dia" and the only fallback is
+    // WhatsApp-only, so nobody claims it.
+    expect(pickAgent(agentsForChannel(team, 'instagram'), 'bom dia')).toBeNull()
+    expect(
+      pickAgent(agentsForChannel(team, 'whatsapp'), 'bom dia')?.agent.id,
+    ).toBe('wa-desk')
+  })
+
+  it('returns nobody for a channel no agent covers', () => {
+    expect(agentsForChannel(team, 'email')).toEqual([])
   })
 })

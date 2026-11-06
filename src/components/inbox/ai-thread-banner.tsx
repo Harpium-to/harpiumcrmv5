@@ -8,39 +8,39 @@ import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
 import { createClient } from "@/lib/supabase/client";
 import { parseReplyFailure, type ParsedReplyFailure } from "@/lib/ai/reply-failure";
-import { autoReplyStatusFromConfig, type AutoReplyStatus } from "@/lib/ai/autoreply-status";
+import { autoReplyStatusFromConfig, type AiConfigSnapshot } from "@/lib/ai/autoreply-status";
 import type { AgentRunStatus } from "@/lib/agents/types";
 
 // ------------------------------------------------------------
-// Account AI status is the same for every conversation, so cache it per
-// account and reuse it across thread switches instead of hitting
-// /api/ai/config every time the agent opens a chat.
+// The account's AI config is the same for every conversation, so cache
+// it per account and reuse it across thread switches instead of hitting
+// /api/ai/config every time the agent opens a chat. What it means for a
+// given thread depends on that thread's channel, so the status itself
+// is derived per thread from the cached snapshot.
 //
 // Keyed by accountId (a multi-account user switching workspaces must not
 // see the previous account's status), and only *successful* fetches are
-// cached — a transient failure returns a default without poisoning the
+// cached — a transient failure returns null without poisoning the
 // cache, so it retries on the next thread open rather than hiding the
 // banner for the whole session.
 // ------------------------------------------------------------
-// `agentMode` (at least one active agent) matters twice: it turns the
-// banner on even with the single-assistant switch off — the dispatcher
-// never reads that switch in agent mode — and it is what makes
-// `agent_runs` exist for the failure notice to read.
-type AiAccountStatus = AutoReplyStatus;
-const OFF: AiAccountStatus = { autoReplyOn: false, agentMode: false };
-const statusCache = new Map<string, AiAccountStatus>();
+// `agentMode` (an active agent speaks on this thread's channel) matters
+// twice: it turns the banner on even with the single-assistant switch
+// off — the dispatcher never reads that switch in agent mode — and it
+// is what makes `agent_runs` exist for the failure notice to read.
+const configCache = new Map<string, AiConfigSnapshot>();
 
-async function fetchAiAccountStatus(accountId: string): Promise<AiAccountStatus> {
-  const cached = statusCache.get(accountId);
+async function fetchAiConfigSnapshot(accountId: string): Promise<AiConfigSnapshot | null> {
+  const cached = configCache.get(accountId);
   if (cached) return cached;
   try {
     const res = await fetch("/api/ai/config", { cache: "no-store" });
-    if (!res.ok) return OFF; // don't cache a transient failure
-    const status = autoReplyStatusFromConfig(await res.json());
-    statusCache.set(accountId, status);
-    return status;
+    if (!res.ok) return null; // don't cache a transient failure
+    const snapshot = (await res.json()) as AiConfigSnapshot;
+    configCache.set(accountId, snapshot);
+    return snapshot;
   } catch {
-    return OFF; // don't cache
+    return null; // don't cache
   }
 }
 
@@ -142,6 +142,9 @@ interface AiThreadBannerProps {
   disabled: boolean;
   /** `conversations.ai_handoff_summary` — note the bot left on handoff. */
   handoffSummary?: string | null;
+  /** `conversations.channel` — which agents may answer depends on it.
+   *  Absent before migration 047, which means WhatsApp. */
+  channel?: string | null;
   /** Current assignee; when a human owns the thread the bot won't run,
    *  so the "AI active" banner is suppressed. */
   assignedAgentId?: string | null;
@@ -164,21 +167,23 @@ interface AiThreadBannerProps {
  *     the pause came from the reply cap, the title says so
  *   - the bot's last attempt failed (agent mode) → a notice that the
  *     customer got no reply, why, and what to do — above either one
- * Renders nothing when the account has no auto-reply running (neither an
- * active agent nor the single-assistant switch), or when the bot is
- * active but a human already owns the thread (nothing to do).
+ * Renders nothing when no auto-reply runs on this thread (no active
+ * agent speaks on its channel and the single-assistant switch is off),
+ * or when the bot is active but a human already owns the thread
+ * (nothing to do).
  */
 export function AiThreadBanner({
   conversationId,
   disabled,
   handoffSummary,
+  channel,
   assignedAgentId,
   currentUserId,
   onChange,
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
   const { accountId } = useAuth();
-  const [status, setStatus] = useState<AiAccountStatus>(OFF);
+  const [config, setConfig] = useState<AiConfigSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   // Optimistic local mirror of the pause flag so the banner flips
   // instantly on click; re-seeds whenever the thread (or its server
@@ -192,12 +197,15 @@ export function AiThreadBanner({
   useEffect(() => {
     if (!accountId) return;
     let alive = true;
-    fetchAiAccountStatus(accountId).then((s) => alive && setStatus(s));
+    fetchAiConfigSnapshot(accountId).then((c) => alive && setConfig(c));
     return () => {
       alive = false;
     };
   }, [accountId]);
 
+  // Same rule as the dispatcher, for this thread's channel. Still
+  // loading (null) → off.
+  const status = autoReplyStatusFromConfig(config, channel);
   const latestRun = useLatestAgentRun(conversationId, status.agentMode);
 
   const toggle = useCallback(

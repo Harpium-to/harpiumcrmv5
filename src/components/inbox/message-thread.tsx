@@ -1136,12 +1136,13 @@ export function MessageThread({
 
       {/* AI auto-reply banner — take over an active bot, resume it
           after a handoff, and see why its last reply failed. Renders
-          nothing unless the account has auto-reply running (an active
-          agent, or the single-assistant switch). */}
+          nothing unless auto-reply runs on this thread (an active agent
+          on its channel, or the single-assistant switch). */}
       <AiThreadBanner
         conversationId={conversation.id}
         disabled={conversation.ai_autoreply_disabled ?? false}
         handoffSummary={conversation.ai_handoff_summary}
+        channel={conversation.channel}
         assignedAgentId={assignedAgentId}
         currentUserId={user?.id}
         onChange={(patch) => {
