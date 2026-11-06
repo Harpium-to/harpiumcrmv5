@@ -276,7 +276,19 @@
       "tookOver": "You’ve taken over this chat.",
       "resumed": "AI resumed.",
       "updateError": "Couldn’t update the AI assistant.",
-      "networkError": "Couldn’t reach the server."
+      "networkError": "Couldn’t reach the server.",
+      "capPausedTitle": "AI reached this chat’s reply limit and paused",
+      "failure": {
+        "title": "AI couldn’t answer the customer’s last message",
+        "whatsapp_not_in_allowed_list": "The customer’s number isn’t on Meta’s test recipient list (error 131030). Add it under Meta for Developers → WhatsApp → API Setup, or use a production WhatsApp number. Until then, reply from here.",
+        "whatsapp_window_closed": "More than 24 hours have passed since the customer’s last message (error 131047). Send an approved message template to reopen the chat.",
+        "whatsapp_number_not_registered": "The WhatsApp Business number isn’t registered on the Cloud API (error 133010). Register it under Settings → WhatsApp and try again.",
+        "ai_invalid_key": "The AI provider rejected the API key. Update it under AI Agents → Key & model. Until then, reply manually.",
+        "ai_no_credit": "The AI provider account is out of credit. Top it up in the OpenAI or Anthropic dashboard. Until then, reply manually.",
+        "unknown": "The customer got no reply. Answer manually; the technical detail is also in the agents monitor.",
+        "detail": "Technical detail: {detail}",
+        "dismiss": "Dismiss notice"
+      }
     }
   },
   "Contacts": {
