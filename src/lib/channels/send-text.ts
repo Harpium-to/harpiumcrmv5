@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { engineSendText } from '@/lib/flows/meta-send'
 import { sendInstagramToConversation } from '@/lib/instagram/send'
@@ -39,10 +40,18 @@ export interface ChannelSendArgs {
  * unapplied), a missing row, a read error. Every thread that existed
  * before Instagram is a WhatsApp thread, so the safe default is also
  * the correct one for every row that has no answer.
+ *
+ * Also read by the AI auto-reply to decide which agents cover the
+ * thread; `db` lets it pass its own service-role client. The default
+ * client is built inside the `try`, so failing to build it is one more
+ * doubt that resolves to WhatsApp.
  */
-async function channelOf(conversationId: string): Promise<string> {
+export async function channelOf(
+  conversationId: string,
+  db?: SupabaseClient,
+): Promise<string> {
   try {
-    const { data, error } = await supabaseAdmin()
+    const { data, error } = await (db ?? supabaseAdmin())
       .from('conversations')
       .select('channel')
       .eq('id', conversationId)

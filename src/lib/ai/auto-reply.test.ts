@@ -465,15 +465,14 @@ describe('auto-reply status for the inbox banner', () => {
     h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyEnabled: false }))
     await dispatchInboundToAiReply(ARGS)
 
-    // The dispatcher answers…
+    // The dispatcher answers (a thread with no channel is WhatsApp)…
     expect(h.engineSendText).toHaveBeenCalled()
     // …so the banner must show.
     expect(
-      autoReplyStatusFromConfig({
-        ...base,
-        auto_reply_enabled: false,
-        agent_mode: true,
-      }),
+      autoReplyStatusFromConfig(
+        { ...base, auto_reply_enabled: false, agent_channels: ['whatsapp'] },
+        undefined,
+      ),
     ).toEqual({ autoReplyOn: true, agentMode: true })
   })
 
@@ -483,32 +482,155 @@ describe('auto-reply status for the inbox banner', () => {
 
     expect(h.engineSendText).not.toHaveBeenCalled()
     expect(
-      autoReplyStatusFromConfig({
-        ...base,
-        auto_reply_enabled: false,
-        agent_mode: false,
-      }),
+      autoReplyStatusFromConfig(
+        { ...base, auto_reply_enabled: false, agent_channels: [] },
+        'whatsapp',
+      ),
     ).toEqual({ autoReplyOn: false, agentMode: false })
   })
 
   it('keeps the single-assistant mode on its switch', () => {
     expect(
-      autoReplyStatusFromConfig({ ...base, auto_reply_enabled: true }),
+      autoReplyStatusFromConfig({ ...base, auto_reply_enabled: true }, 'whatsapp'),
     ).toEqual({ autoReplyOn: true, agentMode: false })
   })
 
   it('is off when AI itself is unavailable, agents or not', () => {
     for (const cfg of [
       null,
-      { configured: false, agent_mode: false },
-      { ...base, is_active: false, agent_mode: true },
-      { ...base, has_key: false, agent_mode: true },
+      { configured: false, agent_channels: [] },
+      { ...base, is_active: false, agent_channels: ['whatsapp'] },
+      { ...base, has_key: false, agent_channels: ['whatsapp'] },
     ]) {
-      expect(autoReplyStatusFromConfig(cfg)).toEqual({
+      expect(autoReplyStatusFromConfig(cfg, 'whatsapp')).toEqual({
         autoReplyOn: false,
         agentMode: false,
       })
     }
+  })
+})
+
+// ------------------------------------------------------------------
+// 2b. Agents answer only on the channels ticked on them.
+//
+// Routing used to ignore `agents.channels`, so an agent marked
+// WhatsApp-only also answered Instagram DMs. Agent mode is now decided
+// per channel, an empty list means the agent talks to no customer, and
+// a channel no agent covers falls back to the single assistant and its
+// switch. Each case checks the dispatcher and the banner together.
+// ------------------------------------------------------------------
+describe('dispatchInboundToAiReply — channels', () => {
+  const base = { configured: true, has_key: true, is_active: true }
+
+  it('keeps a WhatsApp-only agent off Instagram', async () => {
+    h.state.agents = [agentRow({ channels: ['whatsapp'] })]
+    h.state.conv = conv({ channel: 'instagram' })
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyEnabled: false }))
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).not.toHaveBeenCalled()
+    expect(h.engineSendText).not.toHaveBeenCalled()
+    // Not even a skipped run: the agent was never a candidate here.
+    expect(h.state.runInserts).toHaveLength(0)
+    expect(
+      autoReplyStatusFromConfig(
+        { ...base, auto_reply_enabled: false, agent_channels: ['whatsapp'] },
+        'instagram',
+      ),
+    ).toEqual({ autoReplyOn: false, agentMode: false })
+  })
+
+  it('falls back to the single assistant on a channel no agent covers', async () => {
+    h.state.agents = [agentRow({ channels: ['whatsapp'] })]
+    h.state.conv = conv({ channel: 'instagram' })
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyEnabled: true }))
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalled()
+    // The account's cap (3), not the agent's (10), and no agent run.
+    expect(h.state.rpcCalls).toEqual([
+      {
+        name: 'claim_ai_reply_slot',
+        args: { conversation_id: 'conv-1', max_replies: 3 },
+      },
+    ])
+    expect(h.state.runInserts).toHaveLength(0)
+    // The agent's persona stays out of the prompt.
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).not.toContain('Você atende clientes da Harpium.')
+    expect(
+      autoReplyStatusFromConfig(
+        { ...base, auto_reply_enabled: true, agent_channels: ['whatsapp'] },
+        'instagram',
+      ),
+    ).toEqual({ autoReplyOn: true, agentMode: false })
+  })
+
+  it('answers Instagram through an agent that has it ticked', async () => {
+    h.state.agents = [agentRow({ channels: ['whatsapp', 'instagram'] })]
+    h.state.conv = conv({ channel: 'instagram' })
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyEnabled: false }))
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).toHaveBeenCalled()
+    expect(h.state.runInserts[0]).toMatchObject({ agent_id: 'agent-1' })
+    expect(
+      autoReplyStatusFromConfig(
+        {
+          ...base,
+          auto_reply_enabled: false,
+          agent_channels: ['whatsapp', 'instagram'],
+        },
+        'instagram',
+      ),
+    ).toEqual({ autoReplyOn: true, agentMode: true })
+  })
+
+  it('never lets an agent with no channels answer a customer', async () => {
+    // A fallback agent with an empty list — a researcher, say.
+    h.state.agents = [agentRow({ channels: [] })]
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyEnabled: false }))
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.generateReply).not.toHaveBeenCalled()
+    expect(h.state.runInserts).toHaveLength(0)
+    expect(
+      autoReplyStatusFromConfig(
+        { ...base, auto_reply_enabled: false, agent_channels: [] },
+        'whatsapp',
+      ),
+    ).toEqual({ autoReplyOn: false, agentMode: false })
+  })
+
+  it('re-routes a thread whose owner no longer speaks on its channel', async () => {
+    h.state.agents = [
+      agentRow({ id: 'agent-wa', channels: ['whatsapp'], is_fallback: false }),
+      agentRow({ id: 'agent-ig', channels: ['instagram'], is_fallback: true }),
+    ]
+    // Stamped before its channels were narrowed to WhatsApp.
+    h.state.conv = conv({ channel: 'instagram', agent_id: 'agent-wa' })
+    await dispatchInboundToAiReply(ARGS)
+
+    expect(h.state.runInserts[0]).toMatchObject({ agent_id: 'agent-ig' })
+    expect(h.state.convUpdates.map((u) => u.payload)).toContainEqual({
+      agent_id: 'agent-ig',
+    })
+  })
+
+  it('keeps a thread with the owner that still speaks on its channel', async () => {
+    h.state.agents = [
+      agentRow({ id: 'agent-wa', channels: ['whatsapp'], is_fallback: false }),
+      agentRow({
+        id: 'agent-both',
+        channels: ['whatsapp', 'instagram'],
+        is_fallback: true,
+      }),
+    ]
+    h.state.conv = conv({ channel: 'whatsapp', agent_id: 'agent-wa' })
+    await dispatchInboundToAiReply(ARGS)
+
+    // The fallback would take it on a fresh thread; the owner wins here.
+    expect(h.state.runInserts[0]).toMatchObject({ agent_id: 'agent-wa' })
   })
 })
 
