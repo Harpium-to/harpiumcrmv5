@@ -4,16 +4,19 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
-import { buildHandoffSummary } from './handoff'
+import { buildHandoffSummary, type HandoffReason } from './handoff'
+import { describeReplyFailure } from './reply-failure'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
-import type { AiConfig } from './types'
+import type { AiConfig, AiUsage } from './types'
 import { loadActiveAgents } from '@/lib/agents/store'
 import { pickAgent } from '@/lib/agents/routing'
 import {
   finishAgentRun,
+  recordInstantRun,
   recordSkippedRun,
   startAgentRun,
+  type RunHandle,
   type StartRunArgs,
 } from '@/lib/agents/runtime'
 import type { Agent } from '@/lib/agents/types'
@@ -55,7 +58,9 @@ interface DispatchArgs {
  *   - AI off for the account, or nobody to answer
  *   - a human agent is assigned (they own the thread)
  *   - auto-reply was disabled for this conversation (prior handoff)
- *   - the per-conversation reply cap is reached
+ *   - the per-conversation reply cap is reached — which is itself a
+ *     handoff, not a silent stop: the first message past the cap
+ *     pauses the bot and routes the thread to a human with a note
  *   - there's nothing to reply to
  *
  * The 24h WhatsApp session window is inherently open here — we're
@@ -142,6 +147,92 @@ export async function dispatchInboundToAiReply(
       await recordSkippedRun(db, runArgs)
     }
 
+    /**
+     * Stop auto-replying on this thread and hand it to a human: (a)
+     * pause the bot here (sticky until someone hits "Resume AI"), (b)
+     * route the conversation to the handoff target — null leaves it in
+     * the shared queue — and (c) leave a short internal note so
+     * whoever picks it up has context. Assigning fires the
+     * `on_conversation_assigned` trigger, which notifies the agent.
+     *
+     * The write only lands while the bot is still on
+     * (`ai_autoreply_disabled = false`), so two inbounds racing past
+     * the cap — or a human hitting "Take over" mid-generation — hand
+     * off once, not twice. Returns whether *this* call flipped it.
+     */
+    const handOff = async (
+      reason: HandoffReason,
+      replyCount: number,
+    ): Promise<boolean> => {
+      const update: Record<string, unknown> = {
+        ai_autoreply_disabled: true,
+        ai_handoff_summary: buildHandoffSummary({
+          messages,
+          replyCount,
+          reason,
+        }),
+      }
+      // An agent's own handoff target wins; the account-level one is
+      // the default for agents that don't name someone.
+      const handoffTarget = agent?.handoffAgentId ?? config.handoffAgentId
+      // Only set the assignee when a target is configured AND the
+      // thread isn't already owned — never stomp an existing human
+      // assignment.
+      if (handoffTarget && !conv.assigned_agent_id) {
+        update.assigned_agent_id = handoffTarget
+      }
+      const { data, error } = await db
+        .from('conversations')
+        .update(update)
+        .eq('id', conversationId)
+        .eq('ai_autoreply_disabled', false)
+        .select('id')
+      if (error) {
+        console.error('[ai auto-reply] handoff update failed:', error)
+        return false
+      }
+      return Array.isArray(data) && data.length > 0
+    }
+
+    /**
+     * The reply budget is spent: hand off instead of going quiet.
+     *
+     * The settings screen promises exactly this ("ao atingir o limite,
+     * pausa e direciona a conversa com uma nota"), and the old
+     * behaviour — record a skip and return — left the customer
+     * unanswered with nobody told. Only the first message past the cap
+     * gets here: the handoff sets `ai_autoreply_disabled`, so later
+     * ones stop at the `handed_off` gate above.
+     *
+     * `run` is the open run when the cap was discovered at the atomic
+     * claim (after generating); null when the cheap pre-check caught it.
+     */
+    const handOffAtCap = async (
+      replyCount: number,
+      run: RunHandle | null,
+      usage: AiUsage | null = null,
+    ) => {
+      const flipped = await handOff('reply_cap', replyCount)
+      // Lost the race to another path that already paused the bot (or
+      // the write failed): this message is simply over the cap.
+      const outcome = flipped
+        ? ({ status: 'handoff', reason: 'reply_cap_reached' } as const)
+        : ({ status: 'skipped', reason: 'reply_cap_reached' } as const)
+      if (run) {
+        await finishAgentRun(db, run, { ...outcome, usage })
+      } else if (agent) {
+        await recordInstantRun(db, {
+          accountId,
+          agent,
+          conversationId,
+          contactId,
+          matchedKeyword,
+          inbound,
+          ...outcome,
+        })
+      }
+    }
+
     // ---- Eligibility ----
 
     // Deterministic, user-configured responders win over the LLM — the
@@ -179,9 +270,10 @@ export async function dispatchInboundToAiReply(
       ? agent.maxRepliesPerConversation
       : config.autoReplyMaxPerConversation
     // Cheap early-out; the authoritative cap check is the atomic claim
-    // below (this read can race a concurrent inbound).
+    // below (this read can race a concurrent inbound). Reaching it is a
+    // handoff, not a silent skip — see `handOffAtCap`.
     if (conv.ai_reply_count >= maxReplies) {
-      await skip('reply_cap_reached')
+      await handOffAtCap(conv.ai_reply_count, null)
       return
     }
 
@@ -257,32 +349,18 @@ export async function dispatchInboundToAiReply(
 
       if (handoff || !text) {
         // The model can't (or shouldn't) answer — stop auto-replying on
-        // this thread and hand it to a human. We (a) pause the bot here
-        // (sticky until re-enabled), (b) route the conversation to the
-        // configured handoff target — null leaves it in the shared
-        // queue — and (c) leave a short internal note so whoever picks
-        // it up has context. Assigning fires the
-        // `on_conversation_assigned` trigger, which notifies the agent.
-        const summary = buildHandoffSummary({
-          messages,
-          replyCount: conv.ai_reply_count ?? 0,
-        })
-        const update: Record<string, unknown> = {
-          ai_autoreply_disabled: true,
-          ai_handoff_summary: summary,
-        }
-        // An agent's own handoff target wins; the account-level one is
-        // the default for agents that don't name someone.
-        const handoffTarget = agent?.handoffAgentId ?? config.handoffAgentId
-        // Only set the assignee when a target is configured AND the
-        // thread isn't already owned — never stomp an existing human
-        // assignment.
-        if (handoffTarget && !conv.assigned_agent_id) {
-          update.assigned_agent_id = handoffTarget
-        }
-        await db.from('conversations').update(update).eq('id', conversationId)
+        // this thread and hand it to a human (see `handOff`).
+        const flipped = await handOff('model', conv.ai_reply_count ?? 0)
         if (run) {
-          await finishAgentRun(db, run, { status: 'handoff', usage })
+          await finishAgentRun(
+            db,
+            run,
+            flipped
+              ? { status: 'handoff', usage }
+              : // Someone paused the bot while the model was thinking
+                // (a human hit "Take over") — it was already handed off.
+                { status: 'skipped', reason: 'handed_off', usage },
+          )
         }
         return
       }
@@ -316,14 +394,10 @@ export async function dispatchInboundToAiReply(
         return
       }
       if (claimed !== true) {
-        // Lost the per-conversation cap race.
-        if (run) {
-          await finishAgentRun(db, run, {
-            status: 'skipped',
-            reason: 'reply_cap_reached',
-            usage,
-          })
-        }
+        // Lost the per-conversation cap race: another inbound took the
+        // last slot while this one was generating. The budget is spent
+        // either way, so this is the same handoff as the pre-check.
+        await handOffAtCap(maxReplies, run, usage)
         return
       }
 
@@ -358,10 +432,15 @@ export async function dispatchInboundToAiReply(
       // failed so it doesn't sit in the monitor as perpetually
       // `running`, then rethrow into the outer handler which owns the
       // "never throw" contract.
+      //
+      // The reason leads with a stable code (`whatsapp_not_in_allowed_
+      // list: (#131030) …`) so the inbox banner can tell the operator,
+      // in their language, that the customer got nothing and what to
+      // fix — the raw text alone only ever reached the monitor.
       if (run) {
         await finishAgentRun(db, run, {
           status: 'failed',
-          reason: err instanceof Error ? err.message : 'unknown_error',
+          reason: describeReplyFailure(err),
         })
       }
       throw err

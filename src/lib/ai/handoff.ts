@@ -16,12 +16,19 @@ const MAX_QUOTE_LEN = 160
  *
  * `replyCount` is the bot's auto-reply tally for the thread (0 when it
  * bailed on the very first inbound without answering).
+ *
+ * `reason` says why, when it wasn't the model's own call: `reply_cap`
+ * → "…after 10 replies — reply limit reached." The default (`model`)
+ * keeps the original wording.
  */
+export type HandoffReason = 'model' | 'reply_cap'
+
 export function buildHandoffSummary(args: {
   messages: ChatMessage[]
   replyCount: number
+  reason?: HandoffReason
 }): string {
-  const { messages, replyCount } = args
+  const { messages, replyCount, reason = 'model' } = args
 
   const lastCustomer = [...messages]
     .reverse()
@@ -32,7 +39,9 @@ export function buildHandoffSummary(args: {
       ? 'without replying'
       : `after ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
 
-  const base = `🤖 AI agent handed off ${replies}.`
+  const why = reason === 'reply_cap' ? ' — reply limit reached' : ''
+
+  const base = `🤖 AI agent handed off ${replies}${why}.`
 
   if (!lastCustomer) return base
 

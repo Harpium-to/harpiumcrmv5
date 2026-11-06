@@ -276,7 +276,19 @@
       "tookOver": "Você assumiu esta conversa.",
       "resumed": "IA retomada.",
       "updateError": "Não foi possível atualizar o assistente de IA.",
-      "networkError": "Não foi possível conectar ao servidor."
+      "networkError": "Não foi possível conectar ao servidor.",
+      "capPausedTitle": "A IA atingiu o limite de respostas desta conversa e pausou",
+      "failure": {
+        "title": "A IA não conseguiu responder a última mensagem do cliente",
+        "whatsapp_not_in_allowed_list": "O número do cliente não está na lista de destinatários de teste da Meta (erro 131030). Adicione o número em Meta for Developers → WhatsApp → Configuração da API, ou use um número de WhatsApp em produção. Até lá, responda por aqui.",
+        "whatsapp_window_closed": "Já se passaram mais de 24 horas desde a última mensagem do cliente (erro 131047). Envie um modelo de mensagem aprovado para reabrir a conversa.",
+        "whatsapp_number_not_registered": "O número do WhatsApp Business não está registrado na Cloud API (erro 133010). Registre o número em Configurações → WhatsApp e tente de novo.",
+        "ai_invalid_key": "O provedor de IA recusou a chave de API. Atualize a chave em Agentes de IA → Chave e modelo. Até lá, responda manualmente.",
+        "ai_no_credit": "A conta do provedor de IA está sem crédito. Adicione saldo no painel da OpenAI ou da Anthropic. Até lá, responda manualmente.",
+        "unknown": "O cliente ficou sem resposta. Responda manualmente; o detalhe técnico também está no monitor dos agentes.",
+        "detail": "Detalhe técnico: {detail}",
+        "dismiss": "Dispensar aviso"
+      }
     }
   },
   "Contacts": {

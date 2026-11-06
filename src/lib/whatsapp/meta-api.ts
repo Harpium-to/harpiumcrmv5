@@ -29,15 +29,34 @@ interface MetaErrorResponse {
   error?: { message?: string; code?: number; type?: string }
 }
 
+/**
+ * A Graph API failure. Keeps Meta's numeric error code next to the
+ * message so callers can branch on it (131030 recipient not in the
+ * test list, 131047 outside the 24h window, 133010 number not
+ * registered) instead of pattern-matching prose that Meta may reword.
+ * Still an `Error` with the same message, so existing catch sites and
+ * `toThrow('…')` assertions are unaffected.
+ */
+export class MetaApiError extends Error {
+  readonly metaCode: number | null
+  constructor(message: string, metaCode: number | null = null) {
+    super(message)
+    this.name = 'MetaApiError'
+    this.metaCode = metaCode
+  }
+}
+
 async function throwMetaError(response: Response, fallback: string): Promise<never> {
   let message = fallback
+  let code: number | null = null
   try {
     const data = (await response.json()) as MetaErrorResponse
     if (data.error?.message) message = data.error.message
+    if (typeof data.error?.code === 'number') code = data.error.code
   } catch {
     // response body wasn't JSON — keep the fallback
   }
-  throw new Error(message)
+  throw new MetaApiError(message, code)
 }
 
 // ============================================================
