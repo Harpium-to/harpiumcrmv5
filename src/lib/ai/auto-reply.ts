@@ -10,7 +10,7 @@ import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import type { AiConfig, AiUsage } from './types'
 import { loadActiveAgents } from '@/lib/agents/store'
-import { pickAgent } from '@/lib/agents/routing'
+import { agentsForChannel, pickAgent } from '@/lib/agents/routing'
 import {
   finishAgentRun,
   recordInstantRun,
@@ -20,7 +20,7 @@ import {
   type StartRunArgs,
 } from '@/lib/agents/runtime'
 import type { Agent } from '@/lib/agents/types'
-import { sendChannelText } from '@/lib/channels/send-text'
+import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 interface DispatchArgs {
@@ -41,18 +41,22 @@ interface DispatchArgs {
  * runner's contract: it owns its try/catch and NEVER throws — a failing
  * or slow LLM call must not affect the webhook's 200 to Meta.
  *
- * TWO MODES, ONE PATH
- *   Accounts with at least one *active* agent run in agent mode: the
- *   message is routed to an agent, that agent's persona, model, reply
- *   cap and handoff target are used, and every decision — including
- *   the decision not to answer — is written to `agent_runs` for the
- *   live monitor.
+ * TWO MODES, ONE PATH — chosen per channel
+ *   A thread whose channel (`conversations.channel`) is covered by at
+ *   least one *active* agent runs in agent mode: the message is routed
+ *   to one of those agents, its persona, model, reply cap and handoff
+ *   target are used, and every decision — including the decision not
+ *   to answer — is written to `agent_runs` for the live monitor. An
+ *   agent covers the channels ticked on it, and an empty list covers
+ *   none (see `speaksOn`).
  *
- *   Accounts with no active agents keep the original single-assistant
- *   behaviour exactly, gated on `ai_configs.auto_reply_enabled`. That
- *   switch is deliberately NOT consulted in agent mode: an agent's own
- *   `is_active` is its switch, and requiring both would mean a team
- *   that looks enabled on the agents screen but silently never answers.
+ *   Every other thread keeps the original single-assistant behaviour
+ *   exactly, gated on `ai_configs.auto_reply_enabled` — including an
+ *   Instagram DM on an account whose agents are all WhatsApp-only.
+ *   That switch is deliberately NOT consulted in agent mode: an
+ *   agent's own `is_active` is its switch, and requiring both would
+ *   mean a team that looks enabled on the agents screen but silently
+ *   never answers.
  *
  * Eligibility gates (any → no reply):
  *   - AI off for the account, or nobody to answer
@@ -78,18 +82,18 @@ export async function dispatchInboundToAiReply(
     const config = await loadAiConfig(db, accountId)
     if (!config) return
 
-    // The team, if there is one. Loaded before anything else because
-    // its emptiness is what decides which mode we're in.
-    let agents: Agent[] = []
+    // The whole team, if there is one. Which of it may answer *this*
+    // thread depends on the thread's channel, narrowed below.
+    let team: Agent[] = []
     try {
-      agents = await loadActiveAgents(db, accountId)
+      team = await loadActiveAgents(db, accountId)
     } catch (err) {
       // A missing `agents` table (migration 044 not applied yet) must
       // degrade to the single-assistant path, not take auto-reply down.
       console.error('[ai auto-reply] could not load agents:', err)
     }
-    const agentMode = agents.length > 0
-    if (!agentMode && !config.autoReplyEnabled) return
+    // Nobody could answer on any channel — skip the thread reads.
+    if (team.length === 0 && !config.autoReplyEnabled) return
 
     const { data: conv, error: convErr } = await db
       .from('conversations')
@@ -99,6 +103,20 @@ export async function dispatchInboundToAiReply(
       .eq('id', conversationId)
       .maybeSingle()
     if (convErr || !conv) return
+
+    // Agent mode is decided per channel: the agents that speak on this
+    // thread's channel, and only them, are the team for it. With none,
+    // the thread falls back to the single assistant and its switch.
+    //
+    // The channel is read on its own (`channelOf`) rather than in the
+    // select above so a database without migration 047 degrades to
+    // WhatsApp instead of failing the whole read.
+    const agents =
+      team.length > 0
+        ? agentsForChannel(team, await channelOf(conversationId, db))
+        : []
+    const agentMode = agents.length > 0
+    if (!agentMode && !config.autoReplyEnabled) return
 
     const messages = await buildConversationContext(db, conversationId)
     if (messages.length === 0) return
@@ -118,6 +136,8 @@ export async function dispatchInboundToAiReply(
       // A thread sticks to the agent that already owns it. Re-routing
       // every turn would let "quero comprar" land on sales and the
       // follow-up "quanto custa?" land somewhere else mid-conversation.
+      // `agents` is already narrowed to this channel, so an owner that
+      // no longer speaks on it is not found and the thread re-routes.
       const owner = conv.agent_id
         ? agents.find((a) => a.id === conv.agent_id)
         : undefined
