@@ -37,7 +37,15 @@ const MASKED_TOKEN = '••••••••••••••••';
 type ConnectionStatus = 'connected' | 'disconnected' | 'unknown';
 type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
-export function WhatsAppConfig() {
+interface WhatsAppConfigProps {
+  /** Rendered inside the Embedded Signup panel's "manual" section,
+   *  which already shows the panel title. */
+  hideHeader?: boolean;
+  /** Told after a save or a reset so the connect card can refresh. */
+  onChanged?: () => void;
+}
+
+export function WhatsAppConfig({ hideHeader = false, onChanged }: WhatsAppConfigProps = {}) {
   const t = useTranslations('Settings.whatsapp');
   const supabase = createClient();
   // After multi-user, whatsapp_config is one-row-per-account, not
@@ -270,6 +278,7 @@ export function WhatsAppConfig() {
       }
 
       if (accountId) await fetchConfig(accountId);
+      onChanged?.();
     } catch (err) {
       console.error('Save error:', err);
       toast.error('Falha ao salvar a configuração');
@@ -361,6 +370,7 @@ export function WhatsAppConfig() {
       setConnectionStatus('disconnected');
       setResetReason(null);
       setStatusMessage('');
+      onChanged?.();
     } catch (err) {
       console.error('Reset error:', err);
       toast.error('Falha ao redefinir a configuração');
@@ -377,10 +387,12 @@ export function WhatsAppConfig() {
   if (loading) {
     return (
       <section className="animate-in fade-in-50 duration-200">
-        <SettingsPanelHead
-          title={t("title")}
-          description={t("description")}
-        />
+        {!hideHeader && (
+          <SettingsPanelHead
+            title={t("title")}
+            description={t("description")}
+          />
+        )}
         <div className="flex items-center justify-center py-12">
           <Loader2 className="size-6 animate-spin text-primary" />
         </div>
@@ -392,10 +404,12 @@ export function WhatsAppConfig() {
 
   return (
     <section className="animate-in fade-in-50 duration-200">
-      <SettingsPanelHead
-        title={t("title")}
-        description={t("description")}
-      />
+      {!hideHeader && (
+        <SettingsPanelHead
+          title={t("title")}
+          description={t("description")}
+        />
+      )}
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       {/* Main config form */}
       <div className="space-y-6">
