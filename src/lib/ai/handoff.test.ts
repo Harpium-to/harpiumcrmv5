@@ -63,4 +63,15 @@ describe('buildHandoffSummary', () => {
     })
     expect(summary).toBe('🤖 AI agent handed off without replying.')
   })
+
+  it('names the reply cap when that is why it handed off', () => {
+    const summary = buildHandoffSummary({
+      messages: [{ role: 'user', content: 'ainda está aí?' }],
+      replyCount: 10,
+      reason: 'reply_cap',
+    })
+    expect(summary).toBe(
+      '🤖 AI agent handed off after 10 replies — reply limit reached. Last customer message: “ainda está aí?”',
+    )
+  })
 })
