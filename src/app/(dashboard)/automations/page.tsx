@@ -43,6 +43,7 @@ import {
 import { AUTOMATION_TEMPLATES, type TemplateSlug } from "@/lib/automations/templates"
 import { triggerMeta, formatRelative } from "@/lib/automations/trigger-meta"
 import { cn } from "@/lib/utils"
+import { HelpTip } from "@/components/help/help-tip";
 
 const TEMPLATE_ORDER: TemplateSlug[] = [
   "welcome_message",
@@ -162,7 +163,10 @@ export default function AutomationsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t("title")}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+            {t("title")}
+            <HelpTip id="automations.overview" />
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {t("subtitle")}
           </p>

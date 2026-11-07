@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { HelpTip } from '@/components/help/help-tip';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -566,7 +567,7 @@ export function WhatsAppConfig() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('phoneNumberId')}</Label>
+              <Label className="text-muted-foreground">{t('phoneNumberId')}<HelpTip id="whatsapp.phoneNumberId" /></Label>
               <Input
                 placeholder="e.g. 100234567890123"
                 value={phoneNumberId}
@@ -576,7 +577,7 @@ export function WhatsAppConfig() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('wabaId')}</Label>
+              <Label className="text-muted-foreground">{t('wabaId')}<HelpTip id="whatsapp.wabaId" /></Label>
               <Input
                 placeholder="e.g. 100234567890456"
                 value={wabaId}
@@ -586,7 +587,7 @@ export function WhatsAppConfig() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('accessToken')}</Label>
+              <Label className="text-muted-foreground">{t('accessToken')}<HelpTip id="whatsapp.accessToken" /></Label>
               <div className="relative">
                 <Input
                   type={showToken ? 'text' : 'password'}
@@ -620,7 +621,7 @@ export function WhatsAppConfig() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('webhookVerifyToken')}</Label>
+              <Label className="text-muted-foreground">{t('webhookVerifyToken')}<HelpTip id="whatsapp.verifyToken" /></Label>
               <Input
                 placeholder={t('webhookVerifyTokenPlaceholder')}
                 value={verifyToken}
@@ -637,6 +638,7 @@ export function WhatsAppConfig() {
               <Label className="text-muted-foreground">
                 {t('twoStepPin')}
                 <span className="ml-1 text-muted-foreground">{t('optional')}</span>
+                <HelpTip id="whatsapp.pin" />
               </Label>
               <Input
                 type="text"
@@ -666,7 +668,7 @@ export function WhatsAppConfig() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label className="text-muted-foreground">{t('webhookUrl')}</Label>
+              <Label className="text-muted-foreground">{t('webhookUrl')}<HelpTip id="whatsapp.webhookUrl" /></Label>
               <div className="flex gap-2">
                 <Input
                   readOnly

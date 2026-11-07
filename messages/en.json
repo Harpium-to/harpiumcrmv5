@@ -41,7 +41,8 @@
     "menuProfile": "Profile",
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
-    "reports": "Reports"
+    "reports": "Reports",
+    "help": "Help"
   },
   "TopBar": {
     "openMenu": "Open menu",
@@ -50,6 +51,7 @@
     "defaultAvatar": "Avatar",
     "menuProfile": "Profile",
     "menuSettings": "Settings",
+    "menuExtension": "Chrome extension",
     "menuSignOut": "Sign out",
     "agentsTeam": "Team",
     "agentsLive": "Live",
@@ -377,7 +379,8 @@
         "deals": "Deals",
         "noTags": "No tags",
         "noDeals": "No deals",
-        "addNotePlaceholder": "Add a note..."
+        "addNotePlaceholder": "Add a note...",
+        "tags": "Tags"
       },
       "actions": {
         "edit": "Edit",
@@ -387,6 +390,7 @@
       "contactInfo": "Contact Information",
       "unnamed": "Unknown",
       "contactDetailsDesc": "Contact details",
+      "name": "Name",
       "phone": "Phone",
       "email": "Email",
       "company": "Company",
@@ -1451,7 +1455,7 @@
       "unknownDate": "unknown",
       "lastAttemptFailed": "Last attempt failed with: ",
       "retryHint": "Enter (or correct) the 2-step PIN below and click Save Configuration to retry.",
-      "noRegistrationHint": "This number was saved before registration tracking existed, or registration was skipped. Enter the 2-step PIN below and click Save Configuration to subscribe it.",
+      "noRegistrationHint": "This number is not registered with Meta to receive messages yet. Enter a 6-digit PIN below, paste the access token again and click Save Configuration. For a real number, use its two-step verification PIN. For a Meta test number, make one up: it becomes the number's PIN.",
       "diagnosticLastRun": "Diagnostic — last run: ",
       "live": "live",
       "notLive": "not live",
@@ -1468,7 +1472,7 @@
       "twoStepPin": "Two-step verification PIN",
       "optional": "(optional)",
       "pinPlaceholder": "6-digit PIN from Meta WhatsApp Manager",
-      "pinHint": "Needed only to wire inbound messages for a production number. Set it in Meta Business Manager → WhatsApp Accounts → Phone Numbers → Two-step verification, then paste it here so wacrm can subscribe the number — otherwise Meta routes inbound events to whichever app last claimed it (the symptom that hits second numbers under a shared WABA). Meta test numbers have no PIN and are pre-registered — leave this blank for them. Leaving it blank also keeps an existing registration untouched.",
+      "pinHint": "Registers the number with Meta so it can receive messages. For a real number, use its two-step verification PIN (WhatsApp Manager › Phone numbers). For a Meta test number, make up 6 digits and keep them: they become the number's PIN. Leave blank once the number is registered; the current registration is kept.",
       "webhookTitle": "Webhook Configuration",
       "webhookDesc": "Use this URL as your webhook callback in the Meta App Dashboard.",
       "webhookUrl": "Webhook Callback URL",
@@ -1511,7 +1515,10 @@
       "fields": "Fields & tags",
       "deals": "Deals & currency",
       "members": "Team members",
-      "api": "API keys"
+      "api": "API keys",
+      "quick-replies": "Quick replies",
+      "agencia": "Agency access",
+      "extensao": "Chrome extension"
     },
     "groups": {
       "account": "Account",

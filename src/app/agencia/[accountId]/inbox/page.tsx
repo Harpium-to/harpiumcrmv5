@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 
 import { requireAgencia } from '@/lib/agencia/guard'
+import { loadConsentGate } from '@/lib/agencia/consent'
+import { ConsentWall } from '../consent-wall'
 import {
   listAccountConversations,
   type ConversationStatusFilter,
@@ -36,7 +38,12 @@ export default async function AgenciaInboxPage({
   const q = sp.q?.trim() || undefined
   const status = parseStatus(sp.status)
 
-  const { admin } = await requireAgencia()
+  const { admin, userId, role } = await requireAgencia()
+  // Consent first: nothing personal is read when the owner granted metrics.
+  const gate = await loadConsentGate(admin, accountId, { userId, role })
+  if (!gate.allowed) {
+    return <ConsentWall accountId={accountId} gate={gate} what="as conversas" />
+  }
   const { rows, total, pageSize } = await listAccountConversations(
     admin,
     accountId,

@@ -30,6 +30,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { hasMinRole, isAccountRole, type AccountRole } from "./roles";
+import { isMissingFunction, parseAccountContext } from "./account-context";
+import type { CrmStatus } from "@/lib/agencia/crm";
 
 // ------------------------------------------------------------
 // Errors
@@ -83,22 +85,34 @@ export interface AccountContext {
   supabase: SupabaseClient;
   /** `auth.uid()` for the caller. Always defined when this resolves. */
   userId: string;
-  /** Caller's account_id from their profile row. */
+  /** The caller's ACTIVE CRM (a user may belong to several, 049). */
   accountId: string;
-  /** Caller's role within their account. */
+  /** Caller's effective role in the active CRM. */
   role: AccountRole;
   /** Lightweight account meta — id + name. */
   account: { id: string; name: string };
+  /**
+   * True when the caller is here through the agency consent the CRM's
+   * owner granted, not through a membership. Always false before 049.
+   */
+  viaAgency: boolean;
+  /** CRM lifecycle status (050). Suspended means read-only. */
+  status: CrmStatus;
 }
 
 /**
- * Resolve the caller's user + account + role in one round trip.
+ * Resolve the caller's user + active CRM + effective role.
+ *
+ * Since migration 049 the database answers this in one call
+ * (`current_account_context()`): it knows the active CRM and whether
+ * the role comes from a membership or from the agency consent. Before
+ * 049 is applied that function doesn't exist, and this falls back to
+ * the previous profile-based lookup — so deploying the code ahead of
+ * the migration changes nothing.
  *
  * Throws `UnauthorizedError` if there's no Supabase session.
- * Throws `ForbiddenError` if the profile is missing account
- * fields (shouldn't happen post-017 migration; defensive guard
- * against profile rows that pre-date the backfill or were
- * inserted by hand).
+ * Throws `ForbiddenError` if the caller has no active CRM (or lost
+ * the right to it — e.g. a temporary agency grant expired).
  *
  * Use `requireRole(min)` instead when the route also needs a
  * minimum-role check — it's a thin wrapper over this.
@@ -114,10 +128,36 @@ export async function getCurrentAccount(): Promise<AccountContext> {
     throw new UnauthorizedError();
   }
 
+  const { data: resolved, error: rpcErr } = await supabase.rpc(
+    "current_account_context",
+  );
+  if (!rpcErr) {
+    const ctx = parseAccountContext(resolved);
+    if (!ctx) {
+      throw new ForbiddenError("Você não está em nenhum CRM");
+    }
+    return { supabase, userId: user.id, ...ctx };
+  }
+  if (!isMissingFunction(rpcErr)) {
+    console.error("[getCurrentAccount] context rpc error:", rpcErr);
+    throw new ForbiddenError("Não consegui carregar os dados da conta");
+  }
+
+  return legacyAccountContext(supabase, user.id);
+}
+
+/**
+ * Pre-049 resolution: the profile row carries the one account and the
+ * role in it. Kept only so the app keeps working until 049 is applied.
+ */
+async function legacyAccountContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<AccountContext> {
   const { data, error } = await supabase
     .from("profiles")
     .select("account_id, account_role")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) {
@@ -165,10 +205,12 @@ export async function getCurrentAccount(): Promise<AccountContext> {
 
   return {
     supabase,
-    userId: user.id,
+    userId,
     accountId: data.account_id,
     role: data.account_role,
     account: { id: account.id, name: account.name },
+    viaAgency: false,
+    status: "active",
   };
 }
 
@@ -181,6 +223,13 @@ export async function getCurrentAccount(): Promise<AccountContext> {
  */
 export async function requireRole(min: AccountRole): Promise<AccountContext> {
   const ctx = await getCurrentAccount();
+  // A suspended CRM is read-only for everyone; the database refuses
+  // the write anyway (050), this just says why in words.
+  if (ctx.status === "suspended" && min !== "viewer") {
+    throw new ForbiddenError(
+      "Este CRM está suspenso: só leitura. Fale com a agência.",
+    );
+  }
   if (!hasMinRole(ctx.role, min)) {
     throw new ForbiddenError(
       `This action requires the '${min}' role or higher`,

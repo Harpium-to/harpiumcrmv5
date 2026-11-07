@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
-import { LogOut, Menu, Settings as SettingsIcon, User } from "lucide-react";
+import { LogOut, Menu, Puzzle, Settings as SettingsIcon, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,6 +13,8 @@ import { activeNavItem, NAV_SECTIONS } from "@/lib/nav";
 import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 import { AgentPulseChip } from "@/components/agents/agent-pulse-chip";
 import { ModeToggle } from "@/components/layout/mode-toggle";
+import { PageHelp } from "@/components/help/page-help";
+import { CrmMenuItems } from "@/components/layout/crm-menu-items";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -119,6 +121,7 @@ export function TopBar({ onOpenNav }: TopBarProps) {
         {/* ---- Right: live status + account ---- */}
         <div className="flex shrink-0 items-center gap-2">
           <AgentPulseChip className="hidden sm:inline-flex" />
+          <PageHelp />
           <ModeToggle />
 
           <DropdownMenu>
@@ -160,6 +163,7 @@ export function TopBar({ onOpenNav }: TopBarProps) {
                 </p>
               </div>
               <DropdownMenuSeparator className="bg-border" />
+              <CrmMenuItems />
               <DropdownMenuItem
                 render={
                   <Link
@@ -170,6 +174,17 @@ export function TopBar({ onOpenNav }: TopBarProps) {
               >
                 <User className="size-4" />
                 {tb("menuProfile")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                render={
+                  <Link
+                    href="/settings?tab=extensao"
+                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+                  />
+                }
+              >
+                <Puzzle className="size-4" />
+                {tb("menuExtension")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 render={

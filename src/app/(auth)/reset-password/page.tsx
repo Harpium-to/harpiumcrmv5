@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUTH_CARD_ENTER, AUTH_SCREEN_CLASS, AuthBrand } from "@/components/brand/auth-brand";
 import {
   Card,
   CardContent,
@@ -80,8 +81,9 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <Card className="fx-page w-full max-w-md border-border bg-card">
+    <div className={AUTH_SCREEN_CLASS}>
+      <AuthBrand />
+      <Card {...AUTH_CARD_ENTER} className="w-full max-w-md border-border bg-card/80 backdrop-blur-xl">
         <CardHeader className="items-center text-center">
           <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
             {success ? (
