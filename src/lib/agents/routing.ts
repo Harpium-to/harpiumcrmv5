@@ -60,7 +60,43 @@ export function matchesKeyword(text: string, keyword: string): boolean {
 }
 
 /**
+ * May an agent with these channels speak on `channel`?
+ *
+ * An empty list means *no* channel, not every channel: it is how a
+ * back-office role (researcher, prospector, manager) is marked as
+ * never talking to customers. The agent form tells the operator
+ * exactly that ("Vazio significa que ele não fala com cliente"), and
+ * so do migration 045 and the agent factory's prompt.
+ *
+ * Takes the bare list rather than an agent so the inbox can ask the
+ * same question of the union of the team's channels — which is exact
+ * only because empty means none. If an empty list ever came to mean
+ * "everywhere", `/api/ai/config` would have to send each agent's list.
+ */
+export function speaksOn(
+  channels: readonly string[],
+  channel: string,
+): boolean {
+  return channels.includes(channel)
+}
+
+/**
+ * The agents that may answer a thread on `channel`.
+ *
+ * Applied before everything else in routing — before `pickAgent`, and
+ * before honouring the agent a thread is already stamped with — so an
+ * agent marked WhatsApp-only never answers an Instagram DM, not even
+ * on a thread it owned before its channels were narrowed.
+ */
+export function agentsForChannel(agents: Agent[], channel: string): Agent[] {
+  return agents.filter((a) => speaksOn(a.channels, channel))
+}
+
+/**
  * Pick the agent that should handle `text`.
+ *
+ * The caller filters `agents` to the thread's channel first (see
+ * `agentsForChannel`); this function only weighs keywords.
  *
  * Order:
  *   1. The highest-priority active agent with a matching keyword.
