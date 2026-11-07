@@ -5,6 +5,7 @@ import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
+import { matchesAppVerifyToken } from '@/lib/whatsapp/webhook-verify-token'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
@@ -99,6 +100,15 @@ export async function GET(request: Request) {
         { error: 'Faltam parâmetros de verificação' },
         { status: 400 }
       )
+    }
+
+    // App-wide token first: one value for the whole Meta app, and the
+    // only one accounts connected by Embedded Signup have.
+    if (matchesAppVerifyToken(verifyToken)) {
+      return new Response(challenge, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      })
     }
 
     // Fetch all whatsapp configs to check verify tokens
