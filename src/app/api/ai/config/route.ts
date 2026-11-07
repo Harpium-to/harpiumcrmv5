@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   getCurrentAccount,
   requireRole,
@@ -15,11 +16,49 @@ function bad(message: string) {
 }
 
 /**
+ * Does the account answer through agents? Same rule the dispatcher
+ * uses — any active agent — rather than a per-channel one: routing
+ * (`pickAgent`) does not filter on `agents.channels`, so an agent
+ * answers every channel that reaches the dispatcher, and a banner that
+ * filtered by channel would hide on threads the bot is replying to.
+ *
+ * A read error (e.g. the `agents` table not migrated yet) degrades to
+ * false, like the dispatcher does — never to a failed config read.
+ */
+async function hasActiveAgent(
+  supabase: SupabaseClient,
+  accountId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .limit(1)
+    if (error) {
+      console.error('[ai/config GET] agents lookup error:', error)
+      return false
+    }
+    return (data?.length ?? 0) > 0
+  } catch (err) {
+    console.error('[ai/config GET] agents lookup threw:', err)
+    return false
+  }
+}
+
+/**
  * GET /api/ai/config
  *
  * Any member may read the config so the inbox/settings can reflect
  * whether AI is set up. The encrypted key is NEVER returned — only a
  * `has_key` flag; the settings form shows a masked placeholder.
+ *
+ * `agent_mode` is true when the account has at least one active agent.
+ * In that mode the auto-reply answers through the agents and ignores
+ * `auto_reply_enabled` (see `dispatchInboundToAiReply`), so the inbox
+ * banner needs it to know the bot is live — without it, a team running
+ * on agents never sees "Take over" / "Resume AI".
  */
 export async function GET() {
   try {
@@ -43,7 +82,7 @@ export async function GET() {
       )
     }
 
-    if (!data) return NextResponse.json({ configured: false })
+    if (!data) return NextResponse.json({ configured: false, agent_mode: false })
     // The keys are selected only to derive the has_* flags; neither is
     // returned to the client.
     const { api_key, embeddings_api_key, ...safe } = data
@@ -51,6 +90,7 @@ export async function GET() {
       configured: true,
       has_key: !!api_key,
       has_embeddings_key: !!embeddings_api_key,
+      agent_mode: await hasActiveAgent(supabase, accountId),
       ...safe,
     })
   } catch (err) {

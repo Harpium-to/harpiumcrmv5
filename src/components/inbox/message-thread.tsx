@@ -1134,9 +1134,10 @@ export function MessageThread({
         )}
       </div>
 
-      {/* AI auto-reply banner — take over an active bot, or resume it
-          after a handoff. Renders nothing unless the account has
-          auto-reply configured. */}
+      {/* AI auto-reply banner — take over an active bot, resume it
+          after a handoff, and see why its last reply failed. Renders
+          nothing unless the account has auto-reply running (an active
+          agent, or the single-assistant switch). */}
       <AiThreadBanner
         conversationId={conversation.id}
         disabled={conversation.ai_autoreply_disabled ?? false}

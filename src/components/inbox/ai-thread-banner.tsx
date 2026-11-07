@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Hand, Undo2, Loader2 } from "lucide-react";
+import { Sparkles, Hand, Undo2, Loader2, TriangleAlert, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/use-auth";
+import { createClient } from "@/lib/supabase/client";
+import { parseReplyFailure, type ParsedReplyFailure } from "@/lib/ai/reply-failure";
+import { autoReplyStatusFromConfig, type AutoReplyStatus } from "@/lib/ai/autoreply-status";
+import type { AgentRunStatus } from "@/lib/agents/types";
 
 // ------------------------------------------------------------
 // Account AI status is the same for every conversation, so cache it per
@@ -18,9 +22,12 @@ import { useAuth } from "@/hooks/use-auth";
 // cache, so it retries on the next thread open rather than hiding the
 // banner for the whole session.
 // ------------------------------------------------------------
-interface AiAccountStatus {
-  autoReplyOn: boolean;
-}
+// `agentMode` (at least one active agent) matters twice: it turns the
+// banner on even with the single-assistant switch off — the dispatcher
+// never reads that switch in agent mode — and it is what makes
+// `agent_runs` exist for the failure notice to read.
+type AiAccountStatus = AutoReplyStatus;
+const OFF: AiAccountStatus = { autoReplyOn: false, agentMode: false };
 const statusCache = new Map<string, AiAccountStatus>();
 
 async function fetchAiAccountStatus(accountId: string): Promise<AiAccountStatus> {
@@ -28,18 +35,105 @@ async function fetchAiAccountStatus(accountId: string): Promise<AiAccountStatus>
   if (cached) return cached;
   try {
     const res = await fetch("/api/ai/config", { cache: "no-store" });
-    if (!res.ok) return { autoReplyOn: false }; // don't cache a transient failure
-    const j = await res.json();
-    const status = {
-      // AI auto-reply is "live" only when configured, the master switch
-      // is on, and the inbound bot is enabled.
-      autoReplyOn: !!(j?.configured && j?.is_active && j?.auto_reply_enabled),
-    };
+    if (!res.ok) return OFF; // don't cache a transient failure
+    const status = autoReplyStatusFromConfig(await res.json());
     statusCache.set(accountId, status);
     return status;
   } catch {
-    return { autoReplyOn: false }; // don't cache
+    return OFF; // don't cache
   }
+}
+
+// ------------------------------------------------------------
+// The last thing the bot did on this thread, from `agent_runs`.
+//
+// Skipped runs are ignored: they are the bot standing down (a human
+// owns the thread, it is already paused), and letting one count as
+// "latest" would wipe the failure notice or the cap title the moment
+// the customer writes again. A newer reply, handoff or failure — or a
+// run in flight — does supersede it.
+// ------------------------------------------------------------
+interface LatestRun {
+  id: string;
+  status: AgentRunStatus;
+  reason: string | null;
+  startedAt: number;
+}
+
+interface RunRow {
+  id: string;
+  status: string;
+  reason: string | null;
+  started_at: string;
+}
+
+function toLatestRun(row: RunRow): LatestRun {
+  return {
+    id: row.id,
+    status: row.status as AgentRunStatus,
+    reason: row.reason,
+    startedAt: Date.parse(row.started_at) || 0,
+  };
+}
+
+function useLatestAgentRun(conversationId: string, enabled: boolean): LatestRun | null {
+  // Keyed by conversation so a thread switch never shows the previous
+  // thread's run while the new one loads.
+  const [state, setState] = useState<{ conversationId: string; run: LatestRun } | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    const supabase = createClient();
+
+    const take = (row: RunRow) => {
+      if (!alive || row.status === "skipped") return;
+      const next = toLatestRun(row);
+      setState((prev) => {
+        const cur = prev?.conversationId === conversationId ? prev.run : null;
+        if (cur && cur.id !== next.id && next.startedAt < cur.startedAt) return prev;
+        return { conversationId, run: next };
+      });
+    };
+
+    // RLS limits `agent_runs` to the caller's account; the filter
+    // narrows it to this thread.
+    supabase
+      .from("agent_runs")
+      .select("id, status, reason, started_at")
+      .eq("conversation_id", conversationId)
+      .neq("status", "skipped")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        const row = (data as RunRow[] | null)?.[0];
+        if (row) take(row);
+      });
+
+    const channel = supabase
+      .channel(`ai-banner-runs:${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agent_runs",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") return;
+          take(payload.new as RunRow);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      alive = false;
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, enabled]);
+
+  return enabled && state?.conversationId === conversationId ? state.run : null;
 }
 
 interface AiThreadBannerProps {
@@ -66,9 +160,13 @@ interface AiThreadBannerProps {
  * Inbox banner that surfaces + controls the AI auto-reply bot per
  * conversation:
  *   - bot active here → "AI is replying automatically" + [Take over]
- *   - bot paused here → the handoff note (if any) + [Resume AI]
- * Renders nothing when the account has no auto-reply configured, or when
- * the bot is active but a human already owns the thread (nothing to do).
+ *   - bot paused here → the handoff note (if any) + [Resume AI]; when
+ *     the pause came from the reply cap, the title says so
+ *   - the bot's last attempt failed (agent mode) → a notice that the
+ *     customer got no reply, why, and what to do — above either one
+ * Renders nothing when the account has no auto-reply running (neither an
+ * active agent nor the single-assistant switch), or when the bot is
+ * active but a human already owns the thread (nothing to do).
  */
 export function AiThreadBanner({
   conversationId,
@@ -80,22 +178,27 @@ export function AiThreadBanner({
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
   const { accountId } = useAuth();
-  const [autoReplyOn, setAutoReplyOn] = useState<boolean | null>(null);
+  const [status, setStatus] = useState<AiAccountStatus>(OFF);
   const [busy, setBusy] = useState(false);
   // Optimistic local mirror of the pause flag so the banner flips
   // instantly on click; re-seeds whenever the thread (or its server
   // state via realtime) changes.
   const [paused, setPaused] = useState(disabled);
   useEffect(() => setPaused(disabled), [conversationId, disabled]);
+  // The failure notice the operator closed, by run id — a new failure
+  // is a new run and shows again.
+  const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accountId) return;
     let alive = true;
-    fetchAiAccountStatus(accountId).then((s) => alive && setAutoReplyOn(s.autoReplyOn));
+    fetchAiAccountStatus(accountId).then((s) => alive && setStatus(s));
     return () => {
       alive = false;
     };
   }, [accountId]);
+
+  const latestRun = useLatestAgentRun(conversationId, status.agentMode);
 
   const toggle = useCallback(
     async (paused: boolean) => {
@@ -135,43 +238,89 @@ export function AiThreadBanner({
   );
 
   // Account has no auto-reply → nothing to show. (Still loading → nothing.)
-  if (!autoReplyOn) return null;
+  if (!status.autoReplyOn) return null;
 
-  // Paused here (a human took over, or the model handed off).
+  const failure: (ParsedReplyFailure & { runId: string }) | null =
+    latestRun?.status === "failed" && latestRun.id !== dismissedRunId
+      ? { ...parseReplyFailure(latestRun.reason), runId: latestRun.id }
+      : null;
+
+  const failureNotice = failure ? (
+    <div
+      role="alert"
+      className="flex items-start gap-3 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs sm:px-4"
+    >
+      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-destructive" />
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="font-medium text-foreground">{t("failure.title")}</p>
+        <p className="text-muted-foreground">{t(`failure.${failure.code}`)}</p>
+        {failure.detail && (
+          <p
+            className="truncate font-mono text-[11px] text-muted-foreground/80"
+            title={failure.detail}
+          >
+            {t("failure.detail", { detail: failure.detail })}
+          </p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => setDismissedRunId(failure.runId)}
+        aria-label={t("failure.dismiss")}
+        title={t("failure.dismiss")}
+        className="flex-shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  ) : null;
+
+  // Paused here (a human took over, or the bot handed off).
   if (paused) {
+    const capReached =
+      latestRun?.status === "handoff" && latestRun.reason === "reply_cap_reached";
     return (
-      <Banner tone="muted">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">{t("pausedTitle")}</p>
-          {handoffSummary && (
-            <p className="truncate text-muted-foreground" title={handoffSummary}>
-              {handoffSummary}
+      <>
+        {failureNotice}
+        <Banner tone="muted">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">
+              {capReached ? t("capPausedTitle") : t("pausedTitle")}
             </p>
-          )}
-        </div>
-        <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>
-          {t("resume")}
-        </BannerButton>
-      </Banner>
+            {handoffSummary && (
+              <p className="truncate text-muted-foreground" title={handoffSummary}>
+                {handoffSummary}
+              </p>
+            )}
+          </div>
+          <BannerButton onClick={() => toggle(false)} busy={busy} icon={Undo2}>
+            {t("resume")}
+          </BannerButton>
+        </Banner>
+      </>
     );
   }
 
-  // Active, but a human already owns it → the bot won't fire; no banner.
-  if (assignedAgentId) return null;
+  // Active, but a human already owns it → the bot won't fire; only a
+  // pending failure is still worth showing.
+  if (assignedAgentId) return failureNotice;
 
   // Active on this thread.
   return (
-    <Banner tone="primary">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
-        <span className="truncate font-medium text-foreground">
-          {t("activeText")}
-        </span>
-      </div>
-      <BannerButton onClick={() => toggle(true)} busy={busy} icon={Hand}>
-        {t("takeOver")}
-      </BannerButton>
-    </Banner>
+    <>
+      {failureNotice}
+      <Banner tone="primary">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
+          <span className="truncate font-medium text-foreground">
+            {t("activeText")}
+          </span>
+        </div>
+        <BannerButton onClick={() => toggle(true)} busy={busy} icon={Hand}>
+          {t("takeOver")}
+        </BannerButton>
+      </Banner>
+    </>
   );
 }
 
