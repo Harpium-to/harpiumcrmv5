@@ -1547,7 +1547,9 @@
       "disconnected": "WhatsApp disconnected from this CRM.",
       "disconnectFailed": "Couldn't disconnect.",
       "manualTitle": "Manual setup (advanced)",
-      "manualDesc": "For those who already have the token and IDs from Meta, or for test numbers."
+      "manualDesc": "For those who already have the token and IDs from Meta, or for test numbers.",
+      "linkHint": "Your agency asked you to connect the business WhatsApp. Click the button below and follow the Facebook window.",
+      "linkWrongCrm": "This link is for a CRM you don't have access to. Ask your agency for a new link."
     },
     "sections": {
       "overview": "Overview",

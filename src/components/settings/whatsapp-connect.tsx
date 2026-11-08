@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import {
@@ -24,6 +25,8 @@ import {
 import { SettingsPanelHead } from './settings-panel-head';
 import { WhatsAppConfig } from './whatsapp-config';
 import { isFacebookOrigin, parseEmbeddedSignupMessage } from '@/lib/whatsapp/embedded-signup-client';
+import { CONNECT_CRM_PARAM, readConnectIntent } from '@/lib/agencia/connect-link';
+import { useAuth } from '@/hooks/use-auth';
 
 // ============================================================
 // Settings › WhatsApp, with Embedded Signup.
@@ -70,6 +73,35 @@ declare global {
 export function WhatsAppSettings() {
   const t = useTranslations('Settings.whatsappConnect');
   const [info, setInfo] = useState<EmbeddedSignupInfo | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { accountId } = useAuth();
+  // A link from the agency (W2): highlight the button and, for someone
+  // in several CRMs, open the one the link is for.
+  const intent = readConnectIntent(searchParams, accountId);
+  const switchingRef = useRef(false);
+
+  useEffect(() => {
+    if (!intent.switchTo || switchingRef.current) return;
+    switchingRef.current = true;
+    fetch('/api/account/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: intent.switchTo }),
+    })
+      .then((res) => {
+        if (res.ok) {
+          // Everything reads the active CRM: reload to see the right one.
+          window.location.reload();
+          return;
+        }
+        toast.error(t('linkWrongCrm'));
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete(CONNECT_CRM_PARAM);
+        router.replace(`/settings?${params.toString()}`, { scroll: false });
+      })
+      .catch(() => toast.error(t('linkWrongCrm')));
+  }, [intent.switchTo, router, searchParams, t]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -112,6 +144,7 @@ export function WhatsAppSettings() {
         configId={info.config_id}
         graphVersion={info.graph_version}
         canManage={info.can_manage}
+        highlight={intent.highlight && !intent.switchTo}
       />
       {info.can_manage && (
         <Accordion className="rounded-xl border border-border px-4">
@@ -150,9 +183,17 @@ interface CardProps {
   configId: string;
   graphVersion: string;
   canManage: boolean;
+  /** Opened from the agency's connect link: point at the button. */
+  highlight?: boolean;
 }
 
-function WhatsAppConnectCard({ appId, configId, graphVersion, canManage }: CardProps) {
+function WhatsAppConnectCard({
+  appId,
+  configId,
+  graphVersion,
+  canManage,
+  highlight = false,
+}: CardProps) {
   const t = useTranslations('Settings.whatsappConnect');
   const [state, setState] = useState<ConnectionState | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
@@ -163,6 +204,16 @@ function WhatsAppConnectCard({ appId, configId, graphVersion, canManage }: CardP
   // postMessage, separately from the login callback that carries the
   // code. Either can arrive first, so the ids wait here.
   const sessionRef = useRef<{ wabaId?: string; phoneNumberId?: string; businessId?: string }>({});
+  const cardRef = useRef<HTMLDivElement>(null);
+  const scrolledRef = useRef(false);
+
+  // Opened from the agency's link: bring the card into view once, as
+  // soon as it has rendered with its real state.
+  useEffect(() => {
+    if (!highlight || scrolledRef.current || !state || !cardRef.current) return;
+    scrolledRef.current = true;
+    cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlight, state]);
 
   const loadState = useCallback(async () => {
     try {
@@ -361,10 +412,15 @@ function WhatsAppConnectCard({ appId, configId, graphVersion, canManage }: CardP
     </Button>
   );
 
+  const highlightClass = highlight ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '';
+  const agencyHint = highlight ? (
+    <p className="rounded-md bg-primary/10 px-3 py-2 text-sm text-foreground">{t('linkHint')}</p>
+  ) : null;
+
   // ---- Not connected: the one-button path ----
   if (!hasConfig) {
     return (
-      <Card>
+      <Card ref={cardRef} className={highlightClass}>
         {sdk}
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -373,6 +429,7 @@ function WhatsAppConnectCard({ appId, configId, graphVersion, canManage }: CardP
           <CardDescription>{t('connectDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {agencyHint}
           {connectButton(t('connectButton'))}
           {sdkFailed && <p className="text-sm text-destructive">{t('sdkFailed')}</p>}
           {!canManage && <p className="text-sm text-muted-foreground">{t('adminOnly')}</p>}
@@ -390,7 +447,7 @@ function WhatsAppConnectCard({ appId, configId, graphVersion, canManage }: CardP
     quality === 'GREEN' || quality === 'YELLOW' || quality === 'RED' ? quality : 'UNKNOWN';
 
   return (
-    <Card>
+    <Card ref={cardRef} className={live ? '' : highlightClass}>
       {sdk}
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">

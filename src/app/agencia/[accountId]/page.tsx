@@ -25,6 +25,8 @@ import { EnterCrmButton } from './enter-crm'
 import { CRM_STATUS_LABEL, nicheLabel } from '@/lib/agencia/crm'
 import { PeriodTabs } from '../ui'
 import { CrmManagePanel } from './manage'
+import { loadWhatsAppDetail } from '@/lib/agencia/whatsapp'
+import { WhatsAppCard } from './whatsapp-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +52,7 @@ export default async function AgenciaAccountPage({
     usageMap,
     templates,
     applications,
+    whatsapp,
   ] = await Promise.all([
       getAccountDetail(admin, accountId, { personal: gate.allowed }),
       getAccountMetrics(admin, accountId, windowDays),
@@ -59,6 +62,8 @@ export default async function AgenciaAccountPage({
       loadPlatformUsage(admin),
       listTemplates(admin),
       listTemplateApplications(admin, accountId),
+      // The number and last message are personal; the status isn't (W2).
+      loadWhatsAppDetail(admin, accountId, { personal: gate.allowed }),
     ])
   if (!detail) notFound()
   const lifecycle = lifecycleRows[0]
@@ -168,6 +173,13 @@ export default async function AgenciaAccountPage({
           isSuper={myRole === 'super_admin'}
         />
       )}
+
+      <WhatsAppCard
+        accountId={account.id}
+        crmName={account.name}
+        detail={whatsapp}
+        canSendLink={lifecycle?.status !== 'archived'}
+      />
 
       {usageMap?.get(account.id) && lifecycle && (
         <HealthCard
