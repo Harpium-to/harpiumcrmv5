@@ -4,6 +4,8 @@ import { hasMinRole } from '@/lib/auth/roles'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { saveWhatsAppConnection } from '@/lib/whatsapp/connect'
 import { supabaseAdmin } from '@/lib/whatsapp/admin-client'
+import { requestCoexistenceSync } from '@/lib/whatsapp/coexistence'
+import { resolveConnectionMode } from '@/lib/whatsapp/embedded-signup-client'
 import {
   deriveRegistrationPin,
   discoverWabaAndPhone,
@@ -43,7 +45,7 @@ function optionalId(value: unknown): string | null {
 
 /**
  * POST /api/whatsapp/embedded-signup
- *   { code, waba_id?, phone_number_id?, business_id? }
+ *   { code, waba_id?, phone_number_id?, business_id?, mode?, event? }
  *
  * Finishes a connection after the customer completes Meta's popup:
  *   1. trade the code for the customer's business token (the code
@@ -52,6 +54,12 @@ function optionalId(value: unknown): string | null {
  *      WhatsApp account and number the token covers;
  *   3. verify, register with a derived PIN, subscribe our app to the
  *      account's webhooks and save — the same path as the manual form.
+ *      A number kept on the WhatsApp Business app (`mode`
+ *      'coexistence', or the popup's coexistence event) is NOT
+ *      registered: Meta already did it, and /register would take the
+ *      number off the app;
+ *   4. coexistence only: ask Meta for the phone's contacts and chat
+ *      history, which then arrive through the webhook.
  *
  * Template sync is left to the browser right after this returns: it's
  * an existing authenticated route and a slow sync shouldn't hold the
@@ -105,6 +113,8 @@ export async function POST(request: Request) {
       )
     }
 
+    const mode = resolveConnectionMode(body?.mode, body?.event)
+
     let wabaId = optionalId(body?.waba_id)
     let phoneNumberId = optionalId(body?.phone_number_id)
     if (!wabaId || !phoneNumberId) {
@@ -113,6 +123,7 @@ export async function POST(request: Request) {
           accessToken,
           appId: settings.appId,
           appSecret,
+          wabaId,
         })
         wabaId = wabaId ?? found.wabaId
         phoneNumberId = phoneNumberId ?? found.phoneNumberId
@@ -131,18 +142,31 @@ export async function POST(request: Request) {
       phoneNumberId,
       wabaId,
       accessToken,
-      pin: deriveRegistrationPin(phoneNumberId),
+      pin: mode === 'cloud' ? deriveRegistrationPin(phoneNumberId) : null,
+      connectionMode: mode,
     })
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status })
     }
 
+    const sync =
+      mode === 'coexistence'
+        ? await requestCoexistenceSync({
+            db: supabaseAdmin(),
+            accountId,
+            phoneNumberId,
+            accessToken,
+          })
+        : null
+
     return NextResponse.json({
       success: result.registrationError === null,
       registered: result.registered,
       registration_error: result.registrationError,
       phone_info: result.phoneInfo,
+      connection_mode: result.connectionMode,
+      sync,
     })
   } catch (err) {
     return toErrorResponse(err)

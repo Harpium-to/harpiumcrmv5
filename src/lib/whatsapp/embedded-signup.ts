@@ -77,6 +77,10 @@ export interface DiscoverArgs {
   accessToken: string
   appId: string
   appSecret: string
+  /** Already known from the popup (the coexistence flow reports the
+   *  account but not always the number): only the number is looked up,
+   *  on THIS account, instead of whichever account the token lists first. */
+  wabaId?: string | null
 }
 
 export interface DiscoveredNumber {
@@ -102,7 +106,30 @@ export async function discoverWabaAndPhone(
   args: DiscoverArgs,
 ): Promise<DiscoveredNumber> {
   const { accessToken, appId, appSecret } = args
+  const wabaId = args.wabaId || (await wabaFromTokenScopes(accessToken, appId, appSecret))
 
+  const phonesRes = await fetch(
+    `${META_API_BASE}/${wabaId}/phone_numbers?fields=id,display_phone_number`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  if (!phonesRes.ok) {
+    await throwMetaError(phonesRes, `Erro na API da Meta: ${phonesRes.status}`)
+  }
+  const phones = (await phonesRes.json()) as { data?: { id?: string }[] }
+  const phoneNumberId = phones.data?.find((p) => p.id)?.id
+  if (!phoneNumberId) {
+    throw new Error(
+      'A conta do WhatsApp não tem número. Refaça a conexão e adicione o número na janela do Facebook.',
+    )
+  }
+  return { wabaId, phoneNumberId }
+}
+
+async function wabaFromTokenScopes(
+  accessToken: string,
+  appId: string,
+  appSecret: string,
+): Promise<string> {
   const debugRes = await fetch(
     `${META_API_BASE}/debug_token?${new URLSearchParams({ input_token: accessToken })}`,
     { headers: { Authorization: `Bearer ${appId}|${appSecret}` } },
@@ -124,22 +151,7 @@ export async function discoverWabaAndPhone(
       'Não encontramos a conta do WhatsApp autorizada. Refaça a conexão e conclua todas as etapas da janela do Facebook.',
     )
   }
-
-  const phonesRes = await fetch(
-    `${META_API_BASE}/${wabaId}/phone_numbers?fields=id,display_phone_number`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  )
-  if (!phonesRes.ok) {
-    await throwMetaError(phonesRes, `Erro na API da Meta: ${phonesRes.status}`)
-  }
-  const phones = (await phonesRes.json()) as { data?: { id?: string }[] }
-  const phoneNumberId = phones.data?.find((p) => p.id)?.id
-  if (!phoneNumberId) {
-    throw new Error(
-      'A conta do WhatsApp não tem número. Refaça a conexão e adicione o número na janela do Facebook.',
-    )
-  }
-  return { wabaId, phoneNumberId }
+  return wabaId
 }
 
 /**

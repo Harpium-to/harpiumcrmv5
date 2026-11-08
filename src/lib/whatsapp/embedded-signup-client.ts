@@ -7,6 +7,8 @@
 // is ignored, never trusted.
 // ============================================================
 
+import type { ConnectionMode } from './connect'
+
 /**
  * True only for facebook.com itself or one of its subdomains.
  *
@@ -85,4 +87,37 @@ export function parseEmbeddedSignupMessage(raw: unknown): EmbeddedSignupMessage 
     }
   }
   return null
+}
+
+// ---- Coexistence (W3) ---------------------------------------
+
+/** Session event Meta's popup posts when the coexistence flow ends. */
+export const COEXISTENCE_FINISH_EVENT = 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
+
+/**
+ * Which mode a finished popup connected. The popup's own event wins:
+ * the coexistence flow lets the business switch to "use a new number"
+ * halfway, and the two modes need opposite registration steps. The
+ * option the user picked on our card only decides when the event never
+ * reached the page.
+ */
+export function resolveConnectionMode(
+  requested: unknown,
+  event: unknown,
+): ConnectionMode {
+  if (typeof event === 'string' && event.startsWith('FINISH')) {
+    return event === COEXISTENCE_FINISH_EVENT ? 'coexistence' : 'cloud'
+  }
+  return requested === 'coexistence' ? 'coexistence' : 'cloud'
+}
+
+/** The FB.login extras for each mode (Embedded Signup v4). */
+export function embeddedSignupExtras(mode: ConnectionMode): Record<string, unknown> {
+  return mode === 'coexistence'
+    ? {
+        setup: {},
+        featureType: 'whatsapp_business_app_onboarding',
+        sessionInfoVersion: '3',
+      }
+    : { setup: {} }
 }

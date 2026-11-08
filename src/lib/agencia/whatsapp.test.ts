@@ -48,6 +48,25 @@ describe('summarizeWhatsApp', () => {
   it('attention when saved but never registered', () => {
     expect(summarizeWhatsApp({ ...OK_ROW, registered_at: null }).reason).toMatch(/registrado/)
   })
+
+  it('says why when Meta cut the connection (W3)', () => {
+    const removed = summarizeWhatsApp({ ...OK_ROW, status: 'disconnected', status_reason: 'partner_removed' })
+    expect(removed.state).toBe('attention')
+    expect(removed.reason).toMatch(/removeu o acesso/)
+    const offboarded = summarizeWhatsApp({
+      ...OK_ROW,
+      status: 'disconnected',
+      status_reason: 'account_offboarded',
+    })
+    expect(offboarded.reason).toMatch(/app WhatsApp Business/)
+  })
+
+  it('ignores a leftover reason once connected again', () => {
+    expect(summarizeWhatsApp({ ...OK_ROW, status_reason: 'partner_removed' })).toEqual({
+      state: 'connected',
+      reason: null,
+    })
+  })
 })
 
 // Minimal query builder: whatsapp_config answers `row`, messages
@@ -129,6 +148,12 @@ describe('loadWhatsAppDetail', () => {
         ['sender_type', 'customer'],
       ]),
     )
+  })
+
+  it('flags a coexistence connection', async () => {
+    const { client } = fakeAdmin({ row: { ...OK_ROW, connection_mode: 'coexistence' } })
+    const d = await loadWhatsAppDetail(client, 'acc-1', { personal: true })
+    expect(d.coexistence).toBe(true)
   })
 
   it('with metrics-only consent: status, but no number and no message time', async () => {

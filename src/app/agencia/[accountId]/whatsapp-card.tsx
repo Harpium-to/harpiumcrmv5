@@ -39,7 +39,7 @@ export function WhatsAppCard({
   /** Archived CRMs don't get new connections. */
   canSendLink: boolean
 }) {
-  const { state, reason, phone, lastInboundAt, detailsAllowed } = detail
+  const { state, reason, phone, lastInboundAt, detailsAllowed, coexistence } = detail
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
@@ -52,6 +52,13 @@ export function WhatsAppCard({
 
       <div className="space-y-4 p-4">
         {reason && <p className="text-sm text-muted-foreground">{reason}</p>}
+
+        {coexistence && state !== 'none' && (
+          <p className="text-xs text-muted-foreground">
+            Conectado junto com o app WhatsApp Business: o cliente continua usando o celular, e as
+            respostas que ele manda de lá também aparecem no CRM.
+          </p>
+        )}
 
         {detailsAllowed && phone && (
           <dl className="grid gap-3 text-sm sm:grid-cols-4">

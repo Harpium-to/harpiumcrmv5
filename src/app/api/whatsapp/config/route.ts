@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { verifyPhoneNumber } from '@/lib/whatsapp/meta-api'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { saveWhatsAppConnection } from '@/lib/whatsapp/connect'
+import { statusReasonMessage } from '@/lib/whatsapp/status-reason'
 
 /**
  * Resolve the caller's account_id from their profile. Inlined here
@@ -56,6 +57,11 @@ function supabaseAdmin() {
  *   { connected: false, reason: 'no_config',        message: '...' }
  *   { connected: false, reason: 'token_corrupted',  message: '...', needs_reset: true }
  *   { connected: false, reason: 'meta_api_error',   message: '...' }
+ *   { connected: false, reason: 'partner_removed' | 'account_offboarded', message: '...' }
+ *
+ * Every response for a saved row also carries `connection_mode`
+ * ('cloud' | 'coexistence') and, for coexistence, `sync` — how the
+ * import of the phone's contacts and chats is going.
  */
 export async function GET() {
   try {
@@ -84,7 +90,9 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, access_token, status, registered_at, last_registration_error')
+      .select(
+        'phone_number_id, access_token, status, registered_at, last_registration_error, connected_at, connection_mode, status_reason, history_sync_status, history_sync_progress, history_sync_requested_at, history_sync_finished_at, history_sync_error, contacts_sync_requested_at, contacts_synced_at',
+      )
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -104,6 +112,35 @@ export async function GET() {
           message: 'Nenhuma configuração de WhatsApp salva ainda. Preencha o formulário e clique em Salvar configuração.',
         },
         { status: 200 }
+      )
+    }
+
+    const connectionMode = config.connection_mode === 'coexistence' ? 'coexistence' : 'cloud'
+    const extra = {
+      connection_mode: connectionMode,
+      sync:
+        connectionMode === 'coexistence'
+          ? {
+              connected_at: config.connected_at ?? null,
+              history_status: config.history_sync_status ?? null,
+              history_progress: config.history_sync_progress ?? null,
+              history_requested_at: config.history_sync_requested_at ?? null,
+              history_finished_at: config.history_sync_finished_at ?? null,
+              history_error: config.history_sync_error ?? null,
+              contacts_requested_at: config.contacts_sync_requested_at ?? null,
+              contacts_synced_at: config.contacts_synced_at ?? null,
+            }
+          : null,
+    }
+
+    // Meta told us the connection was cut (account_update webhook):
+    // say why, instead of the generic token error the check below
+    // would produce.
+    const cutReason = config.status !== 'connected' ? statusReasonMessage(config.status_reason) : null
+    if (cutReason) {
+      return NextResponse.json(
+        { connected: false, reason: config.status_reason, message: cutReason, ...extra },
+        { status: 200 },
       )
     }
 
@@ -139,6 +176,7 @@ export async function GET() {
         // number also has to be registered for this app's webhooks.
         registered: config.registered_at != null,
         registration_error: config.last_registration_error ?? null,
+        ...extra,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro desconhecido na API da Meta'
@@ -148,6 +186,7 @@ export async function GET() {
           connected: false,
           reason: 'meta_api_error',
           message: `A API da Meta recusou as credenciais: ${message}`,
+          ...extra,
         },
         { status: 200 }
       )
