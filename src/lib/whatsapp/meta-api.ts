@@ -233,6 +233,48 @@ export async function getSubscribedApps(
 }
 
 // ============================================================
+// Coexistence (number shared with the WhatsApp Business app)
+// ============================================================
+
+/**
+ * smb_app_state_sync — the phone's contact names;
+ * history            — the last months of chats on the phone.
+ */
+export type SmbAppDataSyncType = 'smb_app_state_sync' | 'history'
+
+export interface RequestSmbAppDataSyncArgs {
+  phoneNumberId: string
+  accessToken: string
+  syncType: SmbAppDataSyncType
+}
+
+/**
+ * Ask Meta to send, through the webhook, what is already on the
+ * business's phone. Each type can be asked for once, within 24 hours
+ * of the number joining coexistence; the data then arrives as
+ * `smb_app_state_sync` / `history` webhook events. Returns Meta's
+ * request id.
+ */
+export async function requestSmbAppDataSync(
+  args: RequestSmbAppDataSyncArgs
+): Promise<string | null> {
+  const { phoneNumberId, accessToken, syncType } = args
+  const response = await fetch(`${META_API_BASE}/${phoneNumberId}/smb_app_data`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ messaging_product: 'whatsapp', sync_type: syncType }),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Erro na API da Meta: ${response.status}`)
+  }
+  const data = (await response.json().catch(() => ({}))) as { request_id?: string }
+  return data.request_id ?? null
+}
+
+// ============================================================
 // Sending
 // ============================================================
 

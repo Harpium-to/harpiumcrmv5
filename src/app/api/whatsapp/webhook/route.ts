@@ -14,6 +14,11 @@ import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook'
+import {
+  handleCoexistenceChange,
+  isCoexistenceWebhookField,
+  type CoexConfig,
+} from '@/lib/whatsapp/coexistence-webhook'
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -243,6 +248,19 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
         continue
       }
 
+      // Coexistence (W3): what the business sends from the WhatsApp
+      // Business app, the phone's chat history and contact names, and
+      // Meta cutting or restoring the connection. Saved only — these
+      // never reach automations, flows or the AI.
+      if (isCoexistenceWebhookField(change.field)) {
+        await handleCoexistenceChange(
+          supabaseAdmin(),
+          { field: change.field, value: change.value as unknown, entryId: entry.id },
+          loadConfigForCoexistence,
+        )
+        continue
+      }
+
       const value = change.value
 
       // Handle status updates
@@ -315,6 +333,25 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
       }
     }
   }
+}
+
+/** The one CRM a number belongs to, or null (logged) when that's unclear. */
+async function loadConfigForCoexistence(phoneNumberId: string): Promise<CoexConfig | null> {
+  const { data, error } = await supabaseAdmin()
+    .from('whatsapp_config')
+    .select('account_id, user_id')
+    .eq('phone_number_id', phoneNumberId)
+  if (error) {
+    console.error('[webhook] coexistence config lookup failed:', phoneNumberId, error)
+    return null
+  }
+  if (!data || data.length !== 1) {
+    console.error(
+      `[webhook] coexistence event for phone_number_id ${phoneNumberId} matched ${data?.length ?? 0} configs; skipped`,
+    )
+    return null
+  }
+  return data[0] as CoexConfig
 }
 
 // The happy-path status ladder — pending → sent → delivered → read →

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     const { data: config, error } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, access_token')
+      .select('phone_number_id, access_token, connection_mode')
       .eq('account_id', accountId)
       .maybeSingle()
     if (error) {
@@ -43,6 +43,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Nenhum WhatsApp conectado ainda.' },
         { status: 404 },
+      )
+    }
+    if (config.connection_mode === 'coexistence') {
+      // Meta registered it when the business confirmed it in the app;
+      // /register would take the number off the WhatsApp Business app.
+      return NextResponse.json(
+        {
+          error:
+            'Este número está conectado junto com o app WhatsApp Business e não precisa de PIN.',
+        },
+        { status: 409 },
       )
     }
 

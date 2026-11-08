@@ -10,6 +10,7 @@ const connected: WhatsAppDetail = {
   phone: { displayPhoneNumber: '+55 63 3333-0000', verifiedName: 'Clínica Sol', qualityRating: 'GREEN' },
   lastInboundAt: '2026-11-07T12:00:00Z',
   detailsAllowed: true,
+  coexistence: false,
 }
 
 function render(detail: WhatsAppDetail, canSendLink = true) {
@@ -42,6 +43,7 @@ describe('WhatsAppCard', () => {
       phone: null,
       lastInboundAt: null,
       detailsAllowed: true,
+      coexistence: false,
     })
     expect(html).toContain('Não conectado')
     expect(html).toContain('ainda não foi conectado')
@@ -57,6 +59,7 @@ describe('WhatsAppCard', () => {
       phone: null,
       lastInboundAt: null,
       detailsAllowed: true,
+      coexistence: false,
     })
     expect(html).toContain('Precisa de atenção')
     expect(html).toContain('Error validating access token')
@@ -66,5 +69,14 @@ describe('WhatsAppCard', () => {
   it('archived CRM: no link to send', () => {
     const html = render({ ...connected, state: 'none', reason: 'x', phone: null }, false)
     expect(html).not.toContain('Enviar link pelo WhatsApp')
+  })
+
+  it('coexistence: says the phone keeps working', () => {
+    const html = render({ ...connected, coexistence: true })
+    expect(html).toContain('junto com o app WhatsApp Business')
+  })
+
+  it('coexistence is not mentioned for a plain connection', () => {
+    expect(render(connected)).not.toContain('junto com o app WhatsApp Business')
   })
 })

@@ -206,4 +206,74 @@ describe('saveWhatsAppConnection', () => {
     const result = await saveWhatsAppConnection({ ...baseArgs(client), pin: '123456' })
     expect(result).toMatchObject({ ok: false, status: 500 })
   })
+
+  describe('coexistence (number kept on the WhatsApp Business app)', () => {
+    it('never calls /register, even with a PIN, and saves it live', async () => {
+      const { client, writes } = fakeDb({})
+      const result = await saveWhatsAppConnection({
+        ...baseArgs(client),
+        pin: '123456',
+        connectionMode: 'coexistence',
+      })
+      expect(registerMock).not.toHaveBeenCalled()
+      expect(subscribeMock).toHaveBeenCalled()
+      expect(result).toMatchObject({
+        ok: true,
+        registered: true,
+        registrationSkipped: false,
+        connectionMode: 'coexistence',
+      })
+      expect(writes[0].row).toMatchObject({
+        status: 'connected',
+        connection_mode: 'coexistence',
+        status_reason: null,
+        history_sync_status: null,
+        contacts_sync_requested_at: null,
+      })
+      expect(writes[0].row.registered_at).toEqual(expect.any(String))
+    })
+
+    it('a manual re-save of the same coexistence number keeps the mode and skips /register', async () => {
+      const existing = {
+        id: 'cfg-1',
+        phone_number_id: 'PN1',
+        registered_at: '2026-11-06T10:00:00.000Z',
+        verify_token: null,
+        connection_mode: 'coexistence',
+      }
+      const { client, writes } = fakeDb({ existing })
+      const result = await saveWhatsAppConnection({ ...baseArgs(client), pin: '123456' })
+      expect(registerMock).not.toHaveBeenCalled()
+      expect(result).toMatchObject({ ok: true, connectionMode: 'coexistence' })
+      // Same number, same mode: the import state is left alone.
+      expect(writes[0].row).not.toHaveProperty('history_sync_status')
+      expect(writes[0].row.connection_mode).toBe('coexistence')
+    })
+
+    it('switching to a new number by the plain flow goes back to cloud and clears the import', async () => {
+      const existing = {
+        id: 'cfg-1',
+        phone_number_id: 'OLD_PN',
+        registered_at: '2026-11-06T10:00:00.000Z',
+        verify_token: null,
+        connection_mode: 'coexistence',
+      }
+      const { client, writes } = fakeDb({ existing })
+      const result = await saveWhatsAppConnection({
+        ...baseArgs(client),
+        pin: '123456',
+        connectionMode: 'cloud',
+      })
+      expect(registerMock).toHaveBeenCalled()
+      expect(result).toMatchObject({ ok: true, connectionMode: 'cloud' })
+      expect(writes[0].row).toMatchObject({ connection_mode: 'cloud', history_sync_status: null })
+    })
+  })
+
+  it('a reconnection clears the reason Meta gave for the last cut', async () => {
+    const { client, writes } = fakeDb({})
+    await saveWhatsAppConnection({ ...baseArgs(client), pin: '123456' })
+    expect(writes[0].row).toMatchObject({ status_reason: null, connection_mode: 'cloud' })
+  })
 })
+

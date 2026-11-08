@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { verifyPhoneNumber } from '@/lib/whatsapp/meta-api'
+import { statusReasonMessage } from '@/lib/whatsapp/status-reason'
 
 // ============================================================
 // The WhatsApp connection of a client CRM, as the agency console
@@ -29,19 +30,28 @@ export interface WhatsAppConfigRow {
   status: string | null
   registered_at: string | null
   last_registration_error: string | null
+  /** W3 (migration 057). Optional so older callers and fixtures still fit. */
+  connection_mode?: string | null
+  status_reason?: string | null
 }
 
-const STATUS_COLUMNS = 'account_id, phone_number_id, status, registered_at, last_registration_error'
+const STATUS_COLUMNS =
+  'account_id, phone_number_id, status, registered_at, last_registration_error, connection_mode, status_reason'
 
 /**
  * Read a saved config without calling Meta. The order of the checks
- * is the order an operator would fix things in: a refused registration
- * first (it says exactly what Meta objected to), then a connection
- * marked down, then a number saved but never registered for webhooks.
+ * is the order an operator would fix things in: Meta cutting the
+ * connection (it says why), then a refused registration (it says
+ * exactly what Meta objected to), then a connection marked down, then
+ * a number saved but never registered for webhooks.
  */
 export function summarizeWhatsApp(row: WhatsAppConfigRow | null | undefined): WhatsAppStatus {
   if (!row || !row.phone_number_id) {
     return { state: 'none', reason: 'O WhatsApp ainda não foi conectado neste CRM.' }
+  }
+  const cut = row.status !== 'connected' ? statusReasonMessage(row.status_reason) : null
+  if (cut) {
+    return { state: 'attention', reason: cut }
   }
   if (row.last_registration_error) {
     return {
@@ -94,6 +104,8 @@ export interface WhatsAppDetail extends WhatsAppStatus {
   lastInboundAt: string | null
   /** False when consent hides the details — the card says why. */
   detailsAllowed: boolean
+  /** The number is shared with the WhatsApp Business app on the phone. */
+  coexistence: boolean
 }
 
 /**
@@ -121,14 +133,16 @@ export async function loadWhatsAppDetail(
       phone: null,
       lastInboundAt: null,
       detailsAllowed: personal,
+      coexistence: false,
     }
   }
 
   const row = data as (WhatsAppConfigRow & { access_token: string | null }) | null
   let status = summarizeWhatsApp(row)
   if (status.state === 'none' || !row) {
-    return { ...status, phone: null, lastInboundAt: null, detailsAllowed: personal }
+    return { ...status, phone: null, lastInboundAt: null, detailsAllowed: personal, coexistence: false }
   }
+  const coexistence = row.connection_mode === 'coexistence'
 
   let phone: WhatsAppPhone | null = null
   let accessToken: string | null = null
@@ -164,6 +178,7 @@ export async function loadWhatsAppDetail(
     phone: personal ? phone : null,
     lastInboundAt: personal ? await loadLastInbound(admin, accountId) : null,
     detailsAllowed: personal,
+    coexistence,
   }
 }
 

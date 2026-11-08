@@ -34,7 +34,30 @@ export interface SaveConnectionArgs {
   /** 6-digit two-step PIN. Optional on the manual form (Meta test
    *  numbers have none); always present for Embedded Signup. */
   pin?: string | null
+  /**
+   * How the number was connected. Embedded Signup always says; the
+   * manual form leaves it out and the row keeps the mode it had.
+   *   'cloud'       — Cloud API only: /register with the PIN.
+   *   'coexistence' — the number stays on the WhatsApp Business app on
+   *                   the phone. Meta registers it during the popup and
+   *                   /register must NOT be called (it would take the
+   *                   number off the app), so the PIN is ignored.
+   */
+  connectionMode?: ConnectionMode
 }
+
+export type ConnectionMode = 'cloud' | 'coexistence'
+
+/** Sync bookkeeping that belongs to one coexistence onboarding. */
+const SYNC_RESET = {
+  history_sync_status: null,
+  history_sync_progress: null,
+  history_sync_requested_at: null,
+  history_sync_finished_at: null,
+  history_sync_error: null,
+  contacts_sync_requested_at: null,
+  contacts_synced_at: null,
+} as const
 
 export type SaveConnectionResult =
   | { ok: false; status: number; error: string }
@@ -47,6 +70,7 @@ export type SaveConnectionResult =
       registrationSkipped: boolean
       /** /register was tried and Meta refused it. */
       registrationError: string | null
+      connectionMode: ConnectionMode
     }
 
 export async function saveWhatsAppConnection(
@@ -114,19 +138,28 @@ export async function saveWhatsAppConnection(
   // a stale PIN would fail and undo the working subscription.
   const { data: existing } = await db
     .from('whatsapp_config')
-    .select('id, registered_at, phone_number_id, verify_token')
+    .select('id, registered_at, phone_number_id, verify_token, connection_mode')
     .eq('account_id', accountId)
     .maybeSingle()
 
   const sameNumber =
     existing?.phone_number_id === phoneNumberId && existing?.registered_at != null
+  const mode: ConnectionMode =
+    args.connectionMode ??
+    (existing?.phone_number_id === phoneNumberId && existing?.connection_mode === 'coexistence'
+      ? 'coexistence'
+      : 'cloud')
 
   let registeredAt: string | null = sameNumber ? existing?.registered_at ?? null : null
   let registrationError: string | null = null
   let registrationSkipped = false
 
-  const needsRegistration = !sameNumber || pin !== null
-  if (needsRegistration) {
+  const needsRegistration = mode === 'cloud' && (!sameNumber || pin !== null)
+  if (mode === 'coexistence') {
+    // Meta registered the number when the business confirmed it in the
+    // WhatsApp Business app; it's live as soon as the popup closes.
+    registeredAt = registeredAt ?? new Date().toISOString()
+  } else if (needsRegistration) {
     if (!pin) {
       // Meta TEST numbers come pre-registered and have no PIN to give,
       // so requiring one made them impossible to connect (issue #242).
@@ -173,6 +206,17 @@ export async function saveWhatsAppConnection(
     subscribed_apps_at: subscribedAppsAt,
     last_registration_error: registrationError,
     updated_at: now,
+    // A fresh connection clears whatever Meta said when it last cut it.
+    connection_mode: mode,
+    status_reason: null,
+    status_changed_at: now,
+    // A different number (or mode) starts a new onboarding; the import
+    // state of the previous one would only confuse the status screen.
+    ...(existing &&
+    existing.phone_number_id === phoneNumberId &&
+    existing.connection_mode === mode
+      ? {}
+      : SYNC_RESET),
   }
 
   if (existing) {
@@ -200,5 +244,6 @@ export async function saveWhatsAppConnection(
     registered: registeredAt != null && !registrationError,
     registrationSkipped,
     registrationError,
+    connectionMode: mode,
   }
 }

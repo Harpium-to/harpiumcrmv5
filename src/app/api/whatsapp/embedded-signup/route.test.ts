@@ -12,6 +12,7 @@ vi.mock('@/lib/rate-limit', () => ({
 }))
 vi.mock('@/lib/whatsapp/admin-client', () => ({ supabaseAdmin: () => ({ admin: true }) }))
 vi.mock('@/lib/whatsapp/connect', () => ({ saveWhatsAppConnection: vi.fn() }))
+vi.mock('@/lib/whatsapp/coexistence', () => ({ requestCoexistenceSync: vi.fn() }))
 vi.mock('@/lib/whatsapp/embedded-signup', () => ({
   getEmbeddedSignupSettings: vi.fn(),
   exchangeCodeForBusinessToken: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('@/lib/whatsapp/embedded-signup', () => ({
 
 import { requireRole } from '@/lib/auth/account'
 import { saveWhatsAppConnection } from '@/lib/whatsapp/connect'
+import { requestCoexistenceSync } from '@/lib/whatsapp/coexistence'
 import {
   discoverWabaAndPhone,
   exchangeCodeForBusinessToken,
@@ -33,6 +35,7 @@ const saveMock = vi.mocked(saveWhatsAppConnection)
 const settingsMock = vi.mocked(getEmbeddedSignupSettings)
 const exchangeMock = vi.mocked(exchangeCodeForBusinessToken)
 const discoverMock = vi.mocked(discoverWabaAndPhone)
+const syncMock = vi.mocked(requestCoexistenceSync)
 
 const SETTINGS = { appId: 'APP', configId: 'CFG', graphVersion: 'v21.0' }
 
@@ -63,6 +66,12 @@ beforeEach(() => {
     registrationSkipped: false,
     registrationError: null,
     phoneInfo: { id: '111', display_phone_number: '+55 63 3333-0000', verified_name: 'Cliente' },
+    connectionMode: 'cloud',
+  })
+  syncMock.mockReset().mockResolvedValue({
+    contacts: 'requested',
+    history: 'requested',
+    error: null,
   })
 })
 
@@ -113,7 +122,12 @@ describe('POST /api/whatsapp/embedded-signup', () => {
   it('looks the ids up when the popup message never arrived', async () => {
     discoverMock.mockResolvedValue({ wabaId: '33333', phoneNumberId: '44444' })
     await post({ code: 'C' })
-    expect(discoverMock).toHaveBeenCalledWith({ accessToken: 'BIZ_TOKEN', appId: 'APP', appSecret: 'SECRET' })
+    expect(discoverMock).toHaveBeenCalledWith({
+      accessToken: 'BIZ_TOKEN',
+      appId: 'APP',
+      appSecret: 'SECRET',
+      wabaId: null,
+    })
     expect(saveMock).toHaveBeenCalledWith(
       expect.objectContaining({ phoneNumberId: '44444', wabaId: '33333', pin: 'pin-for-44444' }),
     )
@@ -159,6 +173,7 @@ describe('POST /api/whatsapp/embedded-signup', () => {
       registrationSkipped: false,
       registrationError: 'PIN mismatch',
       phoneInfo: { id: '111', display_phone_number: '+55' },
+      connectionMode: 'cloud',
     })
     const res = await post({ code: 'C', waba_id: '22222', phone_number_id: '11111' })
     expect(res.status).toBe(200)
@@ -167,5 +182,60 @@ describe('POST /api/whatsapp/embedded-signup', () => {
       registered: false,
       registration_error: 'PIN mismatch',
     })
+  })
+
+  it('a plain connection registers with the PIN and asks for no import', async () => {
+    await post({ code: 'C', waba_id: '22222', phone_number_id: '11111', event: 'FINISH' })
+    expect(saveMock).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionMode: 'cloud', pin: 'pin-for-11111' }),
+    )
+    expect(syncMock).not.toHaveBeenCalled()
+  })
+
+  it('coexistence: no PIN, mode saved, and the phone import is requested', async () => {
+    saveMock.mockResolvedValue({
+      ok: true,
+      registered: true,
+      registrationSkipped: false,
+      registrationError: null,
+      phoneInfo: { id: '11111', display_phone_number: '+55 63 3333-0000' },
+      connectionMode: 'coexistence',
+    })
+    const res = await post({
+      code: 'C',
+      waba_id: '22222',
+      phone_number_id: '11111',
+      mode: 'coexistence',
+      event: 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+    })
+    expect(saveMock).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionMode: 'coexistence', pin: null }),
+    )
+    expect(syncMock).toHaveBeenCalledWith({
+      db: { admin: true },
+      accountId: 'acct-1',
+      phoneNumberId: '11111',
+      accessToken: 'BIZ_TOKEN',
+    })
+    expect(await res.json()).toMatchObject({
+      success: true,
+      connection_mode: 'coexistence',
+      sync: { contacts: 'requested', history: 'requested' },
+    })
+  })
+
+  it("the popup's event wins over the option picked on the card", async () => {
+    await post({ code: 'C', waba_id: '22222', phone_number_id: '11111', mode: 'coexistence', event: 'FINISH' })
+    expect(saveMock).toHaveBeenCalledWith(expect.objectContaining({ connectionMode: 'cloud' }))
+    expect(syncMock).not.toHaveBeenCalled()
+  })
+
+  it('coexistence without the number in the session: looks it up on that account', async () => {
+    discoverMock.mockResolvedValue({ wabaId: '22222', phoneNumberId: '55555' })
+    await post({ code: 'C', waba_id: '22222', mode: 'coexistence' })
+    expect(discoverMock).toHaveBeenCalledWith(expect.objectContaining({ wabaId: '22222' }))
+    expect(saveMock).toHaveBeenCalledWith(
+      expect.objectContaining({ phoneNumberId: '55555', connectionMode: 'coexistence' }),
+    )
   })
 })
