@@ -28,6 +28,7 @@ import { hasAgenciaRole } from '@/lib/agencia/roles'
 import { PeriodTabs } from './ui'
 import { PlatformSettings } from './platform-settings'
 import { CrmTable } from './crm-table'
+import { loadWhatsAppStatuses } from '@/lib/agencia/whatsapp'
 
 // Reads live account data through the service role on every request.
 export const dynamic = 'force-dynamic'
@@ -43,7 +44,7 @@ export default async function AgenciaHomePage({
   // Defence in depth: the layout already gated, but a page can execute
   // even as the layout redirects, so we re-verify and get the client.
   const { admin, role } = await requireAgencia()
-  const [accounts, rawOverview, pendingSignups, platform, usage, access] =
+  const [accounts, rawOverview, pendingSignups, platform, usage, access, whatsapp] =
     await Promise.all([
       listAccountsOverview(admin),
       getAgencyOverview(admin, windowDays),
@@ -51,6 +52,7 @@ export default async function AgenciaHomePage({
       getPlatformSettings(admin),
       loadPlatformUsage(admin),
       loadConsentLevels(admin),
+      loadWhatsAppStatuses(admin),
     ])
 
   const now = new Date()
@@ -363,7 +365,13 @@ export default async function AgenciaHomePage({
             Nenhum CRM com esses filtros.
           </p>
         ) : (
-          <CrmTable rows={rows} filters={filters} dias={windowDays} now={now} />
+          <CrmTable
+            rows={rows}
+            filters={filters}
+            dias={windowDays}
+            now={now}
+            whatsapp={whatsapp}
+          />
         )}
       </div>
 

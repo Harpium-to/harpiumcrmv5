@@ -15,6 +15,7 @@ import {
   type PanelRow,
   type PanelSort,
 } from '@/lib/agencia/panel'
+import type { WhatsAppStatus } from '@/lib/agencia/whatsapp'
 
 const BAND_CLASS: Record<HealthBand, string> = {
   healthy: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -32,11 +33,14 @@ export function CrmTable({
   filters,
   dias,
   now,
+  whatsapp = null,
 }: {
   rows: PanelRow[]
   filters: PanelFilters
   dias: number
   now: Date
+  /** WhatsApp status per CRM (W2). null → fall back to "any channel". */
+  whatsapp?: Map<string, WhatsAppStatus> | null
 }) {
   const sortLink = (sort: PanelSort, label: string) => (
     <Link
@@ -60,7 +64,7 @@ export function CrmTable({
             <th className="px-3 py-3 font-medium">{sortLink('acesso', 'Último acesso')}</th>
             <th className="px-3 py-3 font-medium">Usuários 7d</th>
             <th className="px-3 py-3 font-medium">{sortLink('uso', 'Mensagens 7d')}</th>
-            <th className="px-3 py-3 font-medium">Canal</th>
+            <th className="px-3 py-3 font-medium">{whatsapp ? 'WhatsApp' : 'Canal'}</th>
             <th className="px-3 py-3 font-medium">Alertas</th>
           </tr>
         </thead>
@@ -141,7 +145,9 @@ export function CrmTable({
                   )}
                 </td>
                 <td className="px-3 py-3 text-xs">
-                  {r.usage ? (
+                  {whatsapp ? (
+                    <WhatsAppBadge status={whatsapp.get(r.id) ?? null} />
+                  ) : r.usage ? (
                     r.usage.channelConnected ? (
                       'Conectado'
                     ) : (
@@ -186,4 +192,21 @@ function TrendIcon({ trend }: { trend: 'up' | 'down' | 'flat' }) {
     return <ArrowDown className="h-3.5 w-3.5 text-red-600" aria-label="caindo" />
   }
   return <Minus className="h-3.5 w-3.5 text-muted-foreground" aria-label="estável" />
+}
+
+const WA_BADGE: Record<WhatsAppStatus['state'], { label: string; className: string }> = {
+  connected: { label: 'Conectado', className: 'text-emerald-600 dark:text-emerald-400' },
+  attention: { label: 'Atenção', className: 'text-amber-600 dark:text-amber-400' },
+  none: { label: 'Não conectado', className: 'text-muted-foreground' },
+}
+
+/** WhatsApp state of one CRM; the reason shows on hover. */
+function WhatsAppBadge({ status }: { status: WhatsAppStatus | null }) {
+  const s = status ?? { state: 'none' as const, reason: null }
+  const badge = WA_BADGE[s.state]
+  return (
+    <span className={badge.className} title={s.reason ?? undefined}>
+      {badge.label}
+    </span>
+  )
 }
