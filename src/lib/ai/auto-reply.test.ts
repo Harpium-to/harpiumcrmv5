@@ -9,6 +9,7 @@ import {
   parseReplyFailure,
 } from './reply-failure'
 import { autoReplyStatusFromConfig } from './autoreply-status'
+import { DEFAULT_HANDOFF_NOTICE } from './handoff'
 
 // Shared, hoisted mock state so the module mocks can close over it.
 const h = vi.hoisted(() => ({
@@ -304,21 +305,55 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
 })
 
 describe('dispatchInboundToAiReply — handoff', () => {
-  it('disables auto-reply, writes a summary, and does not send on handoff', async () => {
-    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+  const NOTICE = 'Vou chamar o Marcelo, nosso especialista, para montar sua proposta.'
+
+  it('pauses the bot and tells the customer in the model’s own words', async () => {
+    h.generateReply.mockResolvedValue({ text: NOTICE, handoff: true })
     await dispatchInboundToAiReply(ARGS)
-    expect(h.engineSendText).not.toHaveBeenCalled()
-    expect(h.state.rpcCalls).toHaveLength(0)
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'conv-1', text: NOTICE }),
+    )
+    // The bot's last word on the thread, not another turn: no reply slot.
+    expect(h.state.rpcCalls).toHaveLength(0)
     expect(h.state.updatePayload?.ai_handoff_summary).toContain(
-      'AI agent handed off',
+      'A IA passou a conversa para a equipe',
     )
     // The model's own call — no cap wording.
-    expect(h.state.updatePayload?.ai_handoff_summary).not.toContain(
-      'reply limit',
-    )
+    expect(h.state.updatePayload?.ai_handoff_summary).not.toContain('limite')
     // No handoff target configured → conversation left unassigned.
     expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+  })
+
+  it.each([
+    ['the bare marker', { text: '', handoff: true }],
+    ['an empty answer', { text: '', handoff: false }],
+  ])('never hands off in silence — a default notice for %s', async (_, reply) => {
+    h.generateReply.mockResolvedValue(reply)
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ text: DEFAULT_HANDOFF_NOTICE }),
+    )
+  })
+
+  it('pauses before it sends', async () => {
+    h.generateReply.mockResolvedValue({ text: NOTICE, handoff: true })
+    let pausedAtSend: unknown = 'not sent'
+    h.engineSendText.mockImplementation(async () => {
+      pausedAtSend = h.state.updatePayload?.ai_autoreply_disabled
+      return { whatsapp_message_id: 'm1' }
+    })
+    await dispatchInboundToAiReply(ARGS)
+    expect(pausedAtSend).toBe(true)
+  })
+
+  it('stays quiet when a human took over while the model was thinking', async () => {
+    h.generateReply.mockResolvedValue({ text: NOTICE, handoff: true })
+    h.state.handoffMatches = false // the guarded pause matched no row
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
   it('routes to the configured handoff agent on handoff', async () => {
@@ -328,6 +363,38 @@ describe('dispatchInboundToAiReply — handoff', () => {
     expect(h.state.updatePayload).toMatchObject({
       ai_autoreply_disabled: true,
       assigned_agent_id: 'agent-7',
+    })
+  })
+
+  describe('in agent mode', () => {
+    beforeEach(() => {
+      h.state.agents = [agentRow()]
+    })
+
+    it('records the notice as the run’s output', async () => {
+      h.generateReply.mockResolvedValue({ text: NOTICE, handoff: true })
+      await dispatchInboundToAiReply(ARGS)
+      expect(runOutcomes()).toEqual([{ status: 'handoff', reason: null }])
+      expect(h.state.runUpdates[0].output_preview).toBe(NOTICE)
+    })
+
+    it('records why the customer got nothing when the notice fails', async () => {
+      h.generateReply.mockResolvedValue({ text: '', handoff: true })
+      const message = '(#131030) Recipient phone number not in allowed list'
+      h.engineSendText.mockRejectedValue(new MetaApiError(message, 131030))
+      await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+      // Still paused: the thread belongs to a human either way.
+      expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+      expect(runOutcomes()).toEqual([
+        { status: 'failed', reason: `whatsapp_not_in_allowed_list: ${message}` },
+      ])
+    })
+
+    it('records a skip when a human took over mid-generation', async () => {
+      h.generateReply.mockResolvedValue({ text: NOTICE, handoff: true })
+      h.state.handoffMatches = false
+      await dispatchInboundToAiReply(ARGS)
+      expect(runOutcomes()).toEqual([{ status: 'skipped', reason: 'handed_off' }])
     })
   })
 })
@@ -348,7 +415,7 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
     expect(h.engineSendText).not.toHaveBeenCalled()
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toBe(
-      '🤖 AI agent handed off after 3 replies — reply limit reached. Last customer message: “hi”',
+      '🤖 A IA passou a conversa para a equipe depois de 3 respostas (limite da conversa). Última mensagem do cliente: “hi”',
     )
     // No target configured → left in the shared queue.
     expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
@@ -399,7 +466,7 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
         assigned_agent_id: 'human-2',
       })
       expect(h.state.updatePayload?.ai_handoff_summary).toContain(
-        'after 10 replies — reply limit reached',
+        'depois de 10 respostas (limite da conversa)',
       )
       expect(runOutcomes()).toEqual([
         { status: 'handoff', reason: 'reply_cap_reached' },
@@ -441,7 +508,7 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
       expect(h.engineSendText).not.toHaveBeenCalled()
       expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
       expect(h.state.updatePayload?.ai_handoff_summary).toContain(
-        'after 10 replies — reply limit reached',
+        'depois de 10 respostas (limite da conversa)',
       )
       expect(runOutcomes()).toEqual([
         { status: 'handoff', reason: 'reply_cap_reached' },

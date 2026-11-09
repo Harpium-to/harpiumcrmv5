@@ -5,6 +5,7 @@ import { loadAiConfig } from '@/lib/ai/config'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
+import { DEFAULT_HANDOFF_NOTICE } from '@/lib/ai/handoff'
 import { latestUserMessage } from '@/lib/ai/query'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
 
@@ -85,7 +86,13 @@ export async function POST(request: Request) {
     })
 
     const { text, handoff } = await generateReply({ config, systemPrompt, messages })
-    return NextResponse.json({ reply: text, handoff })
+    // Same rule as the live auto-reply: an empty answer is a handoff, and
+    // a handoff always tells the customer something.
+    const handedOff = handoff || !text
+    return NextResponse.json({
+      reply: text || (handedOff ? DEFAULT_HANDOFF_NOTICE : ''),
+      handoff: handedOff,
+    })
   } catch (err) {
     if (err instanceof AiError) {
       return NextResponse.json(

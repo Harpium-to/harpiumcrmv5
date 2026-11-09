@@ -4,7 +4,11 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
-import { buildHandoffSummary, type HandoffReason } from './handoff'
+import {
+  DEFAULT_HANDOFF_NOTICE,
+  buildHandoffSummary,
+  type HandoffReason,
+} from './handoff'
 import { describeReplyFailure } from './reply-failure'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
@@ -371,16 +375,56 @@ export async function dispatchInboundToAiReply(
         // The model can't (or shouldn't) answer — stop auto-replying on
         // this thread and hand it to a human (see `handOff`).
         const flipped = await handOff('model', conv.ai_reply_count ?? 0)
+        if (!flipped) {
+          // Someone paused the bot while the model was thinking (a
+          // human hit "Take over") — it was already handed off, and the
+          // human now speaks for the business.
+          if (run) {
+            await finishAgentRun(db, run, {
+              status: 'skipped',
+              reason: 'handed_off',
+              usage,
+            })
+          }
+          return
+        }
+
+        // Tell the customer before going quiet — a silent handoff left
+        // them writing to nobody. The model's own words when it wrote
+        // any ("o Marcelo monta sua proposta"), a neutral default
+        // otherwise. Sent only after the pause landed, so a human who
+        // took over mid-generation is never talked over, and not
+        // counted against the reply cap: it is the bot's last word on
+        // this thread, not another turn.
+        const notice = text || DEFAULT_HANDOFF_NOTICE
+        try {
+          await sendChannelText({
+            accountId,
+            userId: configOwnerUserId,
+            conversationId,
+            contactId,
+            text: notice,
+            aiGenerated: true,
+          })
+        } catch (err) {
+          // The thread is paused either way. Record why the customer
+          // got nothing, so the inbox banner can say it and what to fix.
+          console.error('[ai auto-reply] handoff notice failed:', err)
+          if (run) {
+            await finishAgentRun(db, run, {
+              status: 'failed',
+              reason: describeReplyFailure(err),
+              usage,
+            })
+          }
+          return
+        }
         if (run) {
-          await finishAgentRun(
-            db,
-            run,
-            flipped
-              ? { status: 'handoff', usage }
-              : // Someone paused the bot while the model was thinking
-                // (a human hit "Take over") — it was already handed off.
-                { status: 'skipped', reason: 'handed_off', usage },
-          )
+          await finishAgentRun(db, run, {
+            status: 'handoff',
+            output: notice,
+            usage,
+          })
         }
         return
       }
