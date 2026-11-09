@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
+import { openFirstContactDeal } from '@/lib/deals/first-contact'
 import type { UazapiInboundMessage } from './parse'
 
 // Persist one UAZAPI message: find-or-create the contact and its
@@ -57,7 +58,7 @@ async function findOrCreateConversation(
   accountId: string,
   ownerUserId: string,
   contactId: string,
-): Promise<string | null> {
+): Promise<{ id: string; created: boolean } | null> {
   const { data: existing } = await admin
     .from('conversations')
     .select('id')
@@ -65,7 +66,7 @@ async function findOrCreateConversation(
     .eq('contact_id', contactId)
     .order('created_at', { ascending: true })
     .limit(1)
-  if (existing && existing.length > 0) return existing[0].id
+  if (existing && existing.length > 0) return { id: existing[0].id, created: false }
 
   const { data, error } = await admin
     .from('conversations')
@@ -81,12 +82,12 @@ async function findOrCreateConversation(
         .eq('contact_id', contactId)
         .order('created_at', { ascending: true })
         .limit(1)
-      return raced && raced.length > 0 ? raced[0].id : null
+      return raced && raced.length > 0 ? { id: raced[0].id, created: false } : null
     }
     console.error('[uazapi inbound] conversation create failed:', error.message)
     return null
   }
-  return data.id
+  return { id: data.id, created: true }
 }
 
 export async function ingestUazapiInbound(
@@ -103,13 +104,27 @@ export async function ingestUazapiInbound(
   )
   if (!contactId) return
 
-  const conversationId = await findOrCreateConversation(
+  const conversation = await findOrCreateConversation(
     admin,
     account.id,
     account.ownerUserId,
     contactId,
   )
-  if (!conversationId) return
+  if (!conversation) return
+  const conversationId = conversation.id
+
+  // The person's first message opened the thread → card in the funnel.
+  // Not when the operator wrote first from the phone (`fromMe`): they
+  // started that conversation and handle the funnel themselves. See
+  // lib/deals/first-contact.ts. Never throws.
+  if (conversation.created && !msg.fromMe) {
+    await openFirstContactDeal(admin, {
+      accountId: account.id,
+      ownerUserId: account.ownerUserId,
+      contactId,
+      conversationId,
+    })
+  }
 
   // The gateway can redeliver; `message_id` carries the WhatsApp id, so
   // skip anything already stored for this conversation.

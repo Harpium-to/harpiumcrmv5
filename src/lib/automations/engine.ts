@@ -526,6 +526,23 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
     case 'create_deal': {
       const cfg = step.step_config as CreateDealStepConfig
       if (!cfg.pipeline_id || !cfg.stage_id) throw new Error('Criar negócio precisa do funil e da etapa')
+      // One open card per contact per funnel. The inbound webhooks
+      // already open a deal on a contact's first message (see
+      // lib/deals/first-contact.ts) before automations run, so a
+      // "first message → create deal" automation — the niche templates
+      // ship one — would otherwise put the same person in twice.
+      if (args.contactId) {
+        const { data: open, error: openErr } = await db
+          .from('deals')
+          .select('id')
+          .eq('account_id', args.automation.account_id)
+          .eq('contact_id', args.contactId)
+          .eq('pipeline_id', cfg.pipeline_id)
+          .eq('status', 'open')
+          .limit(1)
+        if (openErr) throw new Error(`falha ao buscar negócios do contato: ${openErr.message}`)
+        if (open && open.length > 0) return 'deal skipped: contact already has an open deal in this pipeline'
+      }
       // Match the account's configured default currency rather than
       // the static `deals.currency` DB default — keeps automation-
       // created deals consistent with the one-currency-per-account

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isUniqueViolation } from '@/lib/contacts/dedupe'
+import { openFirstContactDeal } from '@/lib/deals/first-contact'
 import type { InstagramInboundMessage } from './parse'
 
 // ============================================================
@@ -74,7 +75,7 @@ async function findOrCreateConversation(
   accountId: string,
   ownerUserId: string,
   contactId: string,
-): Promise<string | null> {
+): Promise<{ id: string; created: boolean } | null> {
   // Scoped to the Instagram channel. Someone who already exists as a
   // WhatsApp contact and then writes on Instagram gets a separate
   // thread, because the reply has to leave by the right door and a
@@ -87,7 +88,7 @@ async function findOrCreateConversation(
     .eq('channel', 'instagram')
     .order('created_at', { ascending: true })
     .limit(1)
-  if (existing && existing.length > 0) return existing[0].id as string
+  if (existing && existing.length > 0) return { id: existing[0].id as string, created: false }
 
   const { data, error } = await admin
     .from('conversations')
@@ -109,12 +110,12 @@ async function findOrCreateConversation(
         .eq('channel', 'instagram')
         .order('created_at', { ascending: true })
         .limit(1)
-      return raced && raced.length > 0 ? (raced[0].id as string) : null
+      return raced && raced.length > 0 ? { id: raced[0].id as string, created: false } : null
     }
     console.error('[instagram inbound] conversation create failed:', error.message)
     return null
   }
-  return data.id as string
+  return { id: data.id as string, created: true }
 }
 
 /** True when this exact message id is already stored. */
@@ -148,13 +149,27 @@ export async function ingestInstagramInbound(
   )
   if (!contactId) return null
 
-  const conversationId = await findOrCreateConversation(
+  const conversation = await findOrCreateConversation(
     admin,
     account.id,
     account.ownerUserId,
     contactId,
   )
-  if (!conversationId) return null
+  if (!conversation) return null
+  const conversationId = conversation.id
+
+  // First DM opened the thread → card in the funnel, same as WhatsApp.
+  // The contact has no name yet (see findOrCreateContact), so the card
+  // gets a title that says where it came from. Never throws.
+  if (conversation.created) {
+    await openFirstContactDeal(admin, {
+      accountId: account.id,
+      ownerUserId: account.ownerUserId,
+      contactId,
+      conversationId,
+      title: 'Contato do Instagram',
+    })
+  }
 
   const nowIso = new Date().toISOString()
   const { error } = await admin.from('messages').insert({
