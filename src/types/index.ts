@@ -194,6 +194,12 @@ export interface Conversation {
   ai_autoreply_disabled?: boolean;
   ai_reply_count?: number;
   ai_handoff_summary?: string | null;
+  /**
+   * When the AI handed this conversation to the team and no person has
+   * written to the customer since (migration 058). Kept by database
+   * triggers; null/absent means nobody is waiting.
+   */
+  needs_human_since?: string | null;
 }
 
 // ============================================================

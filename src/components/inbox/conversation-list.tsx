@@ -9,7 +9,15 @@ import {
 } from "@/lib/inbox/conversations";
 import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
-import { AtSign, ChevronDown, Search, X } from "lucide-react";
+import { AtSign, ChevronDown, Hand, Search, X } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { useNow } from "@/hooks/use-now";
+import {
+  formatWait,
+  waitInfo,
+  waitingFirst,
+  type WaitInfo,
+} from "@/lib/inbox/handoff-wait";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useTranslations } from "next-intl";
@@ -45,7 +53,7 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
 
 
 
-type InboxFilter = ConversationStatus | "all" | "unread";
+type InboxFilter = ConversationStatus | "all" | "unread" | "waiting";
 
 export function ConversationList({
   activeConversationId,
@@ -56,8 +64,13 @@ export function ConversationList({
 }: ConversationListProps) {
   const t = useTranslations("Inbox.conversationList");
   
+  const { user } = useAuth();
+  // Keeps "esperando há N min" counting between realtime events.
+  const now = useNow(30_000);
+
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
+    { label: t("filterWaiting"), value: "waiting" },
     { label: t("filterUnread"), value: "unread" },
     { label: t("filterOpen"), value: "open" },
     { label: t("filterPending"), value: "pending" },
@@ -164,6 +177,8 @@ export function ConversationList({
 
     if (filter === "unread") {
       result = result.filter((c) => c.unread_count > 0);
+    } else if (filter === "waiting") {
+      result = result.filter((c) => c.needs_human_since);
     } else if (filter !== "all") {
       result = result.filter((c) => c.status === filter);
     }
@@ -188,8 +203,21 @@ export function ConversationList({
       });
     }
 
-    return result;
+    // Someone has to answer these: always on top, longest wait first.
+    return waitingFirst(result);
   }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+
+  const waitingSummary = useMemo(() => {
+    let count = 0;
+    let late = 0;
+    for (const c of conversations) {
+      const w = waitInfo(c.needs_human_since, now);
+      if (!w.waiting) continue;
+      count++;
+      if (w.late) late++;
+    }
+    return { count, late };
+  }, [conversations, now]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -389,6 +417,30 @@ export function ConversationList({
             </button>
           </div>
         )}
+
+        {/* Conversations the AI handed off with no answer yet. One
+            click narrows the list to them; again to see everything. */}
+        {waitingSummary.count > 0 && (
+          <button
+            type="button"
+            onClick={() => setFilter(filter === "waiting" ? "all" : "waiting")}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors",
+              waitingSummary.late > 0
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-amber-400 text-amber-950 hover:bg-amber-300",
+            )}
+          >
+            <Hand className={cn("h-3.5 w-3.5 shrink-0", waitingSummary.late > 0 && "animate-pulse")} />
+            <span className="min-w-0 flex-1">
+              {t("waitingStrip", { count: waitingSummary.count })}
+              {waitingSummary.late > 0 && ` · ${t("waitingLate", { count: waitingSummary.late })}`}
+            </span>
+            <span className="shrink-0 font-medium underline-offset-2 hover:underline">
+              {filter === "waiting" ? t("waitingShowAll") : t("waitingShow")}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Conversation Items.
@@ -415,6 +467,8 @@ export function ConversationList({
                 isActive={conv.id === activeConversationId}
                 onSelect={handleSelect}
                 t={t}
+                wait={waitInfo(conv.needs_human_since, now)}
+                currentUserId={user?.id ?? null}
               />
             ))}
           </div>
@@ -429,13 +483,17 @@ interface ConversationItemProps {
   isActive: boolean;
   onSelect: (conversation: Conversation) => void;
   t: ReturnType<typeof useTranslations>;
+  wait: WaitInfo;
+  currentUserId: string | null;
 }
 
-function ConversationItem({
+export function ConversationItem({
   conversation,
   isActive,
   onSelect,
   t,
+  wait,
+  currentUserId,
 }: ConversationItemProps) {
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
@@ -452,12 +510,26 @@ function ConversationItem({
       })
     : "";
 
+  const owner = conversation.assigned_agent_id;
+  const waitLabel = !wait.waiting
+    ? null
+    : owner && owner === currentUserId
+      ? t("waitingMine")
+      : owner
+        ? t("waitingAssigned")
+        : t("waitingNobody");
+
   return (
     <button
       onClick={handleClick}
       className={cn(
         "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/50",
-        isActive && "border-l-2 border-primary bg-muted/70"
+        wait.waiting &&
+          (wait.late
+            ? "border-l-4 border-red-600 bg-red-500/10 hover:bg-red-500/15"
+            : "border-l-4 border-amber-400 bg-amber-400/10 hover:bg-amber-400/15"),
+        isActive && !wait.waiting && "border-l-2 border-primary bg-muted/70",
+        isActive && wait.waiting && "ring-1 ring-inset ring-foreground/15",
       )}
     >
       {/* Avatar */}
@@ -513,6 +585,19 @@ function ConversationItem({
             />
           </div>
         </div>
+        {waitLabel && (
+          <span
+            className={cn(
+              "mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              wait.late ? "bg-red-600 text-white" : "bg-amber-400 text-amber-950",
+            )}
+          >
+            <Hand className={cn("h-3 w-3 shrink-0", wait.late && "animate-pulse")} />
+            <span className="truncate">
+              {waitLabel} · {formatWait(wait.minutes)}
+            </span>
+          </span>
+        )}
       </div>
     </button>
   );
