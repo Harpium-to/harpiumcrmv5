@@ -40,11 +40,17 @@ export function WhatsAppCard({
   canSendLink: boolean
 }) {
   const { state, reason, phone, lastInboundAt, detailsAllowed, coexistence } = detail
+  const unofficial = detail.path === 'nao_oficial'
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">WhatsApp</h2>
+        <h2 className="text-sm font-semibold">
+          WhatsApp{' '}
+          <span className="font-normal text-muted-foreground">
+            · {unofficial ? 'não oficial (QR code)' : 'oficial (API da Meta)'}
+          </span>
+        </h2>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATE_CLASS[state]}`}>
           {STATE_LABEL[state]}
         </span>
@@ -52,6 +58,13 @@ export function WhatsAppCard({
 
       <div className="space-y-4 p-4">
         {reason && <p className="text-sm text-muted-foreground">{reason}</p>}
+
+        {unofficial && (
+          <p className="text-xs text-muted-foreground">
+            O cliente escolheu a conexão por QR code: o número pode ser bloqueado pelo WhatsApp,
+            principalmente com envio em massa. O aceite desse risco fica registrado no CRM.
+          </p>
+        )}
 
         {coexistence && state !== 'none' && (
           <p className="text-xs text-muted-foreground">
@@ -64,14 +77,17 @@ export function WhatsAppCard({
           <dl className="grid gap-3 text-sm sm:grid-cols-4">
             <Item label="Número" value={phone.displayPhoneNumber} />
             <Item label="Nome no WhatsApp" value={phone.verifiedName ?? '—'} />
-            <Item
-              label="Qualidade"
-              value={
-                phone.qualityRating
-                  ? QUALITY_LABEL[phone.qualityRating.toUpperCase()] ?? phone.qualityRating
-                  : 'Sem avaliação'
-              }
-            />
+            {/* The quality rating is Meta's; a QR-code number has none. */}
+            {!unofficial && (
+              <Item
+                label="Qualidade"
+                value={
+                  phone.qualityRating
+                    ? QUALITY_LABEL[phone.qualityRating.toUpperCase()] ?? phone.qualityRating
+                    : 'Sem avaliação'
+                }
+              />
+            )}
             <Item
               label="Última mensagem recebida"
               value={
@@ -92,10 +108,17 @@ export function WhatsAppCard({
 
         {canSendLink && state !== 'connected' && (
           <div className="space-y-2">
-            <p className="text-sm">
-              Mande para o cliente o link de conexão: ele entra com o login dele, clica em{' '}
-              <strong>Conectar com o Facebook</strong> e escolhe o número.
-            </p>
+            {unofficial ? (
+              <p className="text-sm">
+                Mande para o cliente o link de conexão: ele entra com o login dele e lê o{' '}
+                <strong>QR code</strong> com o celular do número.
+              </p>
+            ) : (
+              <p className="text-sm">
+                Mande para o cliente o link de conexão: ele entra com o login dele, clica em{' '}
+                <strong>Conectar com o Facebook</strong> e escolhe o número.
+              </p>
+            )}
             <ConnectLinkActions accountId={accountId} crmName={crmName} emphasize />
           </div>
         )}
