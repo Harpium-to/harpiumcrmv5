@@ -219,6 +219,36 @@ export async function dispatchInboundToAiReply(
     }
 
     /**
+     * Tell the customer the team takes it from here — a silent handoff
+     * left them writing to nobody. Call it only after `handOff` landed,
+     * so a human who took over meanwhile is never talked over. It does
+     * not claim a reply slot: it is the bot's last word on this thread,
+     * not another turn. Returns what the monitor should record.
+     */
+    const sendHandoffNotice = async (
+      notice: string,
+    ): Promise<
+      { status: 'handoff'; output: string } | { status: 'failed'; reason: string }
+    > => {
+      try {
+        await sendChannelText({
+          accountId,
+          userId: configOwnerUserId,
+          conversationId,
+          contactId,
+          text: notice,
+          aiGenerated: true,
+        })
+        return { status: 'handoff', output: notice }
+      } catch (err) {
+        // The thread is paused either way. Record why the customer got
+        // nothing, so the inbox banner can say it and what to fix.
+        console.error('[ai auto-reply] handoff notice failed:', err)
+        return { status: 'failed', reason: describeReplyFailure(err) }
+      }
+    }
+
+    /**
      * The reply budget is spent: hand off instead of going quiet.
      *
      * The settings screen promises exactly this ("ao atingir o limite,
@@ -230,6 +260,8 @@ export async function dispatchInboundToAiReply(
      *
      * `run` is the open run when the cap was discovered at the atomic
      * claim (after generating); null when the cheap pre-check caught it.
+     * A reply generated before losing the claim is dropped: the customer
+     * gets the neutral notice instead.
      */
     const handOffAtCap = async (
       replyCount: number,
@@ -238,10 +270,20 @@ export async function dispatchInboundToAiReply(
     ) => {
       const flipped = await handOff('reply_cap', replyCount)
       // Lost the race to another path that already paused the bot (or
-      // the write failed): this message is simply over the cap.
-      const outcome = flipped
-        ? ({ status: 'handoff', reason: 'reply_cap_reached' } as const)
-        : ({ status: 'skipped', reason: 'reply_cap_reached' } as const)
+      // the write failed): this message is simply over the cap, and
+      // whoever paused it speaks now.
+      let outcome:
+        | { status: 'handoff' | 'skipped'; reason: string; output?: string }
+        | { status: 'failed'; reason: string }
+      if (!flipped) {
+        outcome = { status: 'skipped', reason: 'reply_cap_reached' }
+      } else {
+        const sent = await sendHandoffNotice(DEFAULT_HANDOFF_NOTICE)
+        // Keep the cap reason on a handoff: the banner titles it
+        // "limit reached" from it.
+        outcome =
+          sent.status === 'handoff' ? { ...sent, reason: 'reply_cap_reached' } : sent
+      }
       if (run) {
         await finishAgentRun(db, run, { ...outcome, usage })
       } else if (agent) {
@@ -389,42 +431,11 @@ export async function dispatchInboundToAiReply(
           return
         }
 
-        // Tell the customer before going quiet — a silent handoff left
-        // them writing to nobody. The model's own words when it wrote
-        // any ("o Marcelo monta sua proposta"), a neutral default
-        // otherwise. Sent only after the pause landed, so a human who
-        // took over mid-generation is never talked over, and not
-        // counted against the reply cap: it is the bot's last word on
-        // this thread, not another turn.
-        const notice = text || DEFAULT_HANDOFF_NOTICE
-        try {
-          await sendChannelText({
-            accountId,
-            userId: configOwnerUserId,
-            conversationId,
-            contactId,
-            text: notice,
-            aiGenerated: true,
-          })
-        } catch (err) {
-          // The thread is paused either way. Record why the customer
-          // got nothing, so the inbox banner can say it and what to fix.
-          console.error('[ai auto-reply] handoff notice failed:', err)
-          if (run) {
-            await finishAgentRun(db, run, {
-              status: 'failed',
-              reason: describeReplyFailure(err),
-              usage,
-            })
-          }
-          return
-        }
+        // The model's own words when it wrote any ("o Marcelo monta sua
+        // proposta"), a neutral default otherwise.
+        const outcome = await sendHandoffNotice(text || DEFAULT_HANDOFF_NOTICE)
         if (run) {
-          await finishAgentRun(db, run, {
-            status: 'handoff',
-            output: notice,
-            usage,
-          })
+          await finishAgentRun(db, run, { ...outcome, usage })
         }
         return
       }

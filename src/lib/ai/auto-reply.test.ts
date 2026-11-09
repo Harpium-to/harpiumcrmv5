@@ -263,12 +263,16 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(h.engineSendText).not.toHaveBeenCalled()
   })
 
-  it('does not send when the atomic slot claim loses the race', async () => {
+  it('drops the reply when the atomic slot claim loses the race', async () => {
     h.state.claim = false
     await dispatchInboundToAiReply(ARGS)
-    // It still attempts the claim, but the send is skipped.
+    // It still attempts the claim; the generated reply is not sent —
+    // the cap is spent, so the customer gets the handoff notice.
     expect(h.state.rpcCalls).toHaveLength(1)
-    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ text: DEFAULT_HANDOFF_NOTICE }),
+    )
   })
 
   it('skips when AI is off / not configured', async () => {
@@ -407,12 +411,23 @@ describe('dispatchInboundToAiReply — handoff', () => {
 // return, leaving the customer unanswered and nobody told.
 // ------------------------------------------------------------------
 describe('dispatchInboundToAiReply — reply cap hands off', () => {
-  it('pauses the bot and leaves a cap note instead of going quiet', async () => {
+  it('pauses the bot, leaves a cap note and tells the customer', async () => {
     h.state.conv = conv({ ai_reply_count: 3 })
+    let pausedAtSend: unknown = 'not sent'
+    h.engineSendText.mockImplementation(async () => {
+      pausedAtSend = h.state.updatePayload?.ai_autoreply_disabled
+      return { whatsapp_message_id: 'm1' }
+    })
     await dispatchInboundToAiReply(ARGS)
 
     expect(h.generateReply).not.toHaveBeenCalled()
-    expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.engineSendText).toHaveBeenCalledTimes(1)
+    expect(h.engineSendText).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'conv-1', text: DEFAULT_HANDOFF_NOTICE }),
+    )
+    // Paused first; and the notice is not another turn — no slot.
+    expect(pausedAtSend).toBe(true)
+    expect(h.state.rpcCalls).toHaveLength(0)
     expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
     expect(h.state.updatePayload?.ai_handoff_summary).toBe(
       '🤖 A IA passou a conversa para a equipe depois de 3 respostas (limite da conversa). Última mensagem do cliente: “hi”',
@@ -471,6 +486,19 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
       expect(runOutcomes()).toEqual([
         { status: 'handoff', reason: 'reply_cap_reached' },
       ])
+      expect(h.state.runInserts[0].output_preview).toBe(DEFAULT_HANDOFF_NOTICE)
+    })
+
+    it('records why the customer got nothing when the cap notice fails', async () => {
+      h.state.conv = conv({ ai_reply_count: 10 })
+      const message = '(#131030) Recipient phone number not in allowed list'
+      h.engineSendText.mockRejectedValue(new MetaApiError(message, 131030))
+      await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+      // Still paused: the thread belongs to a human either way.
+      expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+      expect(runOutcomes()).toEqual([
+        { status: 'failed', reason: `whatsapp_not_in_allowed_list: ${message}` },
+      ])
     })
 
     it('uses the agent’s own cap, not the account’s', async () => {
@@ -496,6 +524,8 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
       expect(runOutcomes()).toEqual([
         { status: 'skipped', reason: 'reply_cap_reached' },
       ])
+      // The handoff that won already told the customer.
+      expect(h.engineSendText).not.toHaveBeenCalled()
     })
 
     it('hands off when the cap is lost at the atomic claim', async () => {
@@ -505,7 +535,11 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
       h.state.claim = false
       await dispatchInboundToAiReply(ARGS)
 
-      expect(h.engineSendText).not.toHaveBeenCalled()
+      // The reply it generated is dropped for the handoff notice.
+      expect(h.engineSendText).toHaveBeenCalledTimes(1)
+      expect(h.engineSendText).toHaveBeenCalledWith(
+        expect.objectContaining({ text: DEFAULT_HANDOFF_NOTICE }),
+      )
       expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
       expect(h.state.updatePayload?.ai_handoff_summary).toContain(
         'depois de 10 respostas (limite da conversa)',
