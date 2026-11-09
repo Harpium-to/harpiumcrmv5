@@ -710,7 +710,10 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background">
+    // Sits in the page under the rail and top bar, sized like the flow
+    // editor. It used to be a `fixed inset-0` overlay, which the new
+    // shell's page-enter animation turned into a box of zero height.
+    <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-border bg-background">
       {/* Top bar. At sub-sm widths the "Active" label is hidden and the
           switch moves to the right of the save button, so the name input
           gets maximum width. */}
