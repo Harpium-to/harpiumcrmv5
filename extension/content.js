@@ -84,7 +84,11 @@ let dockSettlesAt = 0;
 
 // The CRM the extension is connected to, for the header. Asked once
 // per CRM address; a failed ask is retried no more than once a minute.
-let account = { baseUrl: null, name: null, askedAt: 0 };
+let account = { baseUrl: null, name: null, person: null, askedAt: 0 };
+// The attendant's signature (Fase 4B, step 4): this person's choice,
+// kept in the extension. `name` is what they typed; empty means the
+// name the CRM has for them (`account.person`).
+let signature = { on: false, name: "" };
 
 // The open deals of the contact on screen. Kept apart from the contact
 // so re-drawing the card (after a temperature change) doesn't refetch
@@ -209,6 +213,8 @@ let chatPhone = () => null;
 let describeDue = () => null;
 let countDueNow = () => 0;
 let localInputToIso = () => null;
+let signText = (text) => String(text ?? "");
+let cleanSignatureName = (name) => String(name ?? "").trim();
 // From send-check.js. Without it the panel never offers to send.
 let sendCheck = () => ({ ok: false, why: null });
 
@@ -390,7 +396,7 @@ function paintAccount() {
 /** Put the connected CRM's name in the header. */
 async function loadAccount(baseUrl) {
   if (account.baseUrl !== baseUrl) {
-    account = { baseUrl, name: null, askedAt: 0 };
+    account = { baseUrl, name: null, person: null, askedAt: 0 };
     paintAccount();
   }
   if (!baseUrl || account.name || Date.now() - account.askedAt < 60_000) return;
@@ -399,7 +405,9 @@ async function loadAccount(baseUrl) {
   if (account.baseUrl !== baseUrl) return;
   if (result.ok && result.data?.name) {
     account.name = result.data.name;
+    account.person = result.data.person || null;
     paintAccount();
+    paintSignature();
   }
 }
 
@@ -521,9 +529,15 @@ function ensurePanel() {
     }
   });
 
+
   panel.addEventListener("change", (event) => {
     const select = event.target;
-    if (select?.classList?.contains("crmc-stage")) {
+    if (select?.classList?.contains("crmc-sign-on")) {
+      setSignature({ on: select.checked });
+    } else if (select?.classList?.contains("crmc-sign-name")) {
+      // Saved when the person leaves the field, not at every key.
+      setSignature({ name: select.value });
+    } else if (select?.classList?.contains("crmc-stage")) {
       void moveDeal(select.getAttribute("data-deal"), select.value);
     } else if (select?.classList?.contains("crmc-kcard-move")) {
       void moveBoardDeal(select.getAttribute("data-deal"), select.value);
@@ -583,7 +597,9 @@ function ensurePanel() {
   paintAccount();
 
   void send("getPrefs").then((prefs) => {
-    if (prefs.ok && prefs.data?.collapsed) setCollapsed(true);
+    if (!prefs.ok) return;
+    if (prefs.data?.collapsed) setCollapsed(true);
+    signature = { on: Boolean(prefs.data?.sign), name: prefs.data?.signName || "" };
   });
 
   return panel;
@@ -1920,8 +1936,10 @@ function setRepliesOpen(open) {
     </div>
     <input class="crmc-input crmc-replies-search" type="search" autocomplete="off"
            placeholder="Buscar pelo título ou pelo texto" aria-label="Buscar resposta rápida" />
+    <div class="crmc-sign"></div>
     <p class="crmc-replies-status" role="status" aria-live="polite"></p>
     <div class="crmc-replies"></div>`;
+  paintSignature();
   paintReplies();
   sheet().querySelector(".crmc-replies-search")?.focus();
   void loadReplies();
@@ -2001,6 +2019,53 @@ function paintReplies() {
           </div>`;
       })
       .join("") + manage;
+}
+
+/** The name this person signs with now, or "" for none. */
+function signatureName() {
+  if (!signature.on) return "";
+  return cleanSignatureName(signature.name || account.person || "");
+}
+
+/** The "Assinar como" line of the replies sheet. */
+function paintSignature() {
+  const slot = sheet()?.querySelector(".crmc-sign");
+  if (!slot || !repliesOpen) return;
+  // Never under the person's fingers: they may be typing the name.
+  if (slot.contains(document.activeElement)) return;
+  const shown = signature.name || account.person || "";
+  slot.innerHTML = `
+    <label class="crmc-sign-row">
+      <input type="checkbox" class="crmc-sign-on" ${signature.on ? "checked" : ""} />
+      <span>Assinar como</span>
+    </label>
+    <input class="crmc-input crmc-sign-name" type="text" maxlength="40" autocomplete="off"
+           value="${escapeHtml(shown)}" placeholder="Seu nome" aria-label="Nome na assinatura"
+           ${signature.on ? "" : "disabled"} />`;
+}
+
+/** Turn the signature on or off, or change its name, and keep it. */
+function setSignature(changes) {
+  if ("on" in changes) signature.on = Boolean(changes.on);
+  if ("name" in changes) {
+    const typed = cleanSignatureName(changes.name);
+    // The CRM's own name is not stored: if it changes there, it changes here.
+    signature.name = typed === cleanSignatureName(account.person || "") ? "" : typed;
+  }
+  void send("setPrefs", { sign: signature.on, signName: signature.name });
+  const name = signatureName();
+  if ("on" in changes) paintSignature();
+  // Show the name as it will be signed, without the marks taken out.
+  const field = sheet()?.querySelector(".crmc-sign-name");
+  if ("name" in changes && field) field.value = signature.name || account.person || "";
+  setRepliesStatus(
+    !signature.on
+      ? "Assinatura desligada."
+      : name
+        ? `Suas mensagens pelo painel começam com *${name}:*`
+        : "Escreva o nome para a assinatura.",
+    signature.on && !name ? "error" : undefined,
+  );
 }
 
 /** Whether "Enviar" may show for the open chat, and why not. */
@@ -2099,15 +2164,17 @@ async function sendReply(replyId) {
   setRepliesStatus(`Enviando “${reply.title}”…`);
   paintReplies();
   const gen = generation;
+  // An empty caption stays empty: a signature alone is not a message.
+  const signed = signText(text, signatureName());
   const result = reply.media
     ? await send("sendMedia", {
         to: check.to,
         kind: reply.media.kind,
         url: reply.media.url,
-        caption: text,
+        caption: signed,
         filename: reply.media.filename,
       })
-    : await send("sendText", { to: check.to, text });
+    : await send("sendText", { to: check.to, text: signed });
   sendingReply = false;
   if (result.ok) {
     // Said even if the chat changed meanwhile: it did go, to that chat.
@@ -2184,7 +2251,7 @@ function pasteKeys() {
  * rebuilt it differently — the browser's own "insert text" command is
  * tried, and the caller falls back to the clipboard after that.
  */
-async function insertIntoComposer(text) {
+async function insertIntoComposer(text, signAs = "") {
   const box = findComposer();
   if (!box) return false;
 
@@ -2197,9 +2264,12 @@ async function insertIntoComposer(text) {
   selection.addRange(range);
 
   const before = box.textContent;
+  // Signed only at the start of a message: what is already typed was
+  // signed then, or the person chose not to.
+  if (!before.trim()) text = signText(text, signAs);
   // On its own line when something is already typed, so the words
   // don't run together — the same thing the CRM's inbox does.
-  if (before && !/\s$/.test(before)) text = `\n${text}`;
+  else if (!/\s$/.test(before)) text = `\n${text}`;
   try {
     const data = new DataTransfer();
     data.setData("text/plain", text);
@@ -2243,7 +2313,7 @@ async function useReply(replyId) {
       ": confira o texto antes de enviar."
     : "";
 
-  if (await insertIntoComposer(text)) {
+  if (await insertIntoComposer(text, signatureName())) {
     setRepliesStatus(`“${reply.title}” está no campo de mensagem. Aperte Enter para enviar.${check}`);
     return;
   }
@@ -2724,6 +2794,8 @@ void (async () => {
     describeDue = format.describeDue;
     countDueNow = format.countDueNow;
     localInputToIso = format.localInputToIso;
+    signText = format.signText;
+    cleanSignatureName = format.cleanSignatureName;
   } catch {
     // The fallbacks above stand in.
   }

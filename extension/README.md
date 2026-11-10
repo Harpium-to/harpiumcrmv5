@@ -106,6 +106,23 @@ de mensagem. São dois cliques: **Enviar** e, em até 5 segundos,
 Quando falta alguma coisa, o painel diz qual numa linha acima das
 respostas, e "colocar no campo" continua funcionando.
 
+**Assinatura.** Na lista de respostas, **Assinar como** liga a
+assinatura de quem atende: a mensagem começa com o nome em negrito,
+como o WhatsApp mostra,
+
+```
+*Ana Lima:*
+Atendemos das 8h às 18h.
+```
+
+O nome vem do CRM (o cadastro da pessoa dona da chave,
+`GET /api/v1/me`) e pode ser trocado ali mesmo. A escolha é de cada
+pessoa e fica guardada na extensão. Vale para o que sai pelo CRM (o
+texto, ou a legenda de um arquivo; o áudio nunca) e para o que vai
+para o campo de mensagem quando o campo está vazio — se já tem texto,
+ele já foi assinado, ou a pessoa preferiu não assinar. Sem nome, nada é
+assinado.
+
 **Respostas com arquivo.** Uma resposta rápida pode ter uma foto, um
 vídeo, um documento ou um áudio (migration 063, criada em
 Configurações › Respostas rápidas › Mídia). No painel ela mostra o tipo

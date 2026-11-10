@@ -953,6 +953,43 @@
   white-space: pre-line;
 }
 
+/* "Assinar como [nome]", under the search. */
+#crm-connector-panel .crmc-sign {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-sign-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--crmc-fg);
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-sign-on {
+  margin: 0;
+  accent-color: var(--crmc-primary);
+}
+
+#crm-connector-panel .crmc-sign-name {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-sign-name:disabled {
+  opacity: 0.55;
+}
+
 /* The file of a reply that has one: its kind and name. */
 #crm-connector-panel .crmc-reply-file {
   display: block;

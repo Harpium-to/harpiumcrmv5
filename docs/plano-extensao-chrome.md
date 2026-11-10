@@ -340,8 +340,9 @@ exige duas coisas que ainda não existem:
 
 *4B (em andamento).* O que precisa mesmo sair pelo CRM. Etapas 1 e 2
 em produção desde 10/11/2026 (extensão 0.10.0, PR #21, migration 062
-aplicada); etapa 3 feita em 10/11 (extensão 0.11.0, migration 063); 4 e
-5 por fazer.
+aplicada); etapa 3 em produção desde 10/11 (extensão 0.11.0, PR #22,
+migration 063 aplicada); etapa 4 feita em 10/11 (extensão 0.12.0, sem
+migration); 5 por fazer.
 
 **Dependia do PR #12** (WhatsApp D1, "dois caminhos", de outra
 conversa), que **entrou em produção em 10/11/2026**, com a migration
@@ -388,8 +389,14 @@ Etapas, na ordem:
    do WhatsApp. A API lista essas respostas com `?include=media`.
    Migration 063. O arquivo continua guardado quando a resposta muda ou
    é apagada: as mensagens já enviadas apontam para ele.
-4. **Assinatura do atendente.** O nome de quem atende no começo da
-   mensagem enviada pelo painel, ligável por pessoa.
+4. ✅ **Assinatura do atendente.** "Assinar como [nome]" na lista de
+   respostas: a mensagem começa com `*Nome:*` (negrito no WhatsApp).
+   O nome vem do CRM (`GET /api/v1/me` passa a trazer `person` nas
+   chaves pessoais) e pode ser trocado. A escolha é de cada pessoa e
+   fica na extensão. Vale para o envio pelo CRM (texto e legenda; áudio
+   não) e para o campo de mensagem quando ele está vazio. O inbox do
+   CRM não assina: se fizer falta, é uma preferência por pessoa no CRM,
+   com migration.
 5. **Funil de mensagens.** Uma sequência com intervalos, disparada com
    1 clique na conversa. Reaproveita as automações (gatilho manual),
    que já sabem esperar e continuar pelo agendador.

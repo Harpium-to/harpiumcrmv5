@@ -117,10 +117,16 @@ curl https://your-crm.example.com/api/v1/me \
 {
   "data": {
     "account": { "id": "…", "name": "Acme Inc" },
-    "key": { "id": "…", "scopes": ["messages:send"] }
+    "key": { "id": "…", "scopes": ["messages:send"] },
+    "person": null
   }
 }
 ```
+
+`person` is `{ "id", "name" }` for a personal key — the Chrome
+extension's — and `null` for an account-level key, which belongs to the
+CRM rather than to whoever created it. `name` is the person's name in
+the CRM, or `null` when they never filled it in.
 
 ### `POST /api/v1/messages`
 
