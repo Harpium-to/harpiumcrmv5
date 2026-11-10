@@ -16,8 +16,9 @@ reconhecer a atualização como a mesma extensão.)
 Cada pessoa gera a própria chave no CRM, em **Configurações › Extensão
 do Chrome**; ela já vem com os escopos certos. Também serve uma chave
 de **Configurações › API** com `contacts:read` e `contacts:write`; para
-ver e mover negócios, também `deals:read` e `deals:write` — sem eles o
-painel funciona e só avisa que não tem acesso a negócios.
+ver e mover negócios, também `deals:read` e `deals:write`; para as
+respostas rápidas, `quick_replies:read`. Sem um deles o painel funciona
+e só avisa que não tem acesso àquela parte.
 
 ## O que ela faz
 
@@ -55,6 +56,27 @@ aberta continua aberta na próxima conversa.
 Cada parte da ficha é redesenhada sozinha: mudar a temperatura ou a
 etapa de um negócio não apaga uma anotação pela metade.
 
+**Respostas rápidas.** O botão no rodapé do painel abre os textos
+prontos do CRM (Configurações › Respostas rápidas), com busca pelo
+título ou pelo texto. Um clique **coloca o texto no campo de mensagem
+do WhatsApp** — depois do que já estiver digitado — e a pessoa aperta
+Enter para enviar. A extensão não envia.
+
+- `{{nome}}`, `{{primeiro_nome}}` e `{{empresa}}` são preenchidos com
+  os dados do contato no CRM; sem cadastro, com o nome que o WhatsApp
+  mostra. A lista já mostra o texto como ele vai sair.
+- Uma variável sem valor é retirada, e o painel avisa qual faltou.
+  Um nome que é só o número de telefone conta como sem nome.
+- A mesma regra vale no inbox do CRM
+  (`src/lib/quick-replies/variables.ts`; a cópia da extensão fica em
+  `format.js` e um teste mantém as duas iguais).
+- Só as respostas de texto aparecem: as interativas (botões, lista)
+  são da API oficial e não cabem num campo de mensagem.
+- Se o campo de mensagem não aceitar o texto, ele é copiado e o painel
+  pede para colar.
+- Precisa da migration 059, que dá à chave da extensão o escopo
+  `quick_replies:read`. Sem ela, o painel diz isso.
+
 ### Conversas com `@lid`
 
 O WhatsApp hoje identifica quase todas as pessoas por um código
@@ -90,8 +112,8 @@ pintou, sem depender dos nomes de classe dela (`theme.js`).
   texto de mensagem é lido, guardado ou enviado para lugar nenhum.
 - **Não funciona em grupos.** Um grupo não tem um contato único para
   mostrar, então o painel diz isso em vez de escolher um participante.
-- **Não envia mensagens.** Para isso já existe a caixa de texto do
-  WhatsApp, logo ali.
+- **Não envia mensagens.** As respostas rápidas param no campo de
+  mensagem; quem envia é a pessoa, depois de ler.
 
 ## Como ela sabe qual conversa está aberta
 
@@ -136,7 +158,13 @@ pede permissão para **um** endereço, o que você digitar nas opções.
 
 ## Quando o WhatsApp Web mudar
 
-`page-bridge.js` usa o registro interno de módulos do WhatsApp
+**O campo de mensagem.** As respostas rápidas entregam o texto ao
+campo de mensagem como uma colagem, que é o que o editor do WhatsApp
+escuta. Se ele deixar de aceitar, a extensão tenta o comando de inserir
+texto do navegador e, por fim, copia o texto e pede para colar: a
+função continua útil mesmo quebrada.
+
+**Qual conversa está aberta.** `page-bridge.js` usa o registro interno de módulos do WhatsApp
 (`require("WAWebChatCollection")`), que não é uma API pública. Se a
 Meta mudar isso, o painel passa a dizer **"Não consegui identificar
 esta conversa"** — com a conversa aberta — em vez de mostrar o contato

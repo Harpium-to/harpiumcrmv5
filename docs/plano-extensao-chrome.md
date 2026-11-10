@@ -293,10 +293,37 @@ Branch `feat/extensao-fase3a-ficha`. **Sem migration.**
   **Assumir**. Depende do PR #10 (migration 058) no `main` e de escopos
   de conversa na chave da extensão.
 
-**Fase 4 — Mensagens com 1 clique.** Primeira fase que envia.
-- Respostas rápidas com texto, áudio, imagem, vídeo e arquivo.
+**Fase 4 — Mensagens com 1 clique.** Dividida em duas.
+
+*4A ✅ (código pronto, extensão 0.7.0, falta testar no WhatsApp real).*
+Branch `feat/extensao-fase4a-respostas`. **Migration 059.**
+- Respostas rápidas de texto do CRM dentro do WhatsApp Web, com busca.
+  Um clique **coloca o texto no campo de mensagem**; a pessoa envia.
+- Variáveis `{{nome}}`, `{{primeiro_nome}}` e `{{empresa}}`, preenchidas
+  com o contato. Valem também no inbox do CRM, pela mesma regra.
+- API nova: `GET /api/v1/quick-replies`, com escopo próprio
+  (`quick_replies:read`). A migration 059 dá esse escopo às chaves da
+  extensão, inclusive às que já existem.
+- Se o campo de mensagem recusar o texto, a extensão copia e pede para
+  colar.
+
+**O envio pelo CRM ficou fora da 4A, de propósito.** Para texto, colocar
+no campo é melhor: a pessoa lê e ajusta antes de enviar, funciona com o
+número conectado ou não, e não há envio automático. E enviar pelo CRM
+exige duas coisas que ainda não existem:
+- saber, de forma confiável, se o número aberto no WhatsApp Web é o
+  mesmo conectado ao CRM — sem isso a mensagem pode sair de outro
+  número;
+- a API pública enviar pelo WhatsApp por QR. Hoje `POST /api/v1/messages`
+  só usa a API oficial, e o canal por QR (UAZAPI) só envia texto.
+
+*4B (a fazer).* O que precisa mesmo sair pelo CRM.
+- Áudio, imagem, vídeo e arquivo com 1 clique.
 - Funil de mensagens (sequência com intervalos).
 - Assinatura do atendente.
+- Antes: as duas condições acima, e mídia no canal por QR. Mexe no
+  envio do CRM, onde há um branch de outra conversa ainda fora do
+  `main` (`claude/mystifying-sanderson-f8da81`).
 
 **Fase 5 — Agendamento e follow-up.**
 - Mensagem agendada por conversa.

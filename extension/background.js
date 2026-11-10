@@ -52,6 +52,7 @@ const PREFS_KEY = "prefs";
 // See the `pipelines` handler. In memory only: it is gone whenever the
 // worker is, which is the right lifetime for a cache.
 let pipelinesCache = { baseUrl: null, at: 0, data: null };
+let repliesCache = { baseUrl: null, at: 0, data: null };
 
 async function readSettings() {
   const stored = await chrome.storage.local.get(SETTINGS_KEYS);
@@ -90,7 +91,9 @@ async function callApi(path, init = {}) {
   }
 
   if (res.status === 401 || res.status === 403) {
-    return { ok: false, error: "unauthorized" };
+    // 401: the key is wrong or revoked. 403: it is fine, and lacks the
+    // scope — a different message for whoever reads it.
+    return { ok: false, error: "unauthorized", status: res.status };
   }
 
   const body = await res.json().catch(() => null);
@@ -338,6 +341,19 @@ const handlers = {
   /** The CRM's tags, to offer while editing a contact's. */
   async tags() {
     return callApi("/tags");
+  },
+
+  /**
+   * The CRM's text quick replies. Kept for a minute, like the
+   * pipelines: the list is opened many times a day and edited rarely.
+   */
+  async quickReplies() {
+    const { baseUrl } = await readSettings();
+    const fresh = repliesCache.baseUrl === baseUrl && Date.now() - repliesCache.at < 60_000;
+    if (fresh) return { ok: true, data: repliesCache.data };
+    const result = await callApi("/quick-replies");
+    if (result.ok) repliesCache = { baseUrl, at: Date.now(), data: result.data };
+    return result;
   },
 
   async settings() {
