@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { addTagName, formatWhen, parseMoney } from './format.js'
+import { fillQuickReply } from '../src/lib/quick-replies/variables'
+import { addTagName, fillTemplate, filterReplies, formatWhen, parseMoney } from './format.js'
 
 describe('parseMoney', () => {
   it('reads the amount the way it is typed in Brazil', () => {
@@ -80,5 +81,85 @@ describe('addTagName', () => {
     expect(addTagName(names, '   ')).toBe(names)
     expect(addTagName(names, 'x'.repeat(41))).toBe(names)
     expect(addTagName(names, undefined)).toBe(names)
+  })
+})
+
+
+describe('fillTemplate', () => {
+  // The CRM's inbox fills the same variables with fillQuickReply. A
+  // reply written once must read the same in both places.
+  const TEXTS = [
+    'Olá {{primeiro_nome}}! Falo com {{nome}}, da {{empresa}}?',
+    'Oi {{ Nome }} / {{PRIMEIRO_NOME}}',
+    'Nosso horário é das 8h às 18h :)\n\nQualquer coisa , chame.',
+    'Olá {{primeiro_nome}}, tudo bem?',
+    'Olá {{nome}} tudo bem?',
+    'Obrigado, {{nome}}',
+    'Obrigado {{nome}}!',
+    '{{nome}}, bom dia!\n{{empresa}} confirmou?',
+    '{{empresa}} {{nome}} {{empresa}} {{primeiro_nome}}',
+    'Oi {{vars.name}} e {{sobrenome}} e {nome}',
+    '',
+  ]
+  const CONTACTS = [
+    { name: 'Maria Souza Lima', company: 'Clínica Sol' },
+    { name: 'Ana' },
+    { name: '5531999998888', company: '  ' },
+    { name: '+55 (31) 99999-8888' },
+    { name: 'Loja 24h', company: 'Loja 24h Ltda' },
+    { name: null, company: null },
+    {},
+  ]
+
+  it('matches the CRM rule exactly', () => {
+    for (const text of TEXTS) {
+      for (const contact of CONTACTS) {
+        expect(fillTemplate(text, contact), `${text} | ${JSON.stringify(contact)}`).toEqual(
+          fillQuickReply(text, contact),
+        )
+      }
+    }
+  })
+
+  it('fills a name and closes the gap of a missing one', () => {
+    expect(fillTemplate('Olá {{primeiro_nome}}, tudo bem?', { name: 'Maria Souza' })).toEqual({
+      text: 'Olá Maria, tudo bem?',
+      missing: [],
+    })
+    expect(fillTemplate('Olá {{primeiro_nome}}, tudo bem?', undefined)).toEqual({
+      text: 'Olá, tudo bem?',
+      missing: ['primeiro_nome'],
+    })
+  })
+})
+
+describe('filterReplies', () => {
+  const replies = [
+    { id: '1', title: 'Saudação', text: 'Olá {{primeiro_nome}}, tudo bem?' },
+    { id: '2', title: 'Horário', text: 'Atendemos das 8h às 18h.' },
+    { id: '3', title: 'Pix', text: 'Nossa chave é o CNPJ.' },
+  ]
+  const ids = (query) => filterReplies(replies, query).map((r) => r.id)
+
+  it('returns everything for an empty search', () => {
+    expect(ids('')).toEqual(['1', '2', '3'])
+    expect(ids('   ')).toEqual(['1', '2', '3'])
+  })
+
+  it('looks in the title and in the text, ignoring accents and case', () => {
+    expect(ids('saudacao')).toEqual(['1'])
+    expect(ids('OLA')).toEqual(['1'])
+    expect(ids('cnpj')).toEqual(['3'])
+    expect(ids('horario')).toEqual(['2'])
+  })
+
+  it('needs every word, in any order', () => {
+    expect(ids('18h atendemos')).toEqual(['2'])
+    expect(ids('atendemos pix')).toEqual([])
+  })
+
+  it('copes with nothing', () => {
+    expect(filterReplies(undefined, 'x')).toEqual([])
+    expect(filterReplies([{ id: '9' }], 'x')).toEqual([])
   })
 })

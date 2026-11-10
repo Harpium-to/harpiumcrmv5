@@ -50,6 +50,7 @@ it. Grant the minimum.
 | `conversations:read` | List and read conversations              |
 | `deals:read`         | List and read deals and pipelines        |
 | `deals:write`        | Create and update deals (move stage, mark won/lost) |
+| `quick_replies:read` | List the account's quick replies         |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
 
@@ -262,6 +263,17 @@ The account's tags, sorted by name: `{ "id", "name", "color" }`. Scope:
 `contacts:read`. Not paginated. To put tags on a contact, send their
 **names** as `tags` in `PATCH /api/v1/contacts/{id}`; a name that
 doesn't exist yet is created.
+
+### `GET /api/v1/quick-replies`
+
+The account's text quick replies, sorted by title:
+`{ "id", "title", "text" }`. Scope: `quick_replies:read`. Not paginated.
+Interactive quick replies (buttons, lists) are not returned.
+
+`text` may contain `{{nome}}`, `{{primeiro_nome}}` and `{{empresa}}`,
+returned as written — fill them from the contact before using the text.
+The Chrome extension's personal keys get this scope from migration
+`059`.
 
 ### `GET /api/v1/conversations`
 

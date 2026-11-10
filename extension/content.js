@@ -104,6 +104,13 @@ let editingContact = false;
 let editTags = [];
 let tagsCache = { baseUrl: null, names: null };
 
+// The quick-replies sheet: open or not, what was typed in its search,
+// and the CRM's replies (asked again each time the sheet opens; the
+// service worker answers from memory when it asked a minute ago).
+let repliesOpen = false;
+let repliesQuery = "";
+let repliesState = { baseUrl: null, status: "idle", items: [], notice: null };
+
 // The API's `temperature` values, in the order the control shows them.
 const TEMPERATURES = [
   ["cold", "Frio"],
@@ -128,6 +135,8 @@ let pickMode = (_colors, prefersDark) => (prefersDark ? "dark" : "light");
 let parseMoney = (text) => (String(text ?? "").trim() === "" ? 0 : null);
 let formatWhen = () => "";
 let addTagName = (names) => names;
+let fillTemplate = (text) => ({ text: String(text ?? ""), missing: [] });
+let filterReplies = (replies) => [...(replies ?? [])];
 
 // page-bridge.js answers inside the dispatch below (see there), so the
 // reply is already in `pageAnswer` when `dispatchEvent` returns.
@@ -310,8 +319,14 @@ function ensurePanel() {
               aria-label="Recolher">${ICON_COLLAPSE}</button>
     </header>
     <div class="crmc-body"></div>
+    <section class="crmc-sheet" aria-label="Respostas rápidas"></section>
+    <footer class="crmc-foot">
+      <button class="crmc-btn crmc-btn-quiet" data-act="replies-open">Respostas rápidas</button>
+    </footer>
   `;
   document.body.appendChild(panel);
+  // A panel rebuilt after WhatsApp replaced the page starts closed.
+  repliesOpen = false;
 
   // A logo that fails to load must not leave a broken-image box; in
   // the tab, which has nothing else in it, initials stand in.
@@ -360,6 +375,16 @@ function ensurePanel() {
     }
     if (action === "tag-add") addTagFromInput();
     if (action === "tag-remove") removeEditTag(target.getAttribute("data-name"));
+    if (action === "replies-open") setRepliesOpen(true);
+    if (action === "replies-close") setRepliesOpen(false);
+    if (action === "reply-use") void useReply(target.getAttribute("data-id"));
+  });
+
+  panel.addEventListener("input", (event) => {
+    if (!event.target?.classList?.contains("crmc-replies-search")) return;
+    repliesQuery = event.target.value;
+    setRepliesStatus("");
+    paintReplies();
   });
 
   panel.addEventListener("change", (event) => {
@@ -390,6 +415,7 @@ function ensurePanel() {
       event.preventDefault();
       addTagFromInput();
     }
+    if (event.key === "Escape" && repliesOpen) setRepliesOpen(false);
   });
 
   // Typing in the panel must not reach WhatsApp's own keyboard
@@ -542,6 +568,8 @@ function showContact(contact, { linked = false } = {}) {
   editingContact = false;
   renderContact(contact);
   void loadDeals(contact.id);
+  // The previews now have the CRM's name for this person.
+  paintReplies();
 }
 
 function paintWho() {
@@ -1347,6 +1375,228 @@ function createTyped(digits) {
 }
 
 // ------------------------------------------------------------
+// Quick replies
+//
+// The CRM's text snippets, one click from WhatsApp's message box. The
+// text is PUT in the box, not sent: the person reads it — with the
+// contact's name already filled in — and presses Enter themselves.
+// Nothing leaves without a human looking at it.
+//
+// The list opens as a sheet over the record rather than replacing it,
+// so a half-written note is still there when the sheet closes.
+// ------------------------------------------------------------
+
+function sheet() {
+  return ensurePanel().querySelector(".crmc-sheet");
+}
+
+/** Whose data fills the variables: the CRM's, else WhatsApp's name. */
+function replyContact() {
+  if (currentContact) return { name: currentContact.name, company: currentContact.company };
+  // A group's title is not a person's name.
+  return { name: currentChat ? readOpenChatName() : null, company: null };
+}
+
+function setRepliesOpen(open) {
+  repliesOpen = open;
+  ensurePanel().classList.toggle("crmc-sheet-open", open);
+  if (!open) return;
+
+  repliesQuery = "";
+  sheet().innerHTML = `
+    <div class="crmc-sheet-head">
+      <p class="crmc-name">Respostas rápidas</p>
+      <button class="crmc-link" data-act="replies-close">Fechar</button>
+    </div>
+    <input class="crmc-input crmc-replies-search" type="search" autocomplete="off"
+           placeholder="Buscar pelo título ou pelo texto" aria-label="Buscar resposta rápida" />
+    <p class="crmc-replies-status" role="status" aria-live="polite"></p>
+    <div class="crmc-replies"></div>`;
+  paintReplies();
+  sheet().querySelector(".crmc-replies-search")?.focus();
+  void loadReplies();
+}
+
+function setRepliesStatus(message, tone) {
+  const line = sheet()?.querySelector(".crmc-replies-status");
+  if (!line) return;
+  line.textContent = message || "";
+  line.classList.toggle("crmc-err", tone === "error");
+}
+
+function paintReplies() {
+  const el = sheet()?.querySelector(".crmc-replies");
+  if (!el || !repliesOpen) return;
+  const mine = repliesState.baseUrl === currentBaseUrl;
+  if (!mine || repliesState.status === "loading") {
+    el.innerHTML = `<p class="crmc-muted">Carregando…</p>`;
+    return;
+  }
+  if (repliesState.status !== "ready") {
+    el.innerHTML = `<p class="crmc-muted">${escapeHtml(repliesState.notice)}</p>`;
+    return;
+  }
+  const manage = `<a class="crmc-link crmc-link-block" target="_blank" rel="noreferrer noopener"
+       href="${escapeHtml(currentBaseUrl)}/settings?tab=quick-replies">Criar e editar no CRM</a>`;
+  if (!repliesState.items.length) {
+    el.innerHTML = `
+      <p class="crmc-muted">Nenhuma resposta rápida de texto ainda. Elas são criadas no CRM, em
+        Configurações › Respostas rápidas, e valem para a equipe toda.</p>${manage}`;
+    return;
+  }
+  const shown = filterReplies(repliesState.items, repliesQuery);
+  if (!shown.length) {
+    el.innerHTML = `<p class="crmc-muted">Nenhuma resposta com esse texto.</p>`;
+    return;
+  }
+  const contact = replyContact();
+  el.innerHTML =
+    shown
+      .map((reply) => {
+        // The preview is the text as it will go, name and all.
+        const preview = fillTemplate(reply.text, contact).text;
+        return `
+          <button class="crmc-result crmc-reply" data-act="reply-use" data-id="${escapeHtml(reply.id)}">
+            <span class="crmc-result-name">${escapeHtml(reply.title)}</span>
+            <span class="crmc-reply-text">${escapeHtml(preview)}</span>
+          </button>`;
+      })
+      .join("") + manage;
+}
+
+async function loadReplies() {
+  const baseUrl = currentBaseUrl;
+  const known = repliesState.baseUrl === baseUrl && repliesState.status === "ready";
+  // What is already here stays on screen while the fresh list comes.
+  if (!known) {
+    repliesState = { baseUrl, status: "loading", items: [], notice: null };
+    paintReplies();
+  }
+
+  const result = await send("quickReplies");
+  if (currentBaseUrl !== baseUrl) return;
+
+  if (result.ok) {
+    repliesState = {
+      baseUrl,
+      status: "ready",
+      items: Array.isArray(result.data) ? result.data : [],
+      notice: null,
+    };
+  } else if (!known) {
+    let notice = failureText(result, "ver as respostas rápidas");
+    if (result.error === "unauthorized" && result.status === 403) {
+      // The key predates migration 059, which gives it this access.
+      notice =
+        "Sua chave ainda não tem acesso às respostas rápidas. O CRM precisa da atualização 059; depois dela, não é preciso gerar outra chave.";
+    }
+    repliesState = { baseUrl, status: "error", items: [], notice };
+  }
+  paintReplies();
+}
+
+/** WhatsApp's message box for the open chat, or null. */
+function findComposer() {
+  const main = document.querySelector("#main");
+  if (!main) return null;
+  return (
+    main.querySelector('footer [contenteditable="true"][data-lexical-editor="true"]') ||
+    main.querySelector('[contenteditable="true"][data-lexical-editor="true"]') ||
+    main.querySelector('footer [contenteditable="true"]')
+  );
+}
+
+const nextTick = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The paste shortcut as this keyboard writes it. */
+function pasteKeys() {
+  return /mac/i.test(navigator.platform || "") ? "Cmd+V" : "Ctrl+V";
+}
+
+/**
+ * Put `text` in WhatsApp's message box, after whatever is already
+ * typed there. True when the box took it.
+ *
+ * The box is a rich-text editor that keeps its own state, so setting
+ * its content from outside does nothing; what it does listen to is a
+ * paste. This hands it one. If the box did not change — WhatsApp
+ * rebuilt it differently — the browser's own "insert text" command is
+ * tried, and the caller falls back to the clipboard after that.
+ */
+async function insertIntoComposer(text) {
+  const box = findComposer();
+  if (!box) return false;
+
+  box.focus();
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(box);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  const before = box.textContent;
+  // On its own line when something is already typed, so the words
+  // don't run together — the same thing the CRM's inbox does.
+  if (before && !/\s$/.test(before)) text = `\n${text}`;
+  try {
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    box.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  } catch {
+    // No synthetic paste on this browser; the next attempt stands in.
+  }
+  // The editor applies a paste on its own schedule, not inside the event.
+  await nextTick(120);
+  if (box.textContent !== before) return true;
+
+  try {
+    document.execCommand("insertText", false, text);
+  } catch {
+    return false;
+  }
+  await nextTick(120);
+  return box.textContent !== before;
+}
+
+async function useReply(replyId) {
+  const reply = repliesState.items.find((r) => r.id === replyId);
+  if (!reply) return;
+  const { text, missing } = fillTemplate(reply.text, replyContact());
+  const check = missing.length
+    ? " Faltou preencher " +
+      missing.map((v) => `{{${v}}}`).join(", ") +
+      ": confira o texto antes de enviar."
+    : "";
+
+  if (await insertIntoComposer(text)) {
+    setRepliesStatus(`“${reply.title}” está no campo de mensagem. Aperte Enter para enviar.${check}`);
+    return;
+  }
+
+  // No chat open, or the box refused it: the clipboard still gets the
+  // person there with one paste.
+  const chatOpen = Boolean(document.querySelector("#main"));
+  try {
+    await navigator.clipboard.writeText(text);
+    setRepliesStatus(
+      chatOpen
+        ? `Não consegui colocar no campo de mensagem. O texto foi copiado: cole com ${pasteKeys()}.${check}`
+        : `Nenhuma conversa aberta. O texto foi copiado: abra a conversa e cole com ${pasteKeys()}.${check}`,
+    );
+  } catch {
+    setRepliesStatus(
+      chatOpen
+        ? "Não consegui colocar o texto no campo de mensagem nem copiar. Clique no campo de mensagem e tente de novo."
+        : "Abra uma conversa para colocar a resposta no campo de mensagem.",
+      "error",
+    );
+  }
+}
+
+// ------------------------------------------------------------
 // The loop
 // ------------------------------------------------------------
 
@@ -1367,6 +1617,10 @@ async function refresh(force) {
   currentBaseUrl = settings.ok ? settings.data.baseUrl : "";
   const configured = settings.ok && settings.data.configured;
   void loadAccount(configured ? currentBaseUrl : null);
+  // Quick replies need the CRM; and their previews carry this chat's name.
+  ensurePanel().classList.toggle("crmc-connected", Boolean(configured));
+  if (!configured) setRepliesOpen(false);
+  paintReplies();
   if (!configured) {
     renderMessage(
       "Configure o endereço do CRM e a chave de API.",
@@ -1493,6 +1747,8 @@ void (async () => {
     parseMoney = format.parseMoney;
     formatWhen = format.formatWhen;
     addTagName = format.addTagName;
+    fillTemplate = format.fillTemplate;
+    filterReplies = format.filterReplies;
   } catch {
     // The fallbacks above stand in.
   }

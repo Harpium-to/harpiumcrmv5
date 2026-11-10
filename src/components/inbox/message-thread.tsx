@@ -1162,6 +1162,7 @@ export function MessageThread({
         onOpenTemplates={handleOpenTemplates}
         replyTo={replyTo}
         onClearReply={() => setReplyTo(null)}
+        quickReplyContact={conversation.contact}
       />
 
       <TemplatePicker

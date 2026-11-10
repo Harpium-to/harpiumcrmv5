@@ -127,7 +127,7 @@ export function QuickRepliesManager() {
     <div>
       <SettingsPanelHead
         title="Respostas rápidas"
-        description="Trechos reutilizáveis — texto simples ou uma mensagem interativa salva — que a equipe insere pelo campo de mensagem do inbox."
+        description="Trechos reutilizáveis — texto simples ou uma mensagem interativa salva — que a equipe insere pelo campo de mensagem do inbox. Os de texto também aparecem na extensão do Chrome, dentro do WhatsApp Web."
         action={
           <Button onClick={openCreate}>
             <Plus className="mr-1 h-4 w-4" />
@@ -211,12 +211,19 @@ export function QuickRepliesManager() {
                 />
               </div>
               {draft.kind === "text" ? (
-                <Textarea
-                  value={draft.content_text}
-                  onChange={(e) => setDraft({ ...draft, content_text: e.target.value })}
-                  placeholder="O texto da mensagem a inserir"
-                  className="min-h-28 bg-muted text-foreground"
-                />
+                <>
+                  <Textarea
+                    value={draft.content_text}
+                    onChange={(e) => setDraft({ ...draft, content_text: e.target.value })}
+                    placeholder="O texto da mensagem a inserir"
+                    className="min-h-28 bg-muted text-foreground"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Para preencher com os dados do contato, escreva{" "}
+                    <code>{"{{nome}}"}</code>, <code>{"{{primeiro_nome}}"}</code> ou{" "}
+                    <code>{"{{empresa}}"}</code>. Vale no inbox e na extensão do Chrome.
+                  </p>
+                </>
               ) : (
                 <InteractiveBuilder
                   value={draft.interactive_payload}

@@ -849,6 +849,99 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Quick replies ---------------------------------------- */
+
+/* The bar that opens them stays at the bottom of the column, and only
+   exists once the extension is connected to a CRM. */
+#crm-connector-panel .crmc-foot {
+  display: none;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel.crmc-connected .crmc-foot {
+  display: block;
+}
+
+#crm-connector-panel .crmc-foot .crmc-btn {
+  margin: 0;
+}
+
+/* The sheet takes the record's place without replacing it: the record
+   is hidden, not redrawn, so what was half-typed there survives. */
+#crm-connector-panel .crmc-sheet {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#crm-connector-panel.crmc-sheet-open .crmc-sheet {
+  display: block;
+}
+
+#crm-connector-panel.crmc-sheet-open .crmc-body,
+#crm-connector-panel.crmc-sheet-open .crmc-foot,
+#crm-connector-panel.crmc-collapsed .crmc-sheet,
+#crm-connector-panel.crmc-collapsed .crmc-foot {
+  display: none;
+}
+
+#crm-connector-panel .crmc-sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+#crm-connector-panel .crmc-replies-search {
+  display: block;
+  width: 100%;
+}
+
+#crm-connector-panel .crmc-replies-status {
+  margin: 10px 0 0;
+  color: var(--crmc-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-replies-status:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-replies-status.crmc-err {
+  color: var(--crmc-danger);
+}
+
+#crm-connector-panel .crmc-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+
+#crm-connector-panel .crmc-replies > .crmc-muted {
+  margin: 0;
+}
+
+/* Two lines of the text as it will go; the rest is one click away in
+   the message box, where it can still be edited. */
+#crm-connector-panel .crmc-reply-text {
+  display: -webkit-box;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: pre-line;
+}
+
 /* ---- The one rule outside the panel ------------------------ */
 
 /* Docked: WhatsApp's root gives up a column. `left`/`right` matter

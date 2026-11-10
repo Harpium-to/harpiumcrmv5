@@ -66,3 +66,77 @@ export function addTagName(names, name) {
   if (names.some((existing) => existing.toLocaleLowerCase("pt-BR") === key)) return names;
   return [...names, clean];
 }
+
+/**
+ * A name that is only a phone number counts as no name: a contact
+ * created from a message is called by its number until someone fixes
+ * it, and "Olá 5531999998888" is worse than "Olá".
+ */
+function usableName(name) {
+  const trimmed = String(name ?? "").trim();
+  return /^[\d\s+().-]*$/.test(trimmed) ? "" : trimmed;
+}
+
+/**
+ * Fill `{{nome}}`, `{{primeiro_nome}}` and `{{empresa}}` in a quick
+ * reply from the contact. Returns `{ text, missing }`.
+ *
+ * A copy of `fillQuickReply` in src/lib/quick-replies/variables.ts —
+ * the CRM's inbox runs that one, and a reply written once has to read
+ * the same in both places. format.test.js keeps the two equal; the
+ * reasoning behind each rule is written there, with the original.
+ */
+export function fillTemplate(text, contact) {
+  const name = usableName(contact?.name);
+  const values = {
+    nome: name,
+    primeiro_nome: name.split(/\s+/)[0] ?? "",
+    empresa: String(contact?.company ?? "").trim(),
+  };
+  const order = ["nome", "primeiro_nome", "empresa"];
+  const missing = new Set();
+
+  const filled = String(text ?? "").replace(
+    /( ?)\{\{\s*(nome|primeiro_nome|empresa)\s*\}\}( ?)/gi,
+    (match, before, key, after, offset, whole) => {
+      const variable = key.toLowerCase();
+      const value = values[variable];
+      if (value) return `${before}${value}${after}`;
+
+      missing.add(variable);
+      const next = whole[offset + match.length] ?? "";
+      if (before && after) return " ";
+      if (before && (next === "" || next === "\n" || /[,.!?;:]/.test(next))) return "";
+      return before || after;
+    },
+  );
+
+  if (missing.size === 0) return { text: filled, missing: [] };
+
+  const tidy = filled
+    .split("\n")
+    .map((line) => line.replace(/^[ \t]*[,;:][ \t]*/, "").replace(/^[ \t]+/, ""))
+    .join("\n");
+  return { text: tidy, missing: order.filter((v) => missing.has(v)) };
+}
+
+/** Lower case and without accents, so "ola" finds "Olá". */
+function plain(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * The quick replies that match what was typed: every word of the query
+ * somewhere in the title or the text. An empty query matches all.
+ */
+export function filterReplies(replies, query) {
+  const words = plain(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return [...(replies ?? [])];
+  return (replies ?? []).filter((reply) => {
+    const haystack = plain(`${reply?.title ?? ""} ${reply?.text ?? ""}`);
+    return words.every((word) => haystack.includes(word));
+  });
+}

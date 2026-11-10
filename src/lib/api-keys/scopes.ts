@@ -21,6 +21,7 @@ export const API_SCOPES = [
   'conversations:read',
   'deals:read',
   'deals:write',
+  'quick_replies:read',
   'broadcasts:send',
   'webhooks:manage',
 ] as const;
@@ -36,6 +37,7 @@ export const SCOPE_DESCRIPTIONS: Record<ApiScope, string> = {
   'conversations:read': 'Listar e ler conversas',
   'deals:read': 'Listar e ler negócios e funis',
   'deals:write': 'Criar e atualizar negócios (mudar etapa, marcar ganho/perdido)',
+  'quick_replies:read': 'Listar as respostas rápidas',
   'broadcasts:send': 'Lançar campanhas de disparo',
   'webhooks:manage': 'Cadastrar e gerenciar webhooks de eventos',
 };
