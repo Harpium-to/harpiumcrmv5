@@ -134,6 +134,13 @@ const handlers = {
     return callApi("/me");
   },
 
+  /** The CRM this key belongs to, for the panel's header. */
+  async account() {
+    const result = await callApi("/me");
+    if (!result.ok) return result;
+    return { ok: true, data: { name: result.data?.account?.name || null } };
+  },
+
   /**
    * Every contact that is this phone number — usually one, sometimes
    * none, and two when the CRM has the same mobile with and without

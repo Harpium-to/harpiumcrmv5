@@ -63,7 +63,7 @@ async function save() {
   const existing = await chrome.storage.local.get(["apiKey"]);
   const apiKey = typedKey || existing.apiKey || "";
   if (!apiKey) {
-    show("Informe a chave de API.", "bad");
+    show("Informe a chave.", "bad");
     return;
   }
 

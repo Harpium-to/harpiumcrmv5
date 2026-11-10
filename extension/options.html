@@ -3,65 +3,157 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CRM Connector</title>
+    <title>Harpium CRM</title>
     <style>
-      :root { color-scheme: light dark; }
+      /* The same warm neutrals as the panel (content.css) and the CRM.
+         This page is the extension's own, so it follows the system
+         theme; the panel follows WhatsApp's. */
+      :root {
+        color-scheme: light dark;
+        --bg: oklch(0.975 0.006 72);
+        --surface: oklch(0.995 0.003 72);
+        --border: oklch(0.9 0.01 72);
+        --fg: oklch(0.255 0.014 72);
+        --fg-muted: oklch(0.5 0.017 72);
+        --primary: oklch(0.255 0.014 72);
+        --primary-fg: oklch(0.955 0.011 72);
+        --primary-hover: oklch(0.34 0.014 72);
+        --ring: oklch(0.5 0.017 72);
+        --ok: oklch(0.5 0.13 150);
+        --bad: oklch(0.5 0.19 27);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: oklch(0.175 0.012 72);
+          --surface: oklch(0.235 0.012 72);
+          --border: oklch(0.325 0.012 72);
+          --fg: oklch(0.955 0.011 72);
+          --fg-muted: oklch(0.72 0.013 72);
+          --primary: oklch(0.93 0.035 88);
+          --primary-fg: oklch(0.22 0.02 72);
+          --primary-hover: oklch(0.97 0.03 88);
+          --ring: oklch(0.93 0.035 88);
+          --ok: oklch(0.78 0.14 150);
+          --bad: oklch(0.76 0.14 25);
+        }
+      }
       body {
-        margin: 0 auto;
-        padding: 32px 24px;
-        max-width: 520px;
+        margin: 0;
+        padding: 40px 24px;
+        background: var(--bg);
+        color: var(--fg);
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         font-size: 14px;
         line-height: 1.5;
       }
-      h1 { font-size: 19px; margin: 0 0 4px; }
-      p.sub { margin: 0 0 24px; opacity: 0.7; }
-      label { display: block; font-weight: 600; margin: 16px 0 6px; }
+      main {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 8px;
+      }
+      .brand img {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+      }
+      p.sub {
+        margin: 0 0 20px;
+        color: var(--fg-muted);
+      }
+      .card {
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+      label {
+        display: block;
+        margin: 16px 0 6px;
+        font-weight: 600;
+      }
+      label:first-child {
+        margin-top: 0;
+      }
       input {
         box-sizing: border-box;
         width: 100%;
-        padding: 9px 11px;
-        border: 1px solid rgba(128, 128, 128, 0.4);
-        border-radius: 8px;
+        padding: 9px 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg);
+        color: var(--fg);
         font: inherit;
       }
-      small { display: block; margin-top: 6px; opacity: 0.7; }
+      input:focus-visible,
+      button:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+      }
+      small {
+        display: block;
+        margin-top: 6px;
+        color: var(--fg-muted);
+      }
       button {
-        margin-top: 24px;
-        padding: 9px 18px;
+        margin-top: 20px;
+        padding: 9px 20px;
         border: 0;
         border-radius: 999px;
-        background: #00a884;
-        color: #fff;
+        background: var(--primary);
+        color: var(--primary-fg);
         font: inherit;
-        font-weight: 500;
+        font-weight: 600;
         cursor: pointer;
       }
-      #status { margin-top: 14px; min-height: 20px; }
-      .ok { color: #0ca30c; }
-      .bad { color: #d03b3b; }
+      button:hover {
+        background: var(--primary-hover);
+      }
+      #status {
+        min-height: 21px;
+        margin: 14px 0 0;
+      }
+      .ok { color: var(--ok); }
+      .bad { color: var(--bad); }
     </style>
   </head>
   <body>
-    <h1>CRM Connector</h1>
-    <p class="sub">
-      Liga o WhatsApp Web ao seu CRM. A chave fica guardada só neste
-      navegador e nunca entra na página do WhatsApp.
-    </p>
+    <main>
+      <div class="brand">
+        <img src="icons/icon-128.png" alt="" />
+        <h1>Harpium CRM</h1>
+      </div>
+      <p class="sub">
+        Liga o WhatsApp Web ao seu CRM. A chave fica guardada só neste
+        navegador e nunca entra na página do WhatsApp.
+      </p>
 
-    <label for="baseUrl">Endereço do CRM</label>
-    <input id="baseUrl" type="url" placeholder="https://seu-crm.com.br" />
-    <small>Sem barra no fim e sem /api.</small>
+      <div class="card">
+        <label for="baseUrl">Endereço do CRM</label>
+        <input id="baseUrl" type="url" placeholder="https://seu-crm.com.br" />
+        <small>Sem barra no fim e sem /api.</small>
 
-    <label for="apiKey">Chave de API</label>
-    <input id="apiKey" type="password" placeholder="Cole a chave gerada no CRM" />
-    <small>
-      Gere em Configurações &rsaquo; API. Precisa dos escopos
-      <code>contacts:read</code> e <code>contacts:write</code>.
-    </small>
+        <label for="apiKey">Chave</label>
+        <input id="apiKey" type="password" placeholder="Cole a chave gerada no CRM" />
+        <small>
+          No CRM, abra Configurações &rsaquo; Extensão do Chrome e clique
+          em &ldquo;Gerar minha chave&rdquo;. O endereço e a chave aparecem
+          lá, prontos para copiar.
+        </small>
 
-    <button id="save">Salvar e testar</button>
-    <p id="status"></p>
+        <button id="save">Salvar e testar</button>
+        <p id="status"></p>
+      </div>
+    </main>
 
     <script src="options.js"></script>
   </body>

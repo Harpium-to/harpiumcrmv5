@@ -2,15 +2,86 @@
 // Reading which conversation is open, as pure functions.
 //
 // Separated from content.js so it can be tested. This is the most
-// fragile logic in the extension — it reads a DOM that belongs to
+// fragile logic in the extension — it reads a page that belongs to
 // somebody else and changes without notice — and also the logic whose
 // failure is hardest to notice, because a wrong answer produces a
 // panel that looks entirely normal while describing the wrong person.
+//
+// There are two sources, in this order:
+//   1. WhatsApp's own code, asked through page-bridge.js
+//      (`chatFromPage`). As of November 2026 it is the only one that works.
+//   2. The `data-id` of the message rows (`chatFromDataIds`), which
+//      used to carry the chat id. Kept for builds that still do.
 //
 // Loaded by content.js through a dynamic import (MV3 content scripts
 // cannot themselves be modules, but they can import one that is
 // listed in web_accessible_resources).
 // ============================================================
+
+/**
+ * What WhatsApp's own code said about the open chat (the JSON string
+ * page-bridge.js answers with), as one of:
+ *
+ *   { state: "none" }                  no chat is open
+ *   { state: "other" }                 a group, channel or broadcast
+ *   { state: "user", phone, lid }      a person; either may be null,
+ *                                      never both
+ *   null                               no usable answer — read the
+ *                                      page instead
+ *
+ * The answer comes from a script that runs in the page's own world, so
+ * it is exactly as trustworthy as the page: every field is checked
+ * here, and anything that is not plainly a number is dropped rather
+ * than passed along. A `lid` is NOT a phone number and is never
+ * returned as one.
+ */
+export function chatFromPage(answer) {
+  if (typeof answer !== "string" || !answer) return null;
+  let payload;
+  try {
+    payload = JSON.parse(answer);
+  } catch {
+    return null;
+  }
+  if (!payload || payload.v !== 1 || payload.ready !== true) return null;
+
+  const chat = payload.chat;
+  if (chat === null) return { state: "none" };
+  if (typeof chat !== "object" || typeof chat.server !== "string") return null;
+
+  const phoneOf = (value) =>
+    typeof value === "string" && /^\d{8,15}$/.test(value) ? value : null;
+
+  if (chat.server === "c.us" || chat.server === "s.whatsapp.net") {
+    const phone = phoneOf(chat.user);
+    return phone ? { state: "user", phone, lid: null } : null;
+  }
+  if (chat.server === "lid") {
+    if (typeof chat.user !== "string" || !/^\d{1,20}$/.test(chat.user)) return null;
+    return { state: "user", phone: phoneOf(chat.phone), lid: chat.user };
+  }
+  // g.us, broadcast, newsletter and whatever comes next: not a
+  // conversation with one person.
+  return chat.server ? { state: "other" } : null;
+}
+
+/**
+ * The same answer, read from the `data-id` attributes of the message
+ * rows — for WhatsApp builds that still put the chat id there.
+ *
+ * `null` when the rows say nothing, which is what current builds do
+ * (November 2026): the caller then reports it could not identify the chat.
+ */
+export function chatFromDataIds(dataIds) {
+  const identity = chatIdentityFromDataIds(dataIds);
+  if (identity) {
+    return { state: "user", phone: identity.phone ?? null, lid: identity.lid ?? null };
+  }
+  const collective = (dataIds ?? []).some(
+    (raw) => typeof raw === "string" && /@(g\.us|broadcast|status|newsletter)(_|$)/.test(raw),
+  );
+  return collective ? { state: "other" } : null;
+}
 
 /**
  * The phone digits of the open 1:1 chat, from the `data-id` attributes
