@@ -151,6 +151,8 @@ let senderState = { baseUrl: null, status: "idle", provider: null, phone: null, 
 let pendingSend = null;
 let sendingReply = false;
 const SEND_CONFIRM_MS = 5000;
+// What a person calls the file of a quick reply (migration 063).
+const MEDIA_LABELS = { image: "Imagem", video: "Vídeo", document: "Arquivo", audio: "Áudio" };
 
 // The board: open or not, its search, and the pipeline it shows.
 // `moved` is set once a card was moved, so the record beside the chat
@@ -1949,7 +1951,7 @@ function paintReplies() {
        href="${escapeHtml(currentBaseUrl)}/settings?tab=quick-replies">Criar e editar no CRM</a>`;
   if (!repliesState.items.length) {
     el.innerHTML = `
-      <p class="crmc-muted">Nenhuma resposta rápida de texto ainda. Elas são criadas no CRM, em
+      <p class="crmc-muted">Nenhuma resposta rápida ainda. Elas são criadas no CRM, em
         Configurações › Respostas rápidas, e valem para a equipe toda.</p>${manage}`;
     return;
   }
@@ -1975,6 +1977,12 @@ function paintReplies() {
         // The preview is the text as it will go, name and all.
         const preview = fillTemplate(reply.text, contact).text;
         const id = escapeHtml(reply.id);
+        const media = reply.media && MEDIA_LABELS[reply.media.kind] ? reply.media : null;
+        const fileLine = media
+          ? `<span class="crmc-reply-file">${escapeHtml(
+              [MEDIA_LABELS[media.kind], media.filename].filter(Boolean).join(" · "),
+            )}</span>`
+          : "";
         const confirming = pendingSend?.id === reply.id;
         const sendButton = check.ok
           ? `<button class="crmc-reply-send${confirming ? " crmc-reply-confirm" : ""}"
@@ -1987,8 +1995,8 @@ function paintReplies() {
         return `
           <div class="crmc-reply-row">
             <button class="crmc-result crmc-reply" data-act="reply-use" data-id="${id}">
-              <span class="crmc-result-name">${escapeHtml(reply.title)}</span>
-              <span class="crmc-reply-text">${escapeHtml(preview)}</span>
+              <span class="crmc-result-name">${escapeHtml(reply.title)}</span>${fileLine}
+              ${preview ? `<span class="crmc-reply-text">${escapeHtml(preview)}</span>` : ""}
             </button>${sendButton}
           </div>`;
       })
@@ -2091,7 +2099,15 @@ async function sendReply(replyId) {
   setRepliesStatus(`Enviando “${reply.title}”…`);
   paintReplies();
   const gen = generation;
-  const result = await send("sendText", { to: check.to, text });
+  const result = reply.media
+    ? await send("sendMedia", {
+        to: check.to,
+        kind: reply.media.kind,
+        url: reply.media.url,
+        caption: text,
+        filename: reply.media.filename,
+      })
+    : await send("sendText", { to: check.to, text });
   sendingReply = false;
   if (result.ok) {
     // Said even if the chat changed meanwhile: it did go, to that chat.
@@ -2209,6 +2225,17 @@ async function insertIntoComposer(text) {
 async function useReply(replyId) {
   const reply = repliesState.items.find((r) => r.id === replyId);
   if (!reply) return;
+  if (reply.media) {
+    // A file can't be typed into WhatsApp's box: it leaves through the CRM.
+    const check = currentSendCheck();
+    setRepliesStatus(
+      check.ok
+        ? `“${reply.title}” tem um arquivo, que sai pelo CRM: use Enviar.`
+        : `“${reply.title}” tem um arquivo, que só sai pelo CRM.${check.why ? ` ${check.why}` : ""}`,
+      check.ok ? undefined : "error",
+    );
+    return;
+  }
   const { text, missing } = fillTemplate(reply.text, replyContact());
   const check = missing.length
     ? " Faltou preencher " +

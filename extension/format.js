@@ -136,7 +136,10 @@ export function filterReplies(replies, query) {
   const words = plain(query).split(/\s+/).filter(Boolean);
   if (!words.length) return [...(replies ?? [])];
   return (replies ?? []).filter((reply) => {
-    const haystack = plain(`${reply?.title ?? ""} ${reply?.text ?? ""}`);
+    // A reply with a file is also found by the file's name.
+    const haystack = plain(
+      `${reply?.title ?? ""} ${reply?.text ?? ""} ${reply?.media?.filename ?? ""}`,
+    );
     return words.every((word) => haystack.includes(word));
   });
 }

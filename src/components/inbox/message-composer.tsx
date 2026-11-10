@@ -104,7 +104,10 @@ const PICKER_ACCEPT: Record<"image" | "video" | "document", string> = {
 interface MediaDraft {
   kind: ComposerMediaKind;
   mediaUrl: string;
-  /** Storage path — used to GC the object if the draft is discarded. */
+  /**
+   * Storage path — used to GC the object if the draft is discarded.
+   * Empty for a quick reply's file, which the reply keeps owning.
+   */
   path: string;
   filename: string;
   caption: string;
@@ -359,12 +362,29 @@ export function MessageComposer({
   }, [interactivePayload, t]);
 
   // A picked quick reply: text fills the composer; interactive opens the
-  // builder pre-filled so the agent can tweak before sending.
+  // builder pre-filled so the agent can tweak before sending; a file is
+  // staged like an attachment, caption filled in, for the agent to send.
   const handlePickQuickReply = useCallback(
     (qr: QuickReply) => {
       setQuickReplyOpen(false);
       if (qr.kind === "interactive" && qr.interactive_payload) {
         openInteractiveBuilder(qr.interactive_payload);
+        return;
+      }
+      if (qr.kind === "media" && qr.media_kind && qr.media_url) {
+        // An attachment staged before stays this agent's to discard.
+        removeStaged(draftRef.current?.path);
+        setDraft({
+          kind: qr.media_kind,
+          mediaUrl: qr.media_url,
+          // Not this draft's to delete: the quick reply owns the file.
+          path: "",
+          filename: qr.media_filename ?? "documento",
+          caption:
+            qr.media_kind === "audio"
+              ? ""
+              : fillQuickReply(qr.content_text ?? "", quickReplyContact ?? {}).text,
+        });
         return;
       }
       // Variables are filled here, before the text reaches the box, so
@@ -384,7 +404,7 @@ export function MessageComposer({
         }
       });
     },
-    [openInteractiveBuilder, adjustHeight, quickReplyContact],
+    [openInteractiveBuilder, adjustHeight, quickReplyContact, removeStaged],
   );
 
   // Upload a captured file to chat-media and stage it as a draft.

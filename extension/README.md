@@ -104,7 +104,15 @@ de mensagem. São dois cliques: **Enviar** e, em até 5 segundos,
   mostra o contato do CRM com esse mesmo número.
 
 Quando falta alguma coisa, o painel diz qual numa linha acima das
-respostas, e "colocar no campo" continua funcionando. Uma resposta com
+respostas, e "colocar no campo" continua funcionando.
+
+**Respostas com arquivo.** Uma resposta rápida pode ter uma foto, um
+vídeo, um documento ou um áudio (migration 063, criada em
+Configurações › Respostas rápidas › Mídia). No painel ela mostra o tipo
+e o nome do arquivo. Como um arquivo não dá para colar no campo do
+WhatsApp, ela **só sai pelo CRM**, pelo mesmo Enviar → Confirmar e nas
+mesmas condições; a legenda aceita as variáveis. O áudio vai sem
+legenda. Uma resposta com
 variável sem dado (`{{empresa}}` de um contato sem empresa) não é
 enviada: o painel pede para colocar no campo e completar.
 

@@ -171,6 +171,14 @@ describe('filterReplies', () => {
     expect(ids('atendemos pix')).toEqual([])
   })
 
+  it('finds a reply with a file by the file name', () => {
+    const withFile = [
+      ...replies,
+      { id: '4', title: 'Material', text: '', media: { kind: 'document', filename: 'Catálogo 2026.pdf' } },
+    ]
+    expect(filterReplies(withFile, 'catalogo').map((r) => r.id)).toEqual(['4'])
+  })
+
   it('copes with nothing', () => {
     expect(filterReplies(undefined, 'x')).toEqual([])
     expect(filterReplies([{ id: '9' }], 'x')).toEqual([])

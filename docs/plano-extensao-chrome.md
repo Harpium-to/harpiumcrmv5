@@ -339,7 +339,9 @@ exige duas coisas que ainda não existem:
   só usa a API oficial, e o canal por QR (UAZAPI) só envia texto.
 
 *4B (em andamento).* O que precisa mesmo sair pelo CRM. Etapas 1 e 2
-feitas em 10/11/2026 (extensão 0.10.0, migration 062); 3 a 5 por fazer.
+em produção desde 10/11/2026 (extensão 0.10.0, PR #21, migration 062
+aplicada); etapa 3 feita em 10/11 (extensão 0.11.0, migration 063); 4 e
+5 por fazer.
 
 **Dependia do PR #12** (WhatsApp D1, "dois caminhos", de outra
 conversa), que **entrou em produção em 10/11/2026**, com a migration
@@ -376,10 +378,16 @@ Etapas, na ordem:
    variável sem dado não é enviada. A chave da extensão ganha
    `messages:send` (migration 062). Regra em `extension/send-check.js`,
    testada. *Falta testar com um número real*, combinado com você.
-3. **Mídia nas respostas rápidas.** Imagem, áudio (como mensagem de
-   voz), vídeo e arquivo: envio do arquivo em Configurações › Respostas
-   rápidas, prévia no painel e envio pelo CRM. Migration (mídia em
-   `quick_replies`).
+3. ✅ **Mídia nas respostas rápidas.** Imagem, vídeo, documento e
+   áudio: o arquivo é enviado em Configurações › Respostas rápidas ›
+   Mídia (com prévia e legenda), fica no bucket `chat-media` na pasta da
+   conta, e o CRM só aceita um arquivo dessa pasta
+   (`src/lib/quick-replies/media.ts`). No inbox, a resposta entra como
+   anexo pronto para enviar. Na extensão, mostra tipo e nome e **só sai
+   pelo CRM** (Enviar → Confirmar), porque arquivo não se cola no campo
+   do WhatsApp. A API lista essas respostas com `?include=media`.
+   Migration 063. O arquivo continua guardado quando a resposta muda ou
+   é apagada: as mensagens já enviadas apontam para ele.
 4. **Assinatura do atendente.** O nome de quem atende no começo da
    mensagem enviada pelo painel, ligável por pessoa.
 5. **Funil de mensagens.** Uma sequência com intervalos, disparada com

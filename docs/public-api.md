@@ -306,6 +306,15 @@ returned as written — fill them from the contact before using the text.
 The Chrome extension's personal keys get this scope from migration
 `059`.
 
+With `?include=media` the list also has the replies with a file
+(migration `063`), and every item carries `media`: `null` for a text
+reply, else `{ "kind", "url", "filename" }` — `kind` is `image`,
+`video`, `document` or `audio`, and `text` is the caption (`""` when
+there is none; an audio never has one). Send one with
+`POST /api/v1/messages`: `type` = `media.kind`, `media_url` =
+`media.url`, `text` = the caption filled in, and `filename` for a
+document. Without the parameter the response is exactly as before.
+
 ### Tasks
 
 A task is a to-do about a contact, for a person — "ligar na quinta".
