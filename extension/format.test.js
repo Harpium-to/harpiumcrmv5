@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { fillQuickReply } from '../src/lib/quick-replies/variables'
 import { countDueNow as serverCountDueNow, describeDue as serverDescribeDue } from '../src/lib/tasks/due'
 import { describeScheduled as serverDescribeScheduled } from '../src/lib/scheduled/describe'
+import { googleCalendarUrl as serverCalendarUrl, taskEventDetails as serverEventDetails } from '../src/lib/tasks/calendar'
 import {
   addTagName,
   boardColumns,
@@ -16,6 +17,8 @@ import {
   describeDuration,
   defaultScheduleValue,
   describeScheduled,
+  googleCalendarUrl,
+  taskEventDetails,
   signText,
   formatWhen,
   localInputToIso,
@@ -399,5 +402,23 @@ describe('describeScheduled', () => {
     expect(describeScheduled({ status: 'failed', send_at: at(10, 14), outcome: 'Fora da janela' }, now)).toBe(
       'não saiu: Fora da janela',
     )
+  })
+})
+
+describe('googleCalendarUrl', () => {
+  it('builds the same link as the CRM', () => {
+    const cases = [
+      { title: 'Ligar para a Ana', start: '2026-11-12T09:00:00-03:00', details: 'Contato: Ana' },
+      { title: 'Proposta', start: '2026-12-31T23:45:00Z' },
+      { title: ' ', start: '2026-11-12T09:00:00Z' },
+      { title: 'x', start: null },
+    ]
+    for (const c of cases) expect(googleCalendarUrl(c)).toBe(serverCalendarUrl(c))
+  })
+
+  it('describes the task the same way', () => {
+    const c = { name: 'Ana', phone: '+5511999998888', url: 'https://crm/contacts?contact=1' }
+    expect(taskEventDetails(c)).toBe(serverEventDetails(c))
+    expect(taskEventDetails({})).toBe(serverEventDetails({}))
   })
 })

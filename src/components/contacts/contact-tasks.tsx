@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { CalendarPlus, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { isMissingTable } from '@/lib/auth/account-context';
 import { createClient } from '@/lib/supabase/client';
 import { describeDue } from '@/lib/tasks/due';
+import { googleCalendarUrl, taskEventDetails } from '@/lib/tasks/calendar';
 import { cn } from '@/lib/utils';
 import type { ContactTask } from '@/types';
 
@@ -36,7 +37,14 @@ export function sortTasks(tasks: ContactTask[]): ContactTask[] {
  * writes go straight through RLS — the team sees them, agents and
  * above change them.
  */
-export function ContactTasks({ contactId }: { contactId: string | null }) {
+export function ContactTasks({
+  contactId,
+  contact,
+}: {
+  contactId: string | null;
+  /** For the "Adicionar à agenda" event's description. */
+  contact?: { name?: string | null; phone?: string | null } | null;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const { user, accountId } = useAuth();
 
@@ -188,6 +196,22 @@ export function ContactTasks({ contactId }: { contactId: string | null }) {
         <ul className="space-y-1.5">
           {[...open, ...done].map((task) => {
             const when = task.done_at ? null : describeDue(task.due_at);
+            // Google's own "new event" page, filled in (Fase 9).
+            const calendar =
+              when && contactId
+                ? googleCalendarUrl({
+                    title: task.title,
+                    start: task.due_at,
+                    details: taskEventDetails({
+                      name: contact?.name,
+                      phone: contact?.phone,
+                      url:
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/contacts?contact=${contactId}`
+                          : null,
+                    }),
+                  })
+                : null;
             return (
               <li
                 key={task.id}
@@ -221,6 +245,17 @@ export function ContactTasks({ contactId }: { contactId: string | null }) {
                       )}
                     >
                       {when.label}
+                      {calendar && (
+                        <a
+                          href={calendar}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 inline-flex items-center gap-1 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        >
+                          <CalendarPlus className="size-3" />
+                          Adicionar à agenda
+                        </a>
+                      )}
                     </p>
                   )}
                 </div>

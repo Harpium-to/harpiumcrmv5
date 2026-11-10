@@ -481,12 +481,30 @@ conversa:
 - Ligar ou desligar a IA do CRM inteiro ficou nas Configurações, só
   para admin, como decidido em 10/11.
 
-**Fase 8 — Disparos e status.**
-- Disparo para uma lista ou etiqueta.
-- Status agendado, se o provedor permitir.
+**Fase 8 — Disparos e status.** (decidido em 10/11/2026)
+- Disparo para uma lista ou etiqueta. Pelo número do QR: com limite —
+  até 200 envios por dia no CRM, um a cada 30–90 s (sorteado), pelo
+  agendador, com aviso de risco antes de disparar, acompanhar e parar.
+  Pela API oficial, continuam os modelos aprovados, como hoje.
+- Status agendado: fica para depois, até confirmar no servidor UAZAPI da
+  Harpium se ele posta status (a API oficial não posta).
 
-**Fase 9 — Integrações.**
-- Google Agenda, exportação de contatos, atalho para webhooks.
+**Fase 9 — Integrações ✅ (feita em 10/11/2026, extensão 0.17.0, sem
+migration; decidido em 10/11).**
+- **Google Agenda:** "Adicionar à agenda" em cada tarefa com data — na
+  extensão (aba Tarefas e Minhas tarefas) e na ficha do contato no CRM.
+  Abre a página "novo evento" do Google Agenda da própria pessoa, já
+  preenchida (título, 30 minutos no horário da tarefa, contato e link do
+  CRM); ela só salva. Sem acesso à conta Google e sem configurar nada.
+  A sincronização automática (OAuth, verificação do Google) ficou de
+  fora, por escolha.
+- **Exportar contatos:** "Exportar CSV" na tela de Contatos do CRM, para
+  admins, com a mesma busca e o mesmo filtro de etiquetas da tela,
+  todas as páginas, com etiquetas, temperatura e a etapa do negócio em
+  aberto (`/api/contacts/export`). Exportar participantes de grupos do
+  WhatsApp ficou de fora, por escolha.
+- **Webhooks:** já existem no CRM (Configurações › Webhooks); nada novo
+  na extensão.
 
 **Botões dentro do WhatsApp Web (pedido em 10/11/2026). A barra no alto
 da conversa foi feita em 10/11 (extensão 0.16.0, sem migration):** oito
@@ -574,9 +592,8 @@ Não deu para conferir:
 
 Em aberto:
 
-1. **Disparo em massa no número por QR:** só com limite diário,
-   intervalo entre envios e aviso de risco (**recomendado**) · só pela
-   API oficial · sem limite. Decide-se antes da Fase 8.
+1. ~~Disparo em massa no número por QR~~ — decidido em 10/11/2026: com
+   limite diário (200), intervalo sorteado de 30–90 s e aviso de risco.
 2. **Ordem das fases:** a de cima (**recomendado**) · outra prioridade.
 
 Já decididas:

@@ -592,7 +592,11 @@ export function ContactDetailView({
 
               {/* Tasks Tab */}
               <TabsContent value="tasks" className="flex-1 overflow-y-auto px-4 py-3">
-                <ContactTasks key={contactId} contactId={contactId} />
+                <ContactTasks
+                  key={contactId}
+                  contactId={contactId}
+                  contact={{ name: contact.name, phone: contact.phone }}
+                />
                 <div className="mt-6">
                   <ContactScheduled key={contactId} contactId={contactId} />
                 </div>

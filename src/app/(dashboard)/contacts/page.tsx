@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -40,6 +41,7 @@ import {
   Search,
   Plus,
   Upload,
+  Download,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -367,6 +369,23 @@ export default function ContactsPage() {
             </Button>
           )}
           {canEditSettings && <HelpTip id="contacts.customFields" />}
+          {canEditSettings && (
+            // The list as shown: the same search and tag filter, every page.
+            <a
+              href={`/api/contacts/export?${new URLSearchParams({
+                ...(search.trim() ? { search: search.trim() } : {}),
+                ...(selectedTagIds.length ? { tags: selectedTagIds.join(',') } : {}),
+              }).toString()}`}
+              download
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'border-border text-muted-foreground hover:bg-muted',
+              )}
+            >
+              <Download className="size-4" />
+              Exportar CSV
+            </a>
+          )}
           <GatedButton
             variant="outline"
             canAct={canEdit}

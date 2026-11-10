@@ -241,6 +241,8 @@ let defaultScheduleValue = () => "";
 let placeShortcuts = () => null;
 let measureHeader = () => ({ nameRight: 0, actionsLeft: 0 });
 let describeScheduled = (item) => String(item?.status ?? "");
+let googleCalendarUrl = () => null;
+let taskEventDetails = () => "";
 // From send-check.js. Without it the panel never offers to send.
 let sendCheck = () => ({ ok: false, why: null });
 
@@ -1633,13 +1635,33 @@ function renderTaskRow(task, { withContact }) {
     : !mine && task.assigned_to?.name
       ? `Para ${escapeHtml(task.assigned_to.name)}`
       : "";
+  // "Adicionar à agenda" (Fase 9): Google's own "new event" page,
+  // filled in — the person saves it in their calendar.
+  const who = task.contact ?? (currentContact?.id === task.contact_id ? currentContact : null);
+  const contactId = task.contact?.id ?? task.contact_id;
+  const calendar = task.due_at
+    ? googleCalendarUrl({
+        title: task.title,
+        start: task.due_at,
+        details: taskEventDetails({
+          name: who?.name,
+          phone: who?.phone,
+          url: contactId ? contactUrl(contactId) : null,
+        }),
+      })
+    : null;
   return `
     <div class="crmc-task" data-tone="${due?.tone ?? "none"}">
       <button class="crmc-check" data-act="task-done" data-id="${id}"
               aria-label="Concluir: ${escapeHtml(task.title)}"></button>
       <div class="crmc-task-main">
         <p class="crmc-task-title">${escapeHtml(task.title)}</p>
-        ${due ? `<p class="crmc-task-when">${escapeHtml(due.label)}</p>` : ""}
+        ${due ? `<p class="crmc-task-when">${escapeHtml(due.label)}${
+          calendar
+            ? ` · <a class="crmc-link" target="_blank" rel="noopener noreferrer"
+                     href="${escapeHtml(calendar)}">Adicionar à agenda</a>`
+            : ""
+        }</p>` : ""}
         ${about ? `<p class="crmc-task-who">${about}</p>` : ""}
       </div>
     </div>`;
@@ -3531,6 +3553,8 @@ void (async () => {
     describeDuration = format.describeDuration;
     defaultScheduleValue = format.defaultScheduleValue;
     describeScheduled = format.describeScheduled;
+    googleCalendarUrl = format.googleCalendarUrl;
+    taskEventDetails = format.taskEventDetails;
   } catch {
     // The fallbacks above stand in.
   }
