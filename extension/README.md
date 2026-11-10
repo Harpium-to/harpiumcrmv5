@@ -150,6 +150,12 @@ WhatsApp mudou a estrutura) ou se a janela tem menos de 1180px, o
 painel flutua sobre o canto superior direito, como nas versões
 anteriores.
 
+A coluna é ligada por um atributo no `<html>` (`data-crmc-docked`), não
+por uma classe: no WhatsApp Web real, classes desconhecidas no `<html>`
+são apagadas na hora. A conferência mede a largura, sem depender da
+marca, e se repete enquanto o painel está aberto: se a página desfizer
+o encaixe, o painel repõe a marca uma vez e, se não adiantar, flutua.
+
 O visual é o do CRM, não o do WhatsApp. Claro ou escuro acompanha o que
 o WhatsApp está mostrando: o painel lê a cor de fundo que a página
 pintou, sem depender dos nomes de classe dela (`theme.js`).

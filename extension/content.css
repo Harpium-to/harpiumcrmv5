@@ -1299,8 +1299,9 @@
 /* Docked: WhatsApp's root gives up a column. `left`/`right` matter
    only if the root is positioned by them; they are harmless if not.
    content.js confirms the root really got narrower and takes this
-   class off when it didn't. */
-html.crmc-docked #app {
+   mark off when it didn't. An attribute and not a class: WhatsApp Web
+   drops classes it does not know from <html>. */
+html[data-crmc-docked] #app {
   width: calc(100% - 320px) !important;
   max-width: calc(100% - 320px) !important;
   left: 0 !important;

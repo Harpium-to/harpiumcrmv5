@@ -47,7 +47,11 @@ const PANEL_WIDTH = 320;
 // Below this, what would be left for WhatsApp is too narrow to work
 // in, so the panel floats instead of taking a column.
 const DOCK_MIN_VIEWPORT = 1180;
-const DOCK_CLASS = "crmc-docked";
+// The mark on <html> that the `#app` rule in content.css reads. An
+// attribute, not a class: on the real WhatsApp Web (November 2026)
+// something rewrites <html>'s class list and drops any class it does
+// not know in the same tick it is added. An attribute is left alone.
+const DOCK_ATTR = "data-crmc-docked";
 
 // The chat on screen when it is with one person, else null:
 // `{ state: "user", key, phone, lid, phoneFrom }`. `key` is what a
@@ -70,6 +74,13 @@ let panel = null;
 // Set when docking was tried and WhatsApp did not get narrower; cleared
 // on resize, which is the only thing that could change the answer.
 let dockFailed = false;
+// Whether the panel is meant to be docked right now. Kept here rather
+// than read back from the page, which can take the mark off <html>.
+let docked = false;
+// How long WhatsApp gets to make room after the mark goes on, and
+// until when that wait lasts: nothing measures the dock before then.
+const DOCK_SETTLE_MS = 300;
+let dockSettlesAt = 0;
 
 // The CRM the extension is connected to, for the header. Asked once
 // per CRM address; a failed ask is retried no more than once a minute.
@@ -278,7 +289,7 @@ const ICON_COLLAPSE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 1
 /**
  * Dock the panel as a column, or float it.
  *
- * Docking narrows WhatsApp's root through a class on <html>. It is
+ * Docking narrows WhatsApp's root through a mark on <html>. It is
  * only kept when it demonstrably worked: a WhatsApp build whose root
  * isn't `#app`, or doesn't obey the width, would otherwise leave the
  * panel covering a third of the chat with nothing to show for it.
@@ -286,21 +297,57 @@ const ICON_COLLAPSE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 1
 function applyLayout() {
   const node = ensurePanel();
   const collapsed = node.classList.contains("crmc-collapsed");
-  const dock = !collapsed && !dockFailed && window.innerWidth >= DOCK_MIN_VIEWPORT;
-  document.documentElement.classList.toggle(DOCK_CLASS, dock);
-  node.classList.toggle("crmc-floating", !dock);
-  // Not on the next frame: a width that animates would still read as
-  // "didn't shrink" there.
-  if (dock) setTimeout(verifyDock, 300);
+  docked = !collapsed && !dockFailed && window.innerWidth >= DOCK_MIN_VIEWPORT;
+  document.documentElement.toggleAttribute(DOCK_ATTR, docked);
+  node.classList.toggle("crmc-floating", !docked);
+  if (docked) checkDockSoon();
 }
 
-function verifyDock() {
-  if (!document.documentElement.classList.contains(DOCK_CLASS)) return;
+/**
+ * Measure once the page has had time to settle. Not on the next frame:
+ * a width that animates would still read as "didn't shrink" there.
+ */
+function checkDockSoon() {
+  dockSettlesAt = Date.now() + DOCK_SETTLE_MS;
+  setTimeout(verifyDock, DOCK_SETTLE_MS);
+}
+
+/** True when WhatsApp's root really ends where the panel begins. */
+function appMadeRoom() {
   const app = document.querySelector("#app");
   const limit = window.innerWidth - PANEL_WIDTH + 2;
-  if (app && app.getBoundingClientRect().right <= limit) return;
+  return Boolean(app && app.getBoundingClientRect().right <= limit);
+}
+
+/**
+ * Docked, but WhatsApp did not get narrower: float instead.
+ *
+ * Decided by measuring, never by looking for the mark on <html>. The
+ * page can take the mark off, and a missing mark used to end this
+ * check early — leaving the panel neither docked nor floating, on top
+ * of the chat.
+ */
+function verifyDock() {
+  if (!docked || appMadeRoom()) return;
   dockFailed = true;
   applyLayout();
+}
+
+/**
+ * Run on every poll. The page may undo the dock long after it worked
+ * (anything that rewrites <html>'s attributes would): put the mark
+ * back once, and float if WhatsApp still does not make room.
+ */
+function keepDock() {
+  // A check is already on its way while the page settles.
+  if (!docked || Date.now() < dockSettlesAt || appMadeRoom()) return;
+  const html = document.documentElement;
+  if (html.hasAttribute(DOCK_ATTR)) {
+    verifyDock();
+    return;
+  }
+  html.setAttribute(DOCK_ATTR, "");
+  checkDockSoon();
 }
 
 /** Light or dark, following what WhatsApp is showing right now. */
@@ -2491,6 +2538,7 @@ void (async () => {
   await refresh(true);
   setInterval(() => {
     applyMode();
+    keepDock();
     refreshMyTasksIfStale();
     void refresh(false);
   }, POLL_MS);

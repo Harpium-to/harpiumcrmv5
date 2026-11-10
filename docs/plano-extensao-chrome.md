@@ -71,7 +71,7 @@ parece produto da Harpium.
 
 ---
 
-## Fase 1 — Corrigir o que falha ✅ (em produção desde 09/11/2026, falta testar no WhatsApp real)
+## Fase 1 — Corrigir o que falha ✅ (em produção desde 09/11/2026; conferida no WhatsApp real em 10/11)
 
 Só extensão + um ajuste na API pública. **Sem migration.** Extensão
 0.4.0, PR #14 (`feat/extensao-fase1-correcoes`).
@@ -287,9 +287,9 @@ testar no WhatsApp real).* **Sem migration.**
 - Os funis ficam guardados por 1 minuto na extensão, para não pedir de
   novo a cada troca de conversa.
 
-*3B ✅ (código pronto, extensão 0.9.0, falta aplicar a migration 060 e
-testar no WhatsApp real).* Branch `feat/extensao-fase3b-tarefas`.
-**Migration 060.**
+*3B ✅ (em produção desde 10/11/2026, extensão 0.9.0, PR #19; migration
+060 aplicada em 10/11/2026; conferida no WhatsApp real em 10/11, menos
+a faixa "Assumir").*
 - **Tarefas**: aba na ficha do painel, "Minhas tarefas" no rodapé com o
   contador das atrasadas e das de hoje, e a aba Tarefas na tela do
   contato no CRM. Tabela `contact_tasks`; a equipe vê, atendente ou
@@ -317,7 +317,7 @@ IA pelo painel.
 **Fase 4 — Mensagens com 1 clique.** Dividida em duas.
 
 *4A ✅ (em produção desde 10/11/2026, extensão 0.7.0, PR #17; migration
-059 aplicada em 10/11/2026; falta testar no WhatsApp real).*
+059 aplicada em 10/11/2026; conferida no WhatsApp real em 10/11).*
 - Respostas rápidas de texto do CRM dentro do WhatsApp Web, com busca.
   Um clique **coloca o texto no campo de mensagem**; a pessoa envia.
 - Variáveis `{{nome}}`, `{{primeiro_nome}}` e `{{empresa}}`, preenchidas
@@ -338,20 +338,65 @@ exige duas coisas que ainda não existem:
 - a API pública enviar pelo WhatsApp por QR. Hoje `POST /api/v1/messages`
   só usa a API oficial, e o canal por QR (UAZAPI) só envia texto.
 
-*4B (a fazer).* O que precisa mesmo sair pelo CRM.
-- Áudio, imagem, vídeo e arquivo com 1 clique.
-- Funil de mensagens (sequência com intervalos).
-- Assinatura do atendente.
-- Antes: as duas condições acima, e mídia no canal por QR. Mexe no
-  envio do CRM, onde há um branch de outra conversa ainda fora do
-  `main` (`claude/mystifying-sanderson-f8da81`).
+*4B (planejada em 10/11/2026; ainda sem código).* O que precisa mesmo
+sair pelo CRM.
+
+**Dependia do PR #12** (WhatsApp D1, "dois caminhos", de outra
+conversa), que **entrou em produção em 10/11/2026**, com a migration
+061 aplicada. Ele entrega, no servidor, as duas coisas que faltavam para
+a 4B:
+- um único lugar que decide por onde a mensagem sai
+  (`resolveWhatsAppProvider`), usado pelo inbox, pela API pública, pelos
+  fluxos, pelas automações e pela IA. Com isso a API pública passa a
+  enviar também pelo WhatsApp por QR;
+- mídia no WhatsApp por QR (imagem, vídeo, arquivo e áudio como
+  mensagem de voz).
+
+Há ainda o branch `claude/mystifying-sanderson-f8da81`, só local, que
+refaz parte do mesmo envio de outro jeito e não inclui o D1: precisa
+ser reconciliado com o `main` por quem cuida dele.
+
+Etapas, na ordem:
+
+1. **Saber de que número a mensagem sai.** A extensão lê o número
+   logado no WhatsApp Web; o CRM informa o número conectado e o caminho
+   escolhido (`GET /api/v1/me`). "Enviar pelo CRM" só aparece quando os
+   dois são o mesmo número. Sem isso, a mensagem pode sair de outro
+   número. *Conferido no WhatsApp Web real em 10/11/2026:*
+   `require("WAWebUserPrefsMeUser").getMaybeMePnUser()` devolve o número
+   logado (servidor `c.us`; veio com 12 dígitos, sem o nono, então a
+   comparação usa a mesma equivalência do nono dígito). Cabe no
+   `page-bridge.js`, ao lado da leitura da conversa aberta.
+2. **Enviar texto pelo CRM.** Botão "Enviar" nas respostas rápidas, ao
+   lado do "colocar no campo". A chave da extensão ganha `messages:send`
+   (migration).
+3. **Mídia nas respostas rápidas.** Imagem, áudio (como mensagem de
+   voz), vídeo e arquivo: envio do arquivo em Configurações › Respostas
+   rápidas, prévia no painel e envio pelo CRM. Migration (mídia em
+   `quick_replies`).
+4. **Assinatura do atendente.** O nome de quem atende no começo da
+   mensagem enviada pelo painel, ligável por pessoa.
+5. **Funil de mensagens.** Uma sequência com intervalos, disparada com
+   1 clique na conversa. Reaproveita as automações (gatilho manual),
+   que já sabem esperar e continuar pelo agendador.
+
+Riscos próprios desta etapa:
+- **É a primeira que envia de verdade.** Os testes precisam de um
+  número real combinado com você; não dá para testar enviando para
+  clientes.
+- **A chave da extensão passa a poder enviar.** Uma chave vazada envia
+  em nome do cliente até ser revogada.
+- **WhatsApp por QR:** envio automático em volume é o que mais pesa em
+  bloqueio de número. O funil de mensagens precisa de limite por dia e
+  de intervalo mínimo.
 
 **Fase 5 — Agendamento e follow-up.**
 - Mensagem agendada por conversa.
 - Follow-up automático quando o cliente não responde.
 
 **Fase 6 — Kanban dentro do WhatsApp Web ✅ (em produção desde
-10/11/2026, extensão 0.8.0, PR #18; falta testar no WhatsApp real).**
+10/11/2026, extensão 0.8.0, PR #18; conferida no WhatsApp real em 10/11,
+menos o arrastar com o mouse).**
 Feita antes da 3B, da 4B e da 5, a pedido. **Sem migration.**
 - Botão "Funil" no rodapé do painel abre o quadro por cima do WhatsApp:
   uma coluna por etapa, com quantidade e soma.
@@ -385,6 +430,64 @@ qualquer jeito.
 
 **Fase 9 — Integrações.**
 - Google Agenda, exportação de contatos, atalho para webhooks.
+
+**Botões dentro do WhatsApp Web (pedido em 10/11/2026; sem fase
+marcada).** O WaSeller, além do painel, põe botões na própria tela do
+WhatsApp, e a extensão deve ter os seus:
+- uma barra no alto da conversa (etiqueta, etapa, tarefa, assumir);
+- uma coluna de ícones ao lado da conversa (ficha, agenda, notas,
+  lembrete);
+- uma linha ao lado do campo de mensagem (respostas rápidas, agendar,
+  anotação);
+- um trilho na lateral esquerda (funil, disparos, agenda).
+
+Como fazer sem ficar frágil: os botões são atalhos para o que o painel
+já faz, e ficam **ancorados por posição** (medindo o cabeçalho e o
+rodapé da conversa), sem enfiar nada dentro da árvore do WhatsApp, que
+ele reconstrói a toda hora. Sem a âncora, os botões somem e o painel
+continua valendo. Começar pela linha do campo de mensagem e pela barra
+da conversa, que são as que economizam clique no atendimento. Em
+10/11 viu-se que algo na página apaga classes desconhecidas do `<html>`
+e que o WaSeller cobre a tela inteira quando pede login: a extensão não
+pode depender de nada disso.
+
+### Conferência no WhatsApp real (10/11/2026, extensão 0.9.0)
+
+Feita no Chrome do Marcelo, numa conversa de teste, sem enviar nada.
+
+Funcionou:
+- **Reconhecer a conversa.** Sem conversa aberta, o painel diz isso.
+  Numa conversa `@lid`, a leitura interna trouxe o número que o WhatsApp
+  tem, e o contato foi achado no CRM.
+- **Ficha.** Negócios, Tarefas, Notas e Dados carregaram do CRM em
+  produção.
+- **Respostas rápidas.** A lista abriu (vazia: o CRM ainda não tem
+  resposta de texto). A colagem no campo de mensagem do WhatsApp real
+  funciona: conferida com o mesmo evento de colar que a extensão usa (o
+  campo é um editor Lexical). O texto de teste foi apagado em seguida.
+- **Minhas tarefas** e **Funil** abriram com os dados reais; o quadro
+  cobre o WhatsApp até a coluna do painel.
+- Tema claro e nome do CRM no cabeçalho.
+
+Defeito achado, corrigido na 0.9.1:
+- **O painel aberto cobria a conversa.** A coluna é aberta por uma
+  marca no `<html>`. Era uma classe, e algo na página (o WhatsApp ou o
+  WaSeller, instalado nesse Chrome) apaga na hora qualquer classe que
+  não conhece. A conferência do encaixe procurava a classe, não achava e
+  saía sem fazer nada: o painel não ficava encaixado nem flutuante.
+- Correção: a marca passa a ser um atributo (`data-crmc-docked`), que a
+  página não apaga; a conferência **mede** se o WhatsApp estreitou, em
+  vez de procurar a marca; e a cada ciclo o painel repõe a marca se ela
+  sumir e, se o WhatsApp não abrir espaço, flutua.
+
+Não deu para conferir:
+- **Grupo.** A tela de login do WaSeller cobriu a lista de conversas
+  na janela do teste.
+- **Faixa "Assumir".** A conversa de teste não tem atendimento por IA.
+- **Arrastar card com o mouse.** O gesto precisa de mão; o seletor do
+  card funciona.
+- **Lembrete no sino** na hora marcada (depende do agendador em
+  produção).
 
 ### Riscos
 
