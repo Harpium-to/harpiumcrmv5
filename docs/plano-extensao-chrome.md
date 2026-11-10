@@ -211,8 +211,8 @@ chaves existentes) e a tela na extensão.
 
 Cada fase em um branch próprio, aprovada antes de começar.
 
-**Fase 2 — Base visual ✅ (código pronto, extensão 0.5.0, falta testar
-no WhatsApp real).** Branch `feat/extensao-fase2-visual`.
+**Fase 2 — Base visual ✅ (em produção desde 10/11/2026, extensão
+0.5.0, PR #15).**
 - Nome "Harpium CRM" e ícones da águia (fonte em `docs/marca/`).
 - Painel encaixado numa coluna à direita, que estreita o WhatsApp.
   Recolhido, vira uma aba na borda e o WhatsApp volta à largura
@@ -268,8 +268,8 @@ embaixo do painel.
 **Fase 3 — Ficha completa do contato.** O que não envia mensagem.
 Dividida em duas, porque só a segunda precisa de migration.
 
-*3A ✅ (código pronto, extensão 0.6.0, falta testar no WhatsApp real).*
-Branch `feat/extensao-fase3a-ficha`. **Sem migration.**
+*3A ✅ (em produção desde 10/11/2026, extensão 0.6.0, PR #16; falta
+testar no WhatsApp real).* **Sem migration.**
 - Ficha em abas: **Negócios**, **Notas** e **Dados**. A aba aberta
   continua aberta na próxima conversa.
 - Negócios: criar (título, valor, funil, etapa), mover de etapa, fechar
@@ -295,8 +295,8 @@ Branch `feat/extensao-fase3a-ficha`. **Sem migration.**
 
 **Fase 4 — Mensagens com 1 clique.** Dividida em duas.
 
-*4A ✅ (código pronto, extensão 0.7.0, falta testar no WhatsApp real).*
-Branch `feat/extensao-fase4a-respostas`. **Migration 059.**
+*4A ✅ (em produção desde 10/11/2026, extensão 0.7.0, PR #17; falta
+aplicar a migration 059 e testar no WhatsApp real).* **Migration 059.**
 - Respostas rápidas de texto do CRM dentro do WhatsApp Web, com busca.
   Um clique **coloca o texto no campo de mensagem**; a pessoa envia.
 - Variáveis `{{nome}}`, `{{primeiro_nome}}` e `{{empresa}}`, preenchidas
@@ -329,10 +329,30 @@ exige duas coisas que ainda não existem:
 - Mensagem agendada por conversa.
 - Follow-up automático quando o cliente não responde.
 
-**Fase 6 — Kanban dentro do WhatsApp Web.**
-- Quadro do funil em tela cheia, com arrastar e soltar.
-- Abrir a conversa a partir do card.
-- Filtrar a lista de conversas por etiqueta ou etapa.
+**Fase 6 — Kanban dentro do WhatsApp Web ✅ (código pronto, extensão
+0.8.0, falta testar no WhatsApp real).** Feita antes da 3B, da 4B e da
+5, a pedido. Branch `feat/extensao-fase6-kanban`. **Sem migration.**
+- Botão "Funil" no rodapé do painel abre o quadro por cima do WhatsApp:
+  uma coluna por etapa, com quantidade e soma.
+- Mover: arrastar o card ou usar o seletor dele. O card muda na hora e
+  volta se o CRM recusar.
+- "Abrir conversa" no card, pelo link do próprio WhatsApp. **A página
+  recarrega**: é o caminho que não depende das partes internas do
+  WhatsApp. Abrir sem recarregar fica para quando isso for conferido no
+  WhatsApp real.
+- Busca, troca de funil, e até 300 negócios em aberto por funil.
+- API: os negócios passam a trazer `contact` (id, nome e telefone),
+  para o quadro não pedir um contato por card.
+
+Não entrou: **filtrar a lista de conversas do WhatsApp por etiqueta ou
+etapa.** Exigiria mexer na lista do próprio WhatsApp, que é a parte
+mais frágil da página. O quadro e a busca dele cobrem o "quem está em
+qual etapa".
+
+**A conferir no WhatsApp real:** arrastar com o mouse (aqui só deu para
+exercitar os eventos de arrastar, não o gesto) e se o WhatsApp reage ao
+arrasto como se fosse um arquivo. O seletor do card funciona de
+qualquer jeito.
 
 **Fase 7 — Autorresponder e chatbot.**
 - Ligar, desligar e escolher o fluxo pela extensão.

@@ -77,6 +77,28 @@ Enter para enviar. A extensão não envia.
 - Precisa da migration 059, que dá à chave da extensão o escopo
   `quick_replies:read`. Sem ela, o painel diz isso.
 
+**Funil.** O outro botão do rodapé abre o quadro do funil por cima do
+WhatsApp, até a coluna do painel: uma coluna por etapa, com a
+quantidade e a soma dos negócios em aberto.
+
+- Um card muda de etapa **arrastando** para outra coluna ou pelo
+  seletor no próprio card. Ele muda na hora e volta se o CRM recusar.
+- "Abrir conversa" vai para a conversa do contato pelo link do próprio
+  WhatsApp (`web.whatsapp.com/send?phone=…`). **A página recarrega.**
+- Busca por negócio ou contato, e troca de funil quando há mais de um.
+- Mostra até 300 negócios em aberto por funil e avisa quando há mais.
+- Um negócio cuja etapa foi apagada aparece numa coluna "Sem etapa",
+  de onde pode ser movido.
+- Fechar: botão, ou Esc. Se algo foi movido, a ficha ao lado recarrega
+  os negócios do contato.
+- O quadro é um filho do painel com `position: fixed`: herda as cores e
+  o isolamento de estilos, e os eventos de arrastar não saem dele (o
+  WhatsApp escuta arrastos na página inteira para oferecer o envio de
+  arquivo).
+- Precisa do CRM com o contato embutido nos negócios da API
+  (`contact` em `GET /api/v1/deals`). Com um CRM mais antigo os cards
+  aparecem sem nome e sem "Abrir conversa".
+
 ### Conversas com `@lid`
 
 O WhatsApp hoje identifica quase todas as pessoas por um código

@@ -140,3 +140,62 @@ export function filterReplies(replies, query) {
     return words.every((word) => haystack.includes(word));
   });
 }
+
+
+/**
+ * The deals that match what was typed in the board's search: every
+ * word somewhere in the deal's title or its contact's name or phone.
+ */
+export function filterDeals(deals, query) {
+  const words = plain(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return [...(deals ?? [])];
+  return (deals ?? []).filter((deal) => {
+    const haystack = plain(
+      `${deal?.title ?? ""} ${deal?.contact?.name ?? ""} ${deal?.contact?.phone ?? ""}`,
+    );
+    return words.every((word) => haystack.includes(word));
+  });
+}
+
+/**
+ * Deals laid out as board columns: one per stage of the pipeline, in
+ * board order, each with its deals and what they add up to.
+ *
+ * `total` is null when the column mixes currencies — adding reais to
+ * dollars gives a number that means nothing. A deal whose stage is not
+ * one of the pipeline's (the stage was deleted) is not dropped: it
+ * goes to a last column of its own, so it can still be seen and moved.
+ */
+export function boardColumns(stages, deals) {
+  const columns = (stages ?? []).map((stage) => ({ stage, deals: [] }));
+  const byStage = new Map(columns.map((column) => [column.stage.id, column]));
+  const stray = [];
+  for (const deal of deals ?? []) {
+    const column = byStage.get(deal?.stage?.id);
+    if (column) column.deals.push(deal);
+    else stray.push(deal);
+  }
+  if (stray.length) columns.push({ stage: { id: null, name: "Sem etapa" }, deals: stray });
+
+  return columns.map((column) => {
+    const currencies = new Set(column.deals.map((deal) => deal.currency || "BRL"));
+    const total =
+      currencies.size === 1
+        ? {
+            currency: [...currencies][0],
+            value: column.deals.reduce((sum, deal) => sum + (Number(deal.value) || 0), 0),
+          }
+        : null;
+    return { ...column, total };
+  });
+}
+
+/**
+ * The digits to open a WhatsApp chat with, from a phone as the CRM
+ * stores it — or null when it is not a full number. WhatsApp's own
+ * link takes the number with country code and nothing else.
+ */
+export function chatPhone(phone) {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}

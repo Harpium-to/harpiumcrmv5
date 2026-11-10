@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import { fillQuickReply } from '../src/lib/quick-replies/variables'
-import { addTagName, fillTemplate, filterReplies, formatWhen, parseMoney } from './format.js'
+import {
+  addTagName,
+  boardColumns,
+  chatPhone,
+  fillTemplate,
+  filterDeals,
+  filterReplies,
+  formatWhen,
+  parseMoney,
+} from './format.js'
 
 describe('parseMoney', () => {
   it('reads the amount the way it is typed in Brazil', () => {
@@ -161,5 +170,82 @@ describe('filterReplies', () => {
   it('copes with nothing', () => {
     expect(filterReplies(undefined, 'x')).toEqual([])
     expect(filterReplies([{ id: '9' }], 'x')).toEqual([])
+  })
+})
+
+
+describe('boardColumns', () => {
+  const stages = [
+    { id: 's1', name: 'Novo' },
+    { id: 's2', name: 'Proposta' },
+    { id: 's3', name: 'Negociação' },
+  ]
+  const deal = (id, stage, value, currency = 'BRL') => ({ id, value, currency, stage: { id: stage } })
+
+  it('makes one column per stage, in board order, with its deals', () => {
+    const columns = boardColumns(stages, [deal('a', 's2', 100), deal('b', 's1', 50), deal('c', 's2', 25.5)])
+    expect(columns.map((c) => [c.stage.name, c.deals.map((d) => d.id)])).toEqual([
+      ['Novo', ['b']],
+      ['Proposta', ['a', 'c']],
+      ['Negociação', []],
+    ])
+    expect(columns[1].total).toEqual({ currency: 'BRL', value: 125.5 })
+  })
+
+  it('has no total for a column that mixes currencies', () => {
+    const [column] = boardColumns([stages[0]], [deal('a', 's1', 100), deal('b', 's1', 50, 'USD')])
+    expect(column.total).toBeNull()
+  })
+
+  it('totals an empty column as nothing', () => {
+    expect(boardColumns([stages[0]], [])[0].total).toBeNull()
+  })
+
+  it('keeps a deal whose stage is gone, in a last column', () => {
+    const columns = boardColumns(stages, [deal('a', 'deleted', 10), { id: 'b', value: 5 }])
+    expect(columns).toHaveLength(4)
+    expect(columns[3].stage).toEqual({ id: null, name: 'Sem etapa' })
+    expect(columns[3].deals.map((d) => d.id)).toEqual(['a', 'b'])
+  })
+
+  it('reads a value that arrives as text, and ignores one that is not a number', () => {
+    const [column] = boardColumns([stages[0]], [deal('a', 's1', '10.5'), deal('b', 's1', 'x')])
+    expect(column.total.value).toBe(10.5)
+  })
+
+  it('copes with nothing', () => {
+    expect(boardColumns(undefined, undefined)).toEqual([])
+  })
+})
+
+describe('filterDeals', () => {
+  const deals = [
+    { id: '1', title: 'Plano anual', contact: { name: 'Maria Souza', phone: '+5531999998888' } },
+    { id: '2', title: 'Consultoria', contact: { name: 'João Pedro', phone: '+5511987654321' } },
+    { id: '3', title: 'Sem contato', contact: null },
+  ]
+  const ids = (query) => filterDeals(deals, query).map((d) => d.id)
+
+  it('looks in the title, the contact name and the phone', () => {
+    expect(ids('')).toEqual(['1', '2', '3'])
+    expect(ids('anual')).toEqual(['1'])
+    expect(ids('joao')).toEqual(['2'])
+    expect(ids('98765')).toEqual(['2'])
+    expect(ids('plano maria')).toEqual(['1'])
+    expect(ids('plano joao')).toEqual([])
+    expect(ids('contato')).toEqual(['3'])
+  })
+})
+
+describe('chatPhone', () => {
+  it('gives the digits of a full number', () => {
+    expect(chatPhone('+55 (31) 99999-8888')).toBe('5531999998888')
+    expect(chatPhone('5511987654321')).toBe('5511987654321')
+  })
+
+  it('refuses what is not a full number', () => {
+    for (const phone of ['', null, undefined, '99999-8888', '123', '1'.repeat(16), 'abc']) {
+      expect(chatPhone(phone), String(phone)).toBeNull()
+    }
   })
 })

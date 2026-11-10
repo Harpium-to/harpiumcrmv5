@@ -15,9 +15,13 @@ import { num } from '@/lib/reports/aggregate';
 /**
  * `*` so `closed_at` (migration 046) appears on its own once applied,
  * same as `CONVERSATION_SELECT`.
+ *
+ * The contact comes along as name and phone only: enough for a board
+ * to say whose deal a card is and to open that conversation, without
+ * a request per card.
  */
 export const DEAL_SELECT =
-  '*, stage:pipeline_stages(id, name, color, position), pipeline:pipelines(id, name)';
+  '*, stage:pipeline_stages(id, name, color, position), pipeline:pipelines(id, name), contact:contacts(id, name, phone)';
 
 /** `deals.status` CHECK values (migration 002). */
 export const DEAL_STATUSES = ['open', 'won', 'lost'] as const;
@@ -41,6 +45,8 @@ export interface ApiDeal {
   /** When it reached won/lost; `null` while open or before migration 046. */
   closed_at: string | null;
   contact_id: string | null;
+  /** Who the deal is with; `null` once the contact is deleted. */
+  contact: { id: string; name: string | null; phone: string | null } | null;
   conversation_id: string | null;
   pipeline: { id: string; name: string } | null;
   stage: ApiStage | null;
@@ -58,6 +64,10 @@ export interface ApiPipeline {
 export function serializeDeal(row: Record<string, unknown>): ApiDeal {
   const stage = row.stage as ApiStage | null | undefined;
   const pipeline = row.pipeline as { id: string; name: string } | null | undefined;
+  const contact = row.contact as
+    | { id: string; name?: string | null; phone?: string | null }
+    | null
+    | undefined;
   return {
     id: row.id as string,
     title: row.title as string,
@@ -69,6 +79,9 @@ export function serializeDeal(row: Record<string, unknown>): ApiDeal {
     expected_close_date: (row.expected_close_date as string | null) ?? null,
     closed_at: (row.closed_at as string | null) ?? null,
     contact_id: (row.contact_id as string | null) ?? null,
+    contact: contact
+      ? { id: contact.id, name: contact.name ?? null, phone: contact.phone ?? null }
+      : null,
     conversation_id: (row.conversation_id as string | null) ?? null,
     pipeline: pipeline ? { id: pipeline.id, name: pipeline.name } : null,
     stage: stage

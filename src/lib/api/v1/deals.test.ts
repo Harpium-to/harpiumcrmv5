@@ -29,6 +29,7 @@ describe('serializeDeal', () => {
     updated_at: '2026-11-02T00:00:00Z',
     stage: { id: 's2', name: 'Proposta', color: '#f59e0b', position: 1 },
     pipeline: { id: 'p1', name: 'Vendas' },
+    contact: { id: 'c1', name: 'Maria Souza', phone: '+5531999998888' },
   };
 
   it('coerces value to a number and projects the public shape', () => {
@@ -38,6 +39,24 @@ describe('serializeDeal', () => {
     expect(out.pipeline).toEqual({ id: 'p1', name: 'Vendas' });
     expect(out).not.toHaveProperty('account_id');
     expect(out).not.toHaveProperty('user_id');
+  });
+
+  it('carries the contact as id, name and phone only', () => {
+    expect(serializeDeal(row).contact).toEqual({
+      id: 'c1',
+      name: 'Maria Souza',
+      phone: '+5531999998888',
+    });
+    // The embed may bring more columns one day; they must not leak.
+    const wide = { ...row, contact: { id: 'c1', name: null, phone: '+55', email: 'x@y.z', account_id: 'acc' } };
+    expect(serializeDeal(wide).contact).toEqual({ id: 'c1', name: null, phone: '+55' });
+  });
+
+  it('has no contact once the contact is deleted, or when the embed is absent', () => {
+    expect(serializeDeal({ ...row, contact: null }).contact).toBeNull();
+    const { contact: _gone, ...bare } = row;
+    void _gone;
+    expect(serializeDeal(bare).contact).toBeNull();
   });
 
   it('reads closed_at as null before migration 046', () => {
