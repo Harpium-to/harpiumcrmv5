@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import { NextResponse } from 'next/server'
 
 import {
@@ -14,6 +15,7 @@ import {
   createUazapiInstance,
   setUazapiWebhook,
 } from '@/lib/uazapi/api'
+import { hostedUazapi, isHostedBaseUrl } from '@/lib/uazapi/hosted'
 
 // Start (or restart) pairing for the account's UAZAPI instance.
 //
@@ -26,6 +28,14 @@ import {
 //      start arriving without anyone pasting anything.
 //   3. Kick off pairing. The QR itself is NOT in this response; the UI
 //      polls /api/uazapi/status for it (that is where UAZAPI exposes it).
+//
+// Two ways to know the server (D1):
+//   - hosted: the Harpium's own server, from UAZAPI_BASE_URL /
+//     UAZAPI_ADMIN_TOKEN. A CRM with no server saved uses it, and the
+//     client never sees an address or a token. Connecting turns the
+//     channel on: on this path there is no separate "enable" step.
+//   - manual: an address and tokens an admin saved in /canais/uazapi
+//     (agency, or a CRM with its own server). Unchanged.
 //
 // Admins+ only: it spends server credit and rewires where this account's
 // messages are delivered.
@@ -40,13 +50,39 @@ export async function POST(request: Request) {
         : undefined
 
     const admin = supabaseAdmin()
-    const { data: cfg } = await admin
+    const hosted = hostedUazapi()
+    const { data: saved } = await admin
       .from('uazapi_config')
       .select(
         'base_url, admin_token, instance_token, instance_name, webhook_token',
       )
       .eq('account_id', ctx.accountId)
       .maybeSingle()
+    let cfg = saved
+
+    // No server saved: use the Harpium's, creating the row on the way.
+    if (!cfg?.base_url && hosted) {
+      const row = {
+        account_id: ctx.accountId,
+        base_url: hosted.baseUrl,
+        webhook_token: cfg?.webhook_token ?? randomBytes(24).toString('hex'),
+        enabled: true,
+        updated_at: new Date().toISOString(),
+      }
+      const { error: upErr } = await admin
+        .from('uazapi_config')
+        .upsert(row, { onConflict: 'account_id' })
+      if (upErr) {
+        return NextResponse.json({ error: upErr.message }, { status: 500 })
+      }
+      cfg = {
+        base_url: hosted.baseUrl,
+        admin_token: cfg?.admin_token ?? null,
+        instance_token: cfg?.instance_token ?? null,
+        instance_name: cfg?.instance_name ?? null,
+        webhook_token: row.webhook_token,
+      }
+    }
 
     if (!cfg?.base_url) {
       return NextResponse.json(
@@ -60,6 +96,7 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+    const onHostedServer = isHostedBaseUrl(cfg.base_url, hosted)
 
     // A wrong origin would hand this account's messages to another host,
     // so refuse rather than guess. See resolvePublicOrigin.
@@ -79,7 +116,14 @@ export async function POST(request: Request) {
     if (cfg.instance_token) {
       instanceToken = decrypt(cfg.instance_token)
     } else {
-      if (!cfg.admin_token) {
+      // The Harpium's server is minted with its token from the
+      // environment; a manual server, with the one saved for it.
+      const adminToken = cfg.admin_token
+        ? decrypt(cfg.admin_token)
+        : onHostedServer
+          ? hosted!.adminToken
+          : null
+      if (!adminToken) {
         return NextResponse.json(
           {
             error:
@@ -89,11 +133,7 @@ export async function POST(request: Request) {
         )
       }
       const name = cfg.instance_name?.trim() || `harpium-${ctx.accountId.slice(0, 8)}`
-      const created = await createUazapiInstance(
-        cfg.base_url,
-        decrypt(cfg.admin_token),
-        name,
-      )
+      const created = await createUazapiInstance(cfg.base_url, adminToken, name)
       instanceToken = created.token
       const { error: saveErr } = await admin
         .from('uazapi_config')
@@ -122,7 +162,11 @@ export async function POST(request: Request) {
 
     await admin
       .from('uazapi_config')
-      .update({ status: 'connecting', updated_at: new Date().toISOString() })
+      .update({
+        status: 'connecting',
+        ...(onHostedServer ? { enabled: true } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq('account_id', ctx.accountId)
 
     return NextResponse.json({ ok: true, mode: phone ? 'paircode' : 'qr' })

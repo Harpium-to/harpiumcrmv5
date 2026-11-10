@@ -24,6 +24,10 @@ import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
 import { sanitizePhoneForMeta, isValidE164 } from '@/lib/whatsapp/phone-utils';
 import { SendMessageError } from '@/lib/whatsapp/send-message';
 import { resolveAuditUserId, ContactError } from '@/lib/api/v1/contacts';
+import {
+  NOT_CONNECTED_UNOFFICIAL,
+  resolveWhatsAppProvider,
+} from '@/lib/channels/whatsapp-route';
 
 export interface ResolvedConversation {
   conversationId: string;
@@ -54,18 +58,25 @@ export async function resolveConversationByPhone(
   }
 
   // Fail fast (and create nothing) when the account has no WhatsApp
-  // connected — the same error the send would raise anyway.
-  const { data: config } = await db
-    .from('whatsapp_config')
-    .select('id')
-    .eq('account_id', accountId)
-    .maybeSingle();
-  if (!config) {
-    throw new SendMessageError(
-      'whatsapp_not_configured',
-      'WhatsApp não configurado. Configure a integração com o WhatsApp primeiro.',
-      400
-    );
+  // connected — the same error the send would raise anyway. On the
+  // unofficial path (D1) "connected" means the QR-code instance.
+  const provider = await resolveWhatsAppProvider(db, accountId);
+  if (provider === null) {
+    throw new SendMessageError('whatsapp_not_configured', NOT_CONNECTED_UNOFFICIAL, 400);
+  }
+  if (provider === 'meta') {
+    const { data: config } = await db
+      .from('whatsapp_config')
+      .select('id')
+      .eq('account_id', accountId)
+      .maybeSingle();
+    if (!config) {
+      throw new SendMessageError(
+        'whatsapp_not_configured',
+        'WhatsApp não configurado. Configure a integração com o WhatsApp primeiro.',
+        400
+      );
+    }
   }
 
   // Audit user for created rows = the single account-wide default used

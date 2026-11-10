@@ -139,18 +139,32 @@ export async function setUazapiWebhook(
   if (!res.ok) await failure(res, 'Falha ao configurar webhook')
 }
 
-/** Send a plain text message. `toPhone` should be digits only. */
-export async function sendUazapiText(
-  srv: UazapiServer,
-  toPhone: string,
-  text: string,
-): Promise<{ externalId: string | null }> {
-  const res = await fetch(endpoint(srv.baseUrl, 'send/text'), {
+/** End the WhatsApp session on the phone. Reconnecting needs a new QR. */
+export async function disconnectUazapiInstance(srv: UazapiServer): Promise<void> {
+  const res = await fetch(endpoint(srv.baseUrl, 'instance/disconnect'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', token: srv.token },
-    body: JSON.stringify({ number: toPhone, text }),
+    body: JSON.stringify({}),
   })
-  // Never retry a send automatically — the gateway may have delivered it.
+  if (!res.ok) await failure(res, 'Falha ao desconectar')
+}
+
+/**
+ * POST one send and read back the WhatsApp message id.
+ *
+ * Never retried automatically — a timeout leaves the result unknown and
+ * the gateway may already have delivered it (UAZAPI's own guidance).
+ */
+async function postSend(
+  srv: UazapiServer,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<{ externalId: string | null }> {
+  const res = await fetch(endpoint(srv.baseUrl, path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', token: srv.token },
+    body: JSON.stringify(body),
+  })
   if (!res.ok) await failure(res, 'Falha ao enviar')
   const j = await res.json().catch(() => ({}))
   const externalId =
@@ -160,4 +174,99 @@ export async function sendUazapiText(
         ? j.id
         : null
   return { externalId }
+}
+
+/** Send a plain text message. `toPhone` should be digits only. */
+export async function sendUazapiText(
+  srv: UazapiServer,
+  toPhone: string,
+  text: string,
+  opts: { replyId?: string | null } = {},
+): Promise<{ externalId: string | null }> {
+  return postSend(srv, 'send/text', {
+    number: toPhone,
+    text,
+    ...(opts.replyId ? { replyid: opts.replyId } : {}),
+  })
+}
+
+/**
+ * UAZAPI's media types for ours. Audio from the inbox is always a voice
+ * note recorded in the composer, so it goes as `ptt` and arrives as a
+ * voice message, not as a file.
+ */
+export const UAZAPI_MEDIA_TYPE = {
+  image: 'image',
+  video: 'video',
+  document: 'document',
+  audio: 'ptt',
+} as const
+
+export type UazapiMediaKind = keyof typeof UAZAPI_MEDIA_TYPE
+
+/** Send an image, video, document or voice note by public URL. */
+export async function sendUazapiMedia(
+  srv: UazapiServer,
+  toPhone: string,
+  media: {
+    kind: UazapiMediaKind
+    url: string
+    caption?: string | null
+    filename?: string | null
+    replyId?: string | null
+  },
+): Promise<{ externalId: string | null }> {
+  return postSend(srv, 'send/media', {
+    number: toPhone,
+    type: UAZAPI_MEDIA_TYPE[media.kind],
+    file: media.url,
+    ...(media.caption ? { text: media.caption } : {}),
+    ...(media.kind === 'document' && media.filename ? { docName: media.filename } : {}),
+    ...(media.replyId ? { replyid: media.replyId } : {}),
+  })
+}
+
+export interface UazapiMenu {
+  type: 'button' | 'list'
+  text: string
+  choices: string[]
+  footerText?: string
+  listButton?: string
+}
+
+/** Send reply buttons or a list (see `menuFromInteractive`). */
+export async function sendUazapiMenu(
+  srv: UazapiServer,
+  toPhone: string,
+  menu: UazapiMenu,
+  opts: { replyId?: string | null } = {},
+): Promise<{ externalId: string | null }> {
+  return postSend(srv, 'send/menu', {
+    number: toPhone,
+    ...menu,
+    ...(opts.replyId ? { replyid: opts.replyId } : {}),
+  })
+}
+
+/**
+ * A temporary public link to the file of a received media message.
+ *
+ * UAZAPI keeps it on its CDN for 2 days only, so callers copy the file
+ * into our own storage. Audio comes back as MP3, which every browser
+ * plays (Safari can't play the OGG voice notes WhatsApp records).
+ */
+export async function downloadUazapiMedia(
+  srv: UazapiServer,
+  messageId: string,
+): Promise<{ fileUrl: string; mimetype: string | null } | null> {
+  const res = await fetch(endpoint(srv.baseUrl, 'message/download'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', token: srv.token },
+    body: JSON.stringify({ id: messageId, return_link: true, generate_mp3: true }),
+  })
+  if (!res.ok) await failure(res, 'Falha ao baixar a mídia')
+  const j = await res.json().catch(() => ({}))
+  const fileUrl = typeof j?.fileURL === 'string' && j.fileURL ? j.fileURL : null
+  if (!fileUrl) return null
+  return { fileUrl, mimetype: typeof j?.mimetype === 'string' ? j.mimetype : null }
 }
