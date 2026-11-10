@@ -21,6 +21,10 @@ import manifest from '../../../extension/manifest.json';
 
 /** Set when the extension is published in the Chrome Web Store. */
 const STORE_URL = process.env.NEXT_PUBLIC_EXTENSION_STORE_URL || null;
+// The extension is called "Harpium CRM" now, but the zip and its folder
+// keep the old name on purpose: Chrome identifies an unpacked extension
+// by its folder's path, so a renamed folder is a different extension —
+// everyone who updated would lose their connection and saved links.
 const ZIP_URL = '/downloads/crm-connector.zip';
 
 export interface ExtensionStatus {
@@ -165,6 +169,10 @@ export function ExtensionPanelView({
               <li>Ligue o <strong className="text-foreground">Modo do desenvolvedor</strong>, no canto superior direito.</li>
               <li>
                 Clique em <strong className="text-foreground">Carregar sem compactação</strong> e escolha a pasta crm-connector.
+              </li>
+              <li>
+                Ela aparece na lista como <strong className="text-foreground">Harpium CRM</strong>. Abra o
+                WhatsApp Web: o painel fica numa coluna à direita da conversa.
               </li>
             </ol>
             <p className="text-xs text-muted-foreground">
