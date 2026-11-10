@@ -1611,7 +1611,7 @@
       "cancel": "Cancelar",
       "chosenToast": "Caminho escolhido. Agora conecte o número.",
       "adminOnly": "Só administradores do CRM escolhem o caminho do WhatsApp.",
-      "migrationMissing": "Escolher o caminho precisa da migration 059 no banco. Até lá, o WhatsApp funciona como antes.",
+      "migrationMissing": "Escolher o caminho precisa da migration 061 no banco. Até lá, o WhatsApp funciona como antes.",
       "current": "Caminho do WhatsApp",
       "currentOficial": "Oficial (API da Meta)",
       "currentNaoOficial": "Não oficial (QR code)",

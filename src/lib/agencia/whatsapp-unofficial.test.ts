@@ -112,7 +112,7 @@ describe('loadWhatsAppStatuses', () => {
     expect(map?.get('acc-q')?.state).toBe('connected')
   })
 
-  it('before 059, an enabled QR connection still counts as the CRM’s WhatsApp', async () => {
+  it('before 061, an enabled QR connection still counts as the CRM’s WhatsApp', async () => {
     const map = await loadWhatsAppStatuses(
       fakeAdmin({
         whatsapp_config: { rows: [] },

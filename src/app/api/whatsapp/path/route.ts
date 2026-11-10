@@ -22,17 +22,17 @@ import { hostedUazapi, isHostedBaseUrl } from '@/lib/uazapi/hosted'
 // POST — admins+: choose. The unofficial path needs the risk
 //        acceptance (path-choice.ts) and is refused through the
 //        agency's access. Written with the service role: a trigger
-//        (059) keeps the client's own session from changing the
+//        (061) keeps the client's own session from changing the
 //        column directly, so this route's checks can't be skipped.
 //
-// Before 059 the column doesn't exist: GET says so (`migrationReady`)
+// Before 061 the column doesn't exist: GET says so (`migrationReady`)
 // and POST answers 503, while everything else keeps working on the
 // old implicit rule.
 // ============================================================
 
 type Admin = ReturnType<typeof supabaseAdmin>
 
-/** The stored path, or `missing` when 059 isn't applied. */
+/** The stored path, or `missing` when 061 isn't applied. */
 async function readStoredPath(
   admin: Admin,
   accountId: string,
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     const current = await readStoredPath(admin, ctx.accountId)
     if (current.missing) {
       return NextResponse.json(
-        { error: 'Falta aplicar a migration 059 no banco para escolher o caminho do WhatsApp.' },
+        { error: 'Falta aplicar a migration 061 no banco para escolher o caminho do WhatsApp.' },
         { status: 503 },
       )
     }

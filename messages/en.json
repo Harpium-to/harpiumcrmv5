@@ -1611,7 +1611,7 @@
       "cancel": "Cancel",
       "chosenToast": "Path chosen. Now connect the number.",
       "adminOnly": "Only CRM admins choose the WhatsApp path.",
-      "migrationMissing": "Choosing the path needs migration 059 in the database. Until then, WhatsApp works as before.",
+      "migrationMissing": "Choosing the path needs migration 061 in the database. Until then, WhatsApp works as before.",
       "current": "WhatsApp path",
       "currentOficial": "Official (Meta API)",
       "currentNaoOficial": "Unofficial (QR code)",

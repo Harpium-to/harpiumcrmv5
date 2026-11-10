@@ -1,5 +1,5 @@
 // ============================================================
-// Migration 059 — the WhatsApp path a CRM chose.
+// Migration 061 — the WhatsApp path a CRM chose.
 // ============================================================
 
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -7,16 +7,16 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { applyMigration, asUser, errorCode, sql } from './harness'
 import { buildWorld, U, type World } from './world'
 
-const M059 = '059_whatsapp_caminho.sql'
+const M061 = '061_whatsapp_caminho.sql'
 
-describe('059 — WhatsApp path', () => {
+describe('061 — WhatsApp path', () => {
   let w: World
   beforeAll(async () => {
     w = await buildWorld()
   })
 
   it('runs twice and starts every CRM with no path chosen', async () => {
-    await applyMigration(w.db, M059)
+    await applyMigration(w.db, M061)
     const rows = await sql<{ whatsapp_path: string | null }>(
       w.db,
       'SELECT whatsapp_path FROM accounts',

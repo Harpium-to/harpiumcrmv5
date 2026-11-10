@@ -1,6 +1,6 @@
 # Plano: WhatsApp em dois caminhos, o cliente escolhe
 
-Data: 9 de novembro de 2026. Status: **D1 feita (aguarda revisão e a migration 059); D2 a D5 por fazer**.
+Data: 9 de novembro de 2026. Status: **D1 feita (aguarda revisão e a migration 061); D2 a D5 por fazer**.
 
 ## Andamento (9 de novembro de 2026)
 
@@ -8,7 +8,7 @@ As decisões pendentes 1 a 4 e 6 seguiram as recomendações: servidor Uazapi da
 
 **D1 feita**, na branch `worktree-whatsapp-dois-caminhos-d1`:
 
-- **Migration 059** (`059_whatsapp_caminho.sql`):
+- **Migration 061** (`061_whatsapp_caminho.sql`):
   - `accounts.whatsapp_path`;
   - o histórico `whatsapp_path_log`, com a versão do texto de risco aceito;
   - um gatilho que impede o cliente de trocar o caminho sem passar pela tela.
@@ -30,7 +30,7 @@ As decisões pendentes 1 a 4 e 6 seguiram as recomendações: servidor Uazapi da
 
 O que ficou de fora da D1, e por quê:
 
-- **A coluna em `messages` com o caminho de cada mensagem.** Escrever uma coluna nova em todo envio quebraria os envios enquanto a 059 não estiver aplicada. O histórico das conversas fica de qualquer jeito, e `whatsapp_path_log` diz quando o caminho mudou.
+- **A coluna em `messages` com o caminho de cada mensagem.** Escrever uma coluna nova em todo envio quebraria os envios enquanto a 061 não estiver aplicada. O histórico das conversas fica de qualquer jeito, e `whatsapp_path_log` diz quando o caminho mudou.
 - **Texto numerado no lugar dos botões.** Os botões saem pelo menu da Uazapi. Só vale fazer o texto numerado se o teste num celular real mostrar que eles não aparecem.
 - **Conversa nova pela Uazapi não dispara o evento `conversation.created` da API pública.** A Meta dispara.
 - **CRM com os dois números ligados:** uma mensagem que chega pela Meta num CRM que escolheu o não oficial é guardada, e as respostas automáticas saem pelo número do QR code.
@@ -126,12 +126,12 @@ A camada oferece:
 
 ## Fases
 
-Cada fase é aprovada antes de começar, como nas anteriores. As migrations começam na 059, porque a 058 está na branch do inbox.
+Cada fase é aprovada antes de começar, como nas anteriores. As migrations começam na 061: a 058 está na branch do inbox, e a 059 e a 060 foram usadas pela extensão do Chrome (respostas rápidas e tarefas) enquanto esta fase aguardava revisão.
 
 ### Fase D1: escolha do caminho e fundação
 
 - Tela de escolha em **Configurações › WhatsApp**, com os dois cartões e o aceite de risco.
-- Migration 059:
+- Migration 061:
   - caminho do CRM em `accounts`;
   - registro do aceite;
   - coluna em `messages` com o caminho por onde cada mensagem saiu.

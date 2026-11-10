@@ -29,7 +29,7 @@ describe('pickProvider', () => {
     expect(pickProvider(facts({ path: 'nao_oficial' }))).toBeNull()
   })
 
-  it('with no choice keeps the rule the inbox had before 059', () => {
+  it('with no choice keeps the rule the inbox had before 061', () => {
     expect(pickProvider(facts({ uazapiReady: true, evolutionReady: true }))).toBe('uazapi')
     expect(pickProvider(facts({ evolutionReady: true }))).toBe('evolution')
     expect(pickProvider(facts())).toBe('meta')

@@ -1,5 +1,5 @@
 -- ============================================================
--- 059_whatsapp_caminho.sql — the WhatsApp path a CRM chose (D1)
+-- 061_whatsapp_caminho.sql — the WhatsApp path a CRM chose (D1)
 --
 -- Each CRM picks how its WhatsApp is connected:
 --

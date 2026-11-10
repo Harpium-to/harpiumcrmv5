@@ -83,7 +83,7 @@ export async function loadWhatsAppStatuses(
 ): Promise<Map<string, WhatsAppStatus> | null> {
   const [meta, paths, uaz] = await Promise.all([
     admin.from('whatsapp_config').select(STATUS_COLUMNS),
-    // D1. Both reads fail before 059 / 043: the CRMs then read as
+    // D1. Both reads fail before 061 / 043: the CRMs then read as
     // official, which is what they were.
     admin.from('accounts').select('id, whatsapp_path'),
     admin.from('uazapi_config').select(UAZAPI_COLUMNS),

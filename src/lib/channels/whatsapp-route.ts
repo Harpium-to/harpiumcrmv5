@@ -6,7 +6,7 @@ import { getUazapiConfig, isUazapiReady } from '@/lib/uazapi/config'
 // ============================================================
 // Which WhatsApp a CRM sends through (D1).
 //
-// A CRM chooses a *path* (accounts.whatsapp_path, migration 059):
+// A CRM chooses a *path* (accounts.whatsapp_path, migration 061):
 //
 //   'oficial'      Meta Cloud API.
 //   'nao_oficial'  QR code through UAZAPI. Evolution still counts as
@@ -18,9 +18,9 @@ import { getUazapiConfig, isUazapiReady } from '@/lib/uazapi/config'
 // `resolveWhatsAppProvider` first, so a feature is built once and
 // works on both paths.
 //
-// With no path chosen (every CRM before 059, or 059 not applied yet)
+// With no path chosen (every CRM before 061, or 061 not applied yet)
 // the rule is the one the inbox already used: an enabled UAZAPI
-// instance wins, then Evolution, then Meta. Applying 059 changes
+// instance wins, then Evolution, then Meta. Applying 061 changes
 // nothing until somebody chooses.
 //
 // See docs/plano-whatsapp-dois-caminhos.md.
@@ -41,7 +41,7 @@ export const NOT_CONNECTED_UNOFFICIAL =
   'O WhatsApp não oficial não está conectado. Leia o QR code em Configurações › WhatsApp.'
 
 export interface WhatsAppRouteFacts {
-  /** The stored choice. null = not chosen, or 059 not applied. */
+  /** The stored choice. null = not chosen, or 061 not applied. */
   path: WhatsAppPath | null
   uazapiReady: boolean
   evolutionReady: boolean
@@ -88,8 +88,8 @@ export function effectivePath(
 }
 
 /**
- * The stored path. Missing column (059 not applied) or any read error
- * reads as "not chosen", which keeps the pre-059 behaviour.
+ * The stored path. Missing column (061 not applied) or any read error
+ * reads as "not chosen", which keeps the pre-061 behaviour.
  */
 export async function loadWhatsAppPath(
   db: SupabaseClient,

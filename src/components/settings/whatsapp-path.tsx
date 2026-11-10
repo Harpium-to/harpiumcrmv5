@@ -20,7 +20,7 @@ import { WhatsAppSettings } from './whatsapp-connect';
 // The features are the same either way (the server picks the door);
 // what the choice screen compares is cost, risk and the phone.
 //
-// Before migration 059 there is nothing to choose: the panel is the
+// Before migration 061 there is nothing to choose: the panel is the
 // official one, exactly as before.
 // See docs/plano-whatsapp-dois-caminhos.md.
 // ============================================================
@@ -87,7 +87,7 @@ export function WhatsAppPathSettings() {
     );
   }
 
-  // Nothing to choose yet: the official panel, as before 059.
+  // Nothing to choose yet: the official panel, as before 061.
   if (!state.migrationReady) return <WhatsAppSettings />;
 
   const current = state.effectivePath;
