@@ -132,7 +132,7 @@ export function ExtensionPanelView({
       <section className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-2">
         <Feature title="Quem é">Nome, empresa, e-mail e etiquetas do contato da conversa aberta, com edição ali mesmo.</Feature>
         <Feature title="Cadastro e anotações">Contato novo vira lead com um clique. As anotações da equipe ficam na ficha.</Feature>
-        <Feature title="Funil">Temperatura, etapa, novo negócio e fechamento como ganho ou perdido, direto do chat.</Feature>
+        <Feature title="Funil">Temperatura, etapa, novo negócio e fechamento como ganho ou perdido, direto do chat. E o quadro inteiro do funil, com arrastar e soltar.</Feature>
         <Feature title="Respostas rápidas">Os textos prontos do CRM a um clique do campo de mensagem, com o nome do contato preenchido.</Feature>
         <p className="flex items-start gap-2 text-xs text-muted-foreground sm:col-span-2">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />

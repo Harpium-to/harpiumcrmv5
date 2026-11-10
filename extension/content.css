@@ -861,11 +861,16 @@
 }
 
 #crm-connector-panel.crmc-connected .crmc-foot {
-  display: block;
+  display: flex;
+  gap: 8px;
 }
 
 #crm-connector-panel .crmc-foot .crmc-btn {
+  flex: 1;
+  width: auto;
   margin: 0;
+  padding-right: 8px;
+  padding-left: 8px;
 }
 
 /* The sheet takes the record's place without replacing it: the record
@@ -940,6 +945,203 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: pre-line;
+}
+
+/* ---- The board -------------------------------------------- */
+
+/* A child of the panel, placed against the viewport: it covers
+   WhatsApp up to the panel's column. The panel clips its own content,
+   but not this — a fixed box answers to the viewport, not to it. */
+#crm-connector-panel .crmc-board {
+  position: fixed;
+  top: 0;
+  right: var(--crmc-width);
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel.crmc-board-open .crmc-board {
+  display: flex;
+}
+
+/* Floating, there is no column to stop at: the board takes the whole
+   window, the panel's card included, and brings its own way out. */
+#crm-connector-panel.crmc-floating .crmc-board {
+  right: 0;
+}
+
+#crm-connector-panel.crmc-collapsed .crmc-board {
+  display: none;
+}
+
+#crm-connector-panel .crmc-board-head {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-board-head .crmc-btn {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-board-pipe .crmc-select {
+  width: auto;
+  min-width: 140px;
+}
+
+#crm-connector-panel .crmc-board-pipename {
+  color: var(--crmc-fg-muted);
+}
+
+#crm-connector-panel .crmc-board-search {
+  flex: 1 1 180px;
+  max-width: 320px;
+}
+
+#crm-connector-panel .crmc-board-sum {
+  margin: 0 0 0 auto;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-board-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px 0;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-board-note:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-board-cols {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px 16px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#crm-connector-panel .crmc-board-cols > .crmc-muted {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-kcol {
+  display: flex;
+  flex: 0 0 264px;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: var(--crmc-muted);
+}
+
+/* Where a dragged card will land. */
+#crm-connector-panel .crmc-kcol.crmc-kcol-over {
+  border-color: var(--crmc-ring);
+}
+
+#crm-connector-panel .crmc-kcol-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 8px;
+}
+
+#crm-connector-panel .crmc-kcol-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-kcol-head .crmc-count {
+  flex-shrink: 0;
+  background: var(--crmc-bg);
+}
+
+#crm-connector-panel .crmc-kcol-sum {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+#crm-connector-panel .crmc-kcol-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+}
+
+#crm-connector-panel .crmc-kcol-list > .crmc-muted {
+  margin: 4px;
+}
+
+#crm-connector-panel .crmc-kcard {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+  cursor: grab;
+}
+
+#crm-connector-panel .crmc-kcard.crmc-dragging {
+  opacity: 0.45;
+}
+
+#crm-connector-panel .crmc-kcard-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-kcard-who {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-kcard-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-kcard-value {
+  font-variant-numeric: tabular-nums;
+}
+
+#crm-connector-panel .crmc-kcard-move {
+  margin: 8px 0 0;
+  padding: 4px 6px;
+  font-size: 11px;
 }
 
 /* ---- The one rule outside the panel ------------------------ */

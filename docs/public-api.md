@@ -307,6 +307,7 @@ filters: `?contact_id=`, `?pipeline_id=` and `?status=` (`open` /
       "id": "…", "title": "Implante", "value": 1200.5, "currency": "BRL",
       "status": "open", "notes": null, "expected_close_date": "2026-12-01",
       "closed_at": null, "contact_id": "…", "conversation_id": null,
+      "contact": { "id": "…", "name": "Maria Souza", "phone": "+5531999998888" },
       "pipeline": { "id": "…", "name": "Vendas" },
       "stage": { "id": "…", "name": "Proposta", "color": "#f59e0b", "position": 1 },
       "created_at": "…", "updated_at": "…"
@@ -316,7 +317,9 @@ filters: `?contact_id=`, `?pipeline_id=` and `?status=` (`open` /
 }
 ```
 
-`value` is a number. `closed_at` is when the deal reached `won` or
+`contact` is the deal's contact as `id`, `name` and `phone` — enough to
+label a card without a request per deal — and `null` once that contact
+is deleted. `value` is a number. `closed_at` is when the deal reached `won` or
 `lost`; it is set by the database and is `null` while the deal is open
 (or on a deployment without migration `046`).
 

@@ -111,6 +111,23 @@ let repliesOpen = false;
 let repliesQuery = "";
 let repliesState = { baseUrl: null, status: "idle", items: [], notice: null };
 
+// The board: open or not, its search, and the pipeline it shows.
+// `moved` is set once a card was moved, so the record beside the chat
+// knows to reload its own deals when the board closes.
+let boardOpen = false;
+let boardQuery = "";
+let boardState = {
+  baseUrl: null,
+  status: "idle",
+  pipelines: [],
+  pipelineId: null,
+  deals: [],
+  truncated: false,
+  notice: null,
+  moveNotice: null,
+  moved: false,
+};
+
 // The API's `temperature` values, in the order the control shows them.
 const TEMPERATURES = [
   ["cold", "Frio"],
@@ -137,6 +154,14 @@ let formatWhen = () => "";
 let addTagName = (names) => names;
 let fillTemplate = (text) => ({ text: String(text ?? ""), missing: [] });
 let filterReplies = (replies) => [...(replies ?? [])];
+let filterDeals = (deals) => [...(deals ?? [])];
+let boardColumns = (stages, deals) =>
+  (stages ?? []).map((stage) => ({
+    stage,
+    deals: (deals ?? []).filter((deal) => deal.stage?.id === stage.id),
+    total: null,
+  }));
+let chatPhone = () => null;
 
 // page-bridge.js answers inside the dispatch below (see there), so the
 // reply is already in `pageAnswer` when `dispatchEvent` returns.
@@ -322,11 +347,15 @@ function ensurePanel() {
     <section class="crmc-sheet" aria-label="Respostas rápidas"></section>
     <footer class="crmc-foot">
       <button class="crmc-btn crmc-btn-quiet" data-act="replies-open">Respostas rápidas</button>
+      <button class="crmc-btn crmc-btn-quiet" data-act="board-open">Funil</button>
     </footer>
+    <section class="crmc-board" aria-label="Funil"></section>
   `;
   document.body.appendChild(panel);
   // A panel rebuilt after WhatsApp replaced the page starts closed.
   repliesOpen = false;
+  boardOpen = false;
+  wireBoardDragging(panel.querySelector(".crmc-board"));
 
   // A logo that fails to load must not leave a broken-image box; in
   // the tab, which has nothing else in it, initials stand in.
@@ -346,6 +375,7 @@ function ensurePanel() {
     const action = target.getAttribute("data-act");
     if (action === "collapse" || action === "expand") {
       const collapsed = action === "collapse";
+      if (collapsed) setBoardOpen(false);
       setCollapsed(collapsed);
       void send("setPrefs", { collapsed });
     }
@@ -378,19 +408,32 @@ function ensurePanel() {
     if (action === "replies-open") setRepliesOpen(true);
     if (action === "replies-close") setRepliesOpen(false);
     if (action === "reply-use") void useReply(target.getAttribute("data-id"));
+    if (action === "board-open") setBoardOpen(true);
+    if (action === "board-close") setBoardOpen(false);
+    if (action === "board-refresh") void loadBoard();
+    if (action === "board-chat") openChatWith(target.getAttribute("data-phone"));
   });
 
   panel.addEventListener("input", (event) => {
-    if (!event.target?.classList?.contains("crmc-replies-search")) return;
-    repliesQuery = event.target.value;
-    setRepliesStatus("");
-    paintReplies();
+    const classes = event.target?.classList;
+    if (classes?.contains("crmc-replies-search")) {
+      repliesQuery = event.target.value;
+      setRepliesStatus("");
+      paintReplies();
+    } else if (classes?.contains("crmc-board-search")) {
+      boardQuery = event.target.value;
+      paintBoard();
+    }
   });
 
   panel.addEventListener("change", (event) => {
     const select = event.target;
     if (select?.classList?.contains("crmc-stage")) {
       void moveDeal(select.getAttribute("data-deal"), select.value);
+    } else if (select?.classList?.contains("crmc-kcard-move")) {
+      void moveBoardDeal(select.getAttribute("data-deal"), select.value);
+    } else if (select?.name === "board-pipeline") {
+      void loadBoard(select.value);
     } else if (select?.name === "pipeline" && select.form?.dataset.form === "deal") {
       syncDealStages(select.form);
     }
@@ -417,6 +460,20 @@ function ensurePanel() {
     }
     if (event.key === "Escape" && repliesOpen) setRepliesOpen(false);
   });
+
+  // The board covers WhatsApp, so Escape must close it wherever the
+  // focus is — and must not also reach WhatsApp, which closes the chat
+  // on Escape. `panel` in the closure: a rebuilt panel adds its own.
+  const owner = panel;
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key !== "Escape" || !boardOpen || panel !== owner) return;
+      event.stopPropagation();
+      setBoardOpen(false);
+    },
+    true,
+  );
 
   // Typing in the panel must not reach WhatsApp's own keyboard
   // handling (shortcuts, focusing its message box).
@@ -1597,6 +1654,290 @@ async function useReply(replyId) {
 }
 
 // ------------------------------------------------------------
+// The board
+//
+// The pipeline as columns of cards, over WhatsApp. Opened from the
+// panel's footer; a card moves by dragging it to another column or by
+// the picker on the card, and "Abrir conversa" goes to that contact's
+// chat.
+//
+// It is a child of the panel element, placed with `position: fixed`,
+// so it shares the panel's colours, its style isolation and its event
+// handling — and still covers the area to the left of the column.
+// ------------------------------------------------------------
+
+function board() {
+  return ensurePanel().querySelector(".crmc-board");
+}
+
+function setBoardOpen(open) {
+  const wasOpen = boardOpen;
+  boardOpen = open;
+  ensurePanel().classList.toggle("crmc-board-open", open);
+
+  if (!open) {
+    board().innerHTML = "";
+    // The record beside the chat may list a deal the board just moved.
+    if (wasOpen && boardState.moved && currentContact) void loadDeals(currentContact.id);
+    boardState = { ...boardState, moved: false };
+    return;
+  }
+
+  setRepliesOpen(false);
+  boardQuery = "";
+  board().innerHTML = `
+    <header class="crmc-board-head">
+      <p class="crmc-name">Funil</p>
+      <div class="crmc-board-pipe"></div>
+      <input class="crmc-input crmc-board-search" type="search" autocomplete="off"
+             placeholder="Buscar negócio ou contato" aria-label="Buscar no funil" />
+      <p class="crmc-board-sum"></p>
+      <button class="crmc-btn crmc-btn-small crmc-btn-quiet" data-act="board-refresh">Atualizar</button>
+      <button class="crmc-btn crmc-btn-small" data-act="board-close">Fechar</button>
+    </header>
+    <p class="crmc-board-note" role="status" aria-live="polite"></p>
+    <div class="crmc-board-cols"></div>`;
+  void loadBoard();
+}
+
+async function loadBoard(pipelineId) {
+  const baseUrl = currentBaseUrl;
+  boardState = {
+    ...boardState,
+    baseUrl,
+    status: "loading",
+    notice: null,
+    moveNotice: null,
+    pipelineId: pipelineId ?? boardState.pipelineId,
+  };
+  paintBoard();
+
+  const pipes = await send("pipelines");
+  if (!boardOpen || currentBaseUrl !== baseUrl) return;
+  if (!pipes.ok) {
+    boardState = { ...boardState, status: "error", notice: failureText(pipes, "ver os funis") };
+    paintBoard();
+    return;
+  }
+  const pipelines = (Array.isArray(pipes.data) ? pipes.data : []).filter((p) => p.stages?.length);
+  if (!pipelines.length) {
+    boardState = {
+      ...boardState,
+      pipelines: [],
+      status: "error",
+      notice: "Este CRM ainda não tem um funil com etapas. Crie um no CRM para vê-lo aqui.",
+    };
+    paintBoard();
+    return;
+  }
+  const chosen = pipelines.find((p) => p.id === boardState.pipelineId) ?? pipelines[0];
+  boardState = { ...boardState, pipelines, pipelineId: chosen.id };
+  paintBoard();
+
+  const result = await send("boardDeals", { pipelineId: chosen.id });
+  // Closed, or another pipeline picked, while this was loading.
+  if (!boardOpen || currentBaseUrl !== baseUrl || boardState.pipelineId !== chosen.id) return;
+  boardState = result.ok
+    ? {
+        ...boardState,
+        status: "ready",
+        deals: Array.isArray(result.data?.deals) ? result.data.deals : [],
+        truncated: Boolean(result.data?.truncated),
+      }
+    : { ...boardState, status: "error", notice: failureText(result, "ver os negócios") };
+  paintBoard();
+}
+
+function renderBoardCard(deal, stages) {
+  const id = escapeHtml(deal.id);
+  const phone = chatPhone(deal.contact?.phone);
+  const who = deal.contact?.name || deal.contact?.phone || "Sem contato";
+  // A deal in the "Sem etapa" column has no stage to show as current.
+  const known = stages.some((stage) => stage.id === deal.stage?.id);
+  return `
+    <article class="crmc-kcard" draggable="true" data-deal="${id}">
+      <p class="crmc-kcard-title">${escapeHtml(deal.title)}</p>
+      <p class="crmc-kcard-who">${escapeHtml(who)}</p>
+      <p class="crmc-kcard-foot">
+        <span class="crmc-kcard-value">${escapeHtml(formatMoney(deal.value, deal.currency))}</span>
+        ${
+          phone
+            ? `<button class="crmc-link" data-act="board-chat" data-phone="${phone}"
+                       title="Abre a conversa deste contato. O WhatsApp Web recarrega.">Abrir conversa</button>`
+            : ""
+        }
+      </p>
+      <select class="crmc-select crmc-kcard-move" data-deal="${id}"
+              aria-label="Mover ${escapeHtml(deal.title)} para a etapa">
+        ${known ? "" : `<option value="" selected disabled>Mover para…</option>`}
+        ${stageOptions(stages, deal.stage?.id)}
+      </select>
+    </article>`;
+}
+
+function paintBoard() {
+  const root = board();
+  if (!root || !boardOpen) return;
+  const { status, pipelines, pipelineId, deals, truncated, notice, moveNotice } = boardState;
+
+  const pipeSlot = root.querySelector(".crmc-board-pipe");
+  const pipeline = pipelines.find((p) => p.id === pipelineId);
+  pipeSlot.innerHTML =
+    pipelines.length > 1
+      ? `<select class="crmc-select" name="board-pipeline" aria-label="Funil">${pipelines
+          .map(
+            (p) =>
+              `<option value="${escapeHtml(p.id)}"${p.id === pipelineId ? " selected" : ""}>${escapeHtml(p.name)}</option>`,
+          )
+          .join("")}</select>`
+      : pipeline
+        ? `<span class="crmc-board-pipename">${escapeHtml(pipeline.name)}</span>`
+        : "";
+
+  const cols = root.querySelector(".crmc-board-cols");
+  const sum = root.querySelector(".crmc-board-sum");
+  const note = root.querySelector(".crmc-board-note");
+  sum.textContent = "";
+  note.textContent = "";
+  note.classList.remove("crmc-err");
+
+  if (status === "loading" || status === "idle") {
+    cols.innerHTML = `<p class="crmc-muted">Carregando o funil…</p>`;
+    return;
+  }
+  if (status !== "ready" || !pipeline) {
+    cols.innerHTML = `<p class="crmc-muted">${escapeHtml(notice || "Não consegui carregar o funil.")}</p>`;
+    return;
+  }
+
+  const shown = filterDeals(deals, boardQuery);
+  const columns = boardColumns(pipeline.stages, shown);
+  sum.textContent = shown.length === 1 ? "1 negócio em aberto" : `${shown.length} negócios em aberto`;
+  if (moveNotice) {
+    note.textContent = moveNotice;
+    note.classList.add("crmc-err");
+  } else if (truncated) {
+    note.textContent = `Mostrando os ${deals.length} negócios mais recentes. O quadro completo está no CRM.`;
+  }
+
+  cols.innerHTML = columns
+    .map((column) => {
+      const cards = column.deals.map((deal) => renderBoardCard(deal, pipeline.stages)).join("");
+      const total =
+        column.total && column.deals.length
+          ? `<span class="crmc-kcol-sum">${escapeHtml(formatMoney(column.total.value, column.total.currency))}</span>`
+          : "";
+      return `
+        <section class="crmc-kcol" data-stage="${escapeHtml(column.stage.id ?? "")}">
+          <header class="crmc-kcol-head">
+            <span class="crmc-kcol-name">${escapeHtml(column.stage.name)}</span>
+            <span class="crmc-count">${column.deals.length}</span>
+            ${total}
+          </header>
+          <div class="crmc-kcol-list">${
+            cards || `<p class="crmc-muted">${boardQuery.trim() ? "Nada com essa busca." : "Nenhum negócio."}</p>`
+          }</div>
+        </section>`;
+    })
+    .join("");
+}
+
+/**
+ * Move a card to another stage. The card moves at once and goes back
+ * if the CRM refuses — waiting for the answer before moving makes a
+ * drag feel like it failed.
+ */
+async function moveBoardDeal(dealId, stageId) {
+  const pipelineId = boardState.pipelineId;
+  const pipeline = boardState.pipelines.find((p) => p.id === pipelineId);
+  const deal = boardState.deals.find((d) => d.id === dealId);
+  const stage = pipeline?.stages.find((s) => s.id === stageId);
+  if (!deal || !stage || deal.stage?.id === stageId) return;
+
+  const replace = (next) => {
+    boardState = {
+      ...boardState,
+      deals: boardState.deals.map((d) => (d.id === dealId ? next : d)),
+    };
+  };
+  replace({ ...deal, stage });
+  boardState = { ...boardState, moveNotice: null };
+  paintBoard();
+
+  const result = await send("moveDeal", { id: dealId, stageId });
+  // The board was closed or shows another pipeline now.
+  if (!boardOpen || boardState.pipelineId !== pipelineId) return;
+
+  if (!result.ok) {
+    replace(deal);
+    boardState = {
+      ...boardState,
+      moveNotice: `“${deal.title}” voltou para ${deal.stage?.name ?? "onde estava"}: ${failureText(result, "mover negócios")}`,
+    };
+  } else {
+    // An older CRM answers without the contact; keep the one we had.
+    replace({ ...deal, ...result.data, contact: result.data?.contact ?? deal.contact });
+    boardState = { ...boardState, moved: true };
+  }
+  paintBoard();
+}
+
+/** Go to a contact's chat. WhatsApp's own link; the page reloads. */
+function openChatWith(phone) {
+  const digits = chatPhone(phone);
+  if (digits) window.location.assign(`https://web.whatsapp.com/send?phone=${digits}`);
+}
+
+/**
+ * Dragging a card. WhatsApp listens for drags on the whole page (to
+ * offer "drop a file here"); none of these events is let out of the
+ * board, so a card being dragged is not mistaken for a file.
+ */
+function wireBoardDragging(root) {
+  let dragged = null;
+  const column = (event) => event.target?.closest?.(".crmc-kcol");
+  const clearTargets = () => {
+    for (const el of root.querySelectorAll(".crmc-kcol-over")) el.classList.remove("crmc-kcol-over");
+  };
+
+  root.addEventListener("dragstart", (event) => {
+    const card = event.target?.closest?.(".crmc-kcard");
+    if (!card) return;
+    dragged = card.getAttribute("data-deal");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", dragged);
+    card.classList.add("crmc-dragging");
+  });
+  root.addEventListener("dragover", (event) => {
+    const target = column(event);
+    // Not the "Sem etapa" column: there is no stage to move to.
+    if (!dragged || !target?.getAttribute("data-stage")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (!target.classList.contains("crmc-kcol-over")) {
+      clearTargets();
+      target.classList.add("crmc-kcol-over");
+    }
+  });
+  root.addEventListener("drop", (event) => {
+    const target = column(event);
+    const stageId = target?.getAttribute("data-stage");
+    clearTargets();
+    if (!dragged || !stageId) return;
+    event.preventDefault();
+    void moveBoardDeal(dragged, stageId);
+  });
+  root.addEventListener("dragend", () => {
+    dragged = null;
+    clearTargets();
+    for (const el of root.querySelectorAll(".crmc-dragging")) el.classList.remove("crmc-dragging");
+  });
+  for (const type of ["dragstart", "dragenter", "dragover", "dragleave", "drop", "dragend"]) {
+    root.addEventListener(type, (event) => event.stopPropagation());
+  }
+}
+
+// ------------------------------------------------------------
 // The loop
 // ------------------------------------------------------------
 
@@ -1619,7 +1960,10 @@ async function refresh(force) {
   void loadAccount(configured ? currentBaseUrl : null);
   // Quick replies need the CRM; and their previews carry this chat's name.
   ensurePanel().classList.toggle("crmc-connected", Boolean(configured));
-  if (!configured) setRepliesOpen(false);
+  if (!configured) {
+    setRepliesOpen(false);
+    setBoardOpen(false);
+  }
   paintReplies();
   if (!configured) {
     renderMessage(
@@ -1749,6 +2093,9 @@ void (async () => {
     addTagName = format.addTagName;
     fillTemplate = format.fillTemplate;
     filterReplies = format.filterReplies;
+    filterDeals = format.filterDeals;
+    boardColumns = format.boardColumns;
+    chatPhone = format.chatPhone;
   } catch {
     // The fallbacks above stand in.
   }

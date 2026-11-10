@@ -54,6 +54,9 @@ const PREFS_KEY = "prefs";
 let pipelinesCache = { baseUrl: null, at: 0, data: null };
 let repliesCache = { baseUrl: null, at: 0, data: null };
 
+// See the `boardDeals` handler: 3 pages of 100.
+const BOARD_PAGES = 3;
+
 async function readSettings() {
   const stored = await chrome.storage.local.get(SETTINGS_KEYS);
   const baseUrl = (stored.baseUrl || "").replace(/\/+$/, "");
@@ -105,7 +108,8 @@ async function callApi(path, init = {}) {
       detail: body?.error?.message || body?.error || `HTTP ${res.status}`,
     };
   }
-  return { ok: true, status: res.status, data: body?.data ?? body };
+  // `meta` carries the cursor of a paginated list, when there is one.
+  return { ok: true, status: res.status, data: body?.data ?? body, meta: body?.meta ?? null };
 }
 
 /** The contacts of `rows` that really are `digits`, by the phone rule. */
@@ -299,6 +303,31 @@ const handlers = {
       method: "PATCH",
       body: JSON.stringify({ stage_id: stageId }),
     });
+  },
+
+  /**
+   * The open deals of one pipeline, for the board.
+   *
+   * The API pages them 100 at a time; this follows the cursor for up
+   * to BOARD_PAGES pages and says so when there were more. A board
+   * with hundreds of cards per column is not something anyone reads
+   * inside a chat window — the CRM's own board is one click away.
+   */
+  async boardDeals({ pipelineId }) {
+    if (!pipelineId) return { ok: false, error: "no_id" };
+    const deals = [];
+    let cursor = null;
+    for (let page = 0; page < BOARD_PAGES; page += 1) {
+      const query =
+        `/deals?pipeline_id=${encodeURIComponent(pipelineId)}&status=open&limit=100` +
+        (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
+      const result = await callApi(query);
+      if (!result.ok) return result;
+      deals.push(...(Array.isArray(result.data) ? result.data : []));
+      cursor = result.meta?.next_cursor ?? null;
+      if (!cursor) break;
+    }
+    return { ok: true, data: { deals, truncated: Boolean(cursor) } };
   },
 
   /** Mark a deal won or lost — or open again, to undo that. */
