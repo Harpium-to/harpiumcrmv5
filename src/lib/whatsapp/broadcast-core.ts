@@ -29,6 +29,7 @@ import {
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
 import type { MessageTemplate } from '@/types';
 import { findOrCreateContact } from '@/lib/api/v1/contacts';
+import { optedOutAmong } from '@/lib/contacts/opt-out';
 
 /** Thrown by createBroadcast on a caller-visible failure; route maps it. */
 export class BroadcastError extends Error {
@@ -72,6 +73,8 @@ export interface BroadcastPlan {
   planned: PlannedRecipient[];
   /** Phones rejected up front (invalid E.164) — counted as failed. */
   rejected: number;
+  /** Contacts left out because they opted out (migration 066). */
+  optedOut: number;
 }
 
 const MAX_RECIPIENTS = 1000;
@@ -171,11 +174,26 @@ export async function createBroadcast(
   // params aren't silently overwritten by a later duplicate — and so
   // the row↔params pairing below (keyed by contact_id) is unambiguous.
   const seenContact = new Set<string>();
-  const deduped = resolved.filter((r) => {
+  const unique = resolved.filter((r) => {
     if (seenContact.has(r.contactId)) return false;
     seenContact.add(r.contactId);
     return true;
   });
+
+  // Whoever asked not to receive automatic messages is left out (066).
+  const optedOutIds = await optedOutAmong(
+    db,
+    accountId,
+    unique.map((r) => r.contactId)
+  );
+  const deduped = unique.filter((r) => !optedOutIds.has(r.contactId));
+  if (unique.length > 0 && deduped.length === 0) {
+    throw new BroadcastError(
+      'bad_request',
+      'Todos os destinatários pediram para não receber mensagens automáticas',
+      400
+    );
+  }
 
   if (deduped.length === 0) {
     throw new BroadcastError(
@@ -243,6 +261,7 @@ export async function createBroadcast(
     templateRow,
     planned,
     rejected,
+    optedOut: optedOutIds.size,
   };
 }
 

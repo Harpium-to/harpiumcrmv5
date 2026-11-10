@@ -42,6 +42,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { ContactTasks } from '@/components/contacts/contact-tasks';
 import { ContactScheduled } from '@/components/contacts/contact-scheduled';
+import { ContactOptOut } from '@/components/contacts/contact-opt-out';
 
 interface ContactDetailViewProps {
   open: boolean;
@@ -501,6 +502,11 @@ export function ContactDetailView({
               {/* Details Tab */}
               <TabsContent value="details" className="flex-1 overflow-y-auto px-4 py-3">
                 <div className="space-y-3">
+                  <ContactOptOut
+                    key={contactId}
+                    contactId={contact.id}
+                    optedOutAt={(contact as { opted_out_at?: string | null }).opted_out_at}
+                  />
                   <div className="space-y-1.5">
                     <Label className="text-muted-foreground text-xs">{t('name')}</Label>
                     <Input

@@ -21,6 +21,7 @@ import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
+import { contactOptedOut } from '@/lib/contacts/opt-out'
 
 // ------------------------------------------------------------
 // Public API
@@ -171,6 +172,16 @@ export async function resumePendingExecution(pending: {
   if (await customerRepliedSinceStart(automation as Automation, pending)) {
     await markPending(pending.id, 'done')
     await finalizeLog(pending.log_id, 'partial', 'Parada: o cliente respondeu.')
+    return
+  }
+  // A sequence also stops when the contact opted out meanwhile (066).
+  if (
+    (automation as Automation).trigger_type === 'manual' &&
+    pending.contact_id &&
+    (await contactOptedOut(db, (automation as Automation).account_id, pending.contact_id))
+  ) {
+    await markPending(pending.id, 'done')
+    await finalizeLog(pending.log_id, 'partial', 'Parada: o contato pediu para não receber.')
     return
   }
 

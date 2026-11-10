@@ -47,6 +47,7 @@ interface State {
 interface Plan {
   total: number;
   not_found: number;
+  opted_out?: number;
   first_at: string | null;
   last_at: string | null;
 }
@@ -335,6 +336,12 @@ function NewBulkDialog({
                 {plan.total} {plan.total === 1 ? 'contato' : 'contatos'} · de {time(plan.first_at)} até por volta de{' '}
                 {time(plan.last_at)}
               </p>
+              {(plan.opted_out ?? 0) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {plan.opted_out} {plan.opted_out === 1 ? 'contato pediu' : 'contatos pediram'} para não receber
+                  mensagens automáticas e fica{plan.opted_out === 1 ? '' : 'm'} de fora.
+                </p>
+              )}
               {plan.not_found > 0 && (
                 <p className="text-xs text-muted-foreground">
                   {plan.not_found} {plan.not_found === 1 ? 'número não é contato' : 'números não são contatos'} do CRM e

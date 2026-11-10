@@ -145,6 +145,14 @@ describe('startSequence', () => {
     );
   });
 
+  it('refuses a contact who opted out', async () => {
+    const tables = world();
+    tables.contacts[0].opted_out_at = '2026-11-09T10:00:00Z';
+    const d = deps();
+    expect(await fails(startSequence(fakeDb(tables), ACC, SEQ, CONTACT, d))).toBe('409 opted_out');
+    expect(d.start).not.toHaveBeenCalled();
+  });
+
   it('refuses a sequence that is switched off', async () => {
     const tables = world();
     tables.automations[0].is_active = false;

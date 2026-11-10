@@ -252,6 +252,12 @@ need `messages:send`.
 
 ### `GET /api/v1/contacts`
 
+Every contact carries `opted_out`: `true` when it asked not to receive
+automatic messages (migration `066`) — bulk sends, template broadcasts,
+sequences and manual flows leave it out. `PATCH /api/v1/contacts/{id}`
+accepts `{ "opted_out": true | false }`. `POST /api/v1/broadcasts`
+answers how many it left out as `opted_out`.
+
 List contacts, newest first. Scope: `contacts:read`. Paginated (see
 [Pagination](#pagination)). Optional filters: `?search=` (matches name
 or phone) and `?tag=<tagId>`.

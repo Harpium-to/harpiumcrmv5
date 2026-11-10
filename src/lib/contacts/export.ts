@@ -22,6 +22,8 @@ export interface ExportRow {
   company: string | null;
   temperature: string | null;
   created_at: string;
+  /** Migration 066; absent before it. */
+  opted_out_at?: string | null;
   tags: string[];
   stage: string | null;
 }
@@ -41,6 +43,7 @@ export const EXPORT_COLUMNS: CsvColumn<ExportRow>[] = [
   { header: 'Temperatura', value: (c) => (c.temperature ? TEMPERATURE[c.temperature] ?? c.temperature : '') },
   { header: 'Etiquetas', value: (c) => c.tags.join(', ') },
   { header: 'Etapa do negócio', value: (c) => c.stage },
+  { header: 'Não quer receber', value: (c) => (c.opted_out_at ? 'Sim' : '') },
   { header: 'Criado em', value: (c) => formatDate(c.created_at) },
 ];
 
@@ -78,7 +81,8 @@ async function matchingContacts(
     } else {
       let query = db
         .from('contacts')
-        .select('id, name, phone, email, company, temperature, created_at')
+        // `*` so opted_out_at (066) comes along once it exists.
+        .select('*')
         .order('created_at', { ascending: false })
         .range(from, from + CHUNK - 1);
       if (search) {

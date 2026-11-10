@@ -37,12 +37,17 @@ describe('EXPORT_COLUMNS', () => {
       stage: 'Proposta enviada',
     };
     const lines = toCsv([row], EXPORT_COLUMNS).replace(/^﻿/, '').split('\r\n');
-    expect(lines[0]).toBe('Nome,Telefone,Email,Empresa,Temperatura,Etiquetas,Etapa do negócio,Criado em');
+    expect(lines[0]).toBe(
+      'Nome,Telefone,Email,Empresa,Temperatura,Etiquetas,Etapa do negócio,Não quer receber,Criado em',
+    );
     // The shared CSV helper defuses cells that a spreadsheet would read
     // as a formula — "+" included, so phones keep a leading apostrophe,
     // as in the agency's export.
     expect(lines[1]).toContain("Ana Lima,'+5511999998888,ana@x.com");
-    expect(lines[1]).toContain('Quente,"Indicação, VIP",Proposta enviada,10/11/2026');
+    expect(lines[1]).toContain('Quente,"Indicação, VIP",Proposta enviada,,10/11/2026');
+    expect(toCsv([{ ...row, opted_out_at: '2026-11-10T15:00:00Z' }], EXPORT_COLUMNS)).toContain(
+      'Proposta enviada,Sim,',
+    );
     expect(lines[1]).toContain(",'=SOMA(1),");
   });
 });

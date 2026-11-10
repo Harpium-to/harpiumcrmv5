@@ -142,6 +142,16 @@ describe('parseBulkInput', () => {
 });
 
 describe('resolveAudience', () => {
+  it('leaves out whoever opted out, and counts them', async () => {
+    const t = world();
+    t.contacts[1].opted_out_at = '2026-11-09T10:00:00Z';
+    const byTag = await resolveAudience(fakeDb(t), ACC, { tagId: TAG });
+    expect(byTag.contacts.map((c) => c.id)).toEqual(['c1']);
+    expect(byTag.optedOut).toBe(1);
+    const byList = await resolveAudience(fakeDb(t), ACC, { phones: ['5511987654321'] });
+    expect(byList).toMatchObject({ contacts: [], optedOut: 1, notFound: 0 });
+  });
+
   it('takes the tag’s contacts of this account that have a number', async () => {
     const { contacts } = await resolveAudience(fakeDb(world()), ACC, { tagId: TAG });
     expect(contacts.map((c) => c.id).sort()).toEqual(['c1', 'c2']);
