@@ -287,9 +287,8 @@ testar no WhatsApp real).* **Sem migration.**
 - Os funis ficam guardados por 1 minuto na extensão, para não pedir de
   novo a cada troca de conversa.
 
-*3B ✅ (código pronto, extensão 0.9.0, falta aplicar a migration 060 e
-testar no WhatsApp real).* Branch `feat/extensao-fase3b-tarefas`.
-**Migration 060.**
+*3B ✅ (em produção desde 10/11/2026, extensão 0.9.0, PR #19; migration
+060 aplicada em 10/11/2026; falta testar no WhatsApp real).*
 - **Tarefas**: aba na ficha do painel, "Minhas tarefas" no rodapé com o
   contador das atrasadas e das de hoje, e a aba Tarefas na tela do
   contato no CRM. Tabela `contact_tasks`; a equipe vê, atendente ou
@@ -338,13 +337,54 @@ exige duas coisas que ainda não existem:
 - a API pública enviar pelo WhatsApp por QR. Hoje `POST /api/v1/messages`
   só usa a API oficial, e o canal por QR (UAZAPI) só envia texto.
 
-*4B (a fazer).* O que precisa mesmo sair pelo CRM.
-- Áudio, imagem, vídeo e arquivo com 1 clique.
-- Funil de mensagens (sequência com intervalos).
-- Assinatura do atendente.
-- Antes: as duas condições acima, e mídia no canal por QR. Mexe no
-  envio do CRM, onde há um branch de outra conversa ainda fora do
-  `main` (`claude/mystifying-sanderson-f8da81`).
+*4B (planejada em 10/11/2026; ainda sem código).* O que precisa mesmo
+sair pelo CRM.
+
+**Depende do PR #12** (WhatsApp D1, "dois caminhos", de outra conversa).
+Ele já entrega, no servidor, as duas coisas que faltavam para a 4B:
+- um único lugar que decide por onde a mensagem sai
+  (`resolveWhatsAppProvider`), usado pelo inbox, pela API pública, pelos
+  fluxos, pelas automações e pela IA. Com isso a API pública passa a
+  enviar também pelo WhatsApp por QR;
+- mídia no WhatsApp por QR (imagem, vídeo, arquivo e áudio como
+  mensagem de voz).
+
+Construir a 4B no `main` de hoje criaria um terceiro jeito de escolher
+o canal e entraria em conflito com o #12. Há ainda o branch
+`claude/mystifying-sanderson-f8da81`, só local, que refaz parte do mesmo
+envio de outro jeito e não inclui o D1: precisa ser reconciliado com o
+#12 por quem cuida dele.
+
+Etapas, na ordem:
+
+1. **Saber de que número a mensagem sai.** A extensão lê o número
+   logado no WhatsApp Web; o CRM informa o número conectado e o caminho
+   escolhido (`GET /api/v1/me`). "Enviar pelo CRM" só aparece quando os
+   dois são o mesmo número. Sem isso, a mensagem pode sair de outro
+   número. *Precisa ser conferido no WhatsApp Web real*: é a mesma
+   leitura interna que a extensão já usa para saber a conversa aberta.
+2. **Enviar texto pelo CRM.** Botão "Enviar" nas respostas rápidas, ao
+   lado do "colocar no campo". A chave da extensão ganha `messages:send`
+   (migration).
+3. **Mídia nas respostas rápidas.** Imagem, áudio (como mensagem de
+   voz), vídeo e arquivo: envio do arquivo em Configurações › Respostas
+   rápidas, prévia no painel e envio pelo CRM. Migration (mídia em
+   `quick_replies`).
+4. **Assinatura do atendente.** O nome de quem atende no começo da
+   mensagem enviada pelo painel, ligável por pessoa.
+5. **Funil de mensagens.** Uma sequência com intervalos, disparada com
+   1 clique na conversa. Reaproveita as automações (gatilho manual),
+   que já sabem esperar e continuar pelo agendador.
+
+Riscos próprios desta etapa:
+- **É a primeira que envia de verdade.** Os testes precisam de um
+  número real combinado com você; não dá para testar enviando para
+  clientes.
+- **A chave da extensão passa a poder enviar.** Uma chave vazada envia
+  em nome do cliente até ser revogada.
+- **WhatsApp por QR:** envio automático em volume é o que mais pesa em
+  bloqueio de número. O funil de mensagens precisa de limite por dia e
+  de intervalo mínimo.
 
 **Fase 5 — Agendamento e follow-up.**
 - Mensagem agendada por conversa.
