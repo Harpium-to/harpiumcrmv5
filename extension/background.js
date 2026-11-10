@@ -505,6 +505,34 @@ const handlers = {
     return callApi("/messages", { method: "POST", body: JSON.stringify(body) });
   },
 
+  /** What is scheduled for a contact (migration 064). Not cached. */
+  async scheduled({ contactId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/scheduled-messages`);
+  },
+
+  /**
+   * Schedule a message for a contact: a text, or a quick reply's file
+   * with its caption. `onlyIfNoReply` makes it a follow-up.
+   */
+  async schedule({ contactId, text, quickReplyId, sendAt, onlyIfNoReply }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    if (typeof sendAt !== "string" || !sendAt) return { ok: false, error: "no_time" };
+    const body = { send_at: sendAt, only_if_no_reply: Boolean(onlyIfNoReply) };
+    if (typeof text === "string" && text.trim()) body.text = text;
+    if (typeof quickReplyId === "string" && quickReplyId) body.quick_reply_id = quickReplyId;
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/scheduled-messages`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
+  /** Cancel a scheduled message that has not gone yet. */
+  async cancelScheduled({ id }) {
+    if (!id) return { ok: false, error: "no_id" };
+    return callApi(`/scheduled-messages/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
   /**
    * The CRM's sequences (automations started by hand), and which are
    * running for this contact. Not cached: "running" changes as the

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { fillQuickReply } from '../src/lib/quick-replies/variables'
 import { countDueNow as serverCountDueNow, describeDue as serverDescribeDue } from '../src/lib/tasks/due'
+import { describeScheduled as serverDescribeScheduled } from '../src/lib/scheduled/describe'
 import {
   addTagName,
   boardColumns,
@@ -13,6 +14,8 @@ import {
   filterReplies,
   cleanSignatureName,
   describeDuration,
+  defaultScheduleValue,
+  describeScheduled,
   signText,
   formatWhen,
   localInputToIso,
@@ -348,5 +351,53 @@ describe('describeDuration', () => {
     expect(describeDuration(1440)).toBe('1 dia')
     expect(describeDuration(4320)).toBe('3 dias')
     expect(describeDuration(undefined)).toBe('agora')
+  })
+})
+
+describe('defaultScheduleValue', () => {
+  it('is tomorrow at 9, in local time', () => {
+    expect(defaultScheduleValue(new Date(2026, 10, 10, 15, 30))).toBe('2026-11-11T09:00')
+    // Month and year roll over.
+    expect(defaultScheduleValue(new Date(2026, 11, 31, 23, 0))).toBe('2027-01-01T09:00')
+  })
+})
+
+describe('describeScheduled', () => {
+  const now = new Date(2026, 10, 10, 15, 0)
+  const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).toISOString()
+
+  it('says when a waiting one goes, and if it is a follow-up', () => {
+    expect(describeScheduled({ status: 'scheduled', send_at: at(11, 9) }, now)).toBe('amanhã às 09:00')
+    expect(describeScheduled({ status: 'scheduled', send_at: at(11, 9), only_if_no_reply: true }, now)).toBe(
+      'amanhã às 09:00 · se não responder',
+    )
+    // Past its time, the scheduler is about to pick it up.
+    expect(describeScheduled({ status: 'scheduled', send_at: at(10, 14) }, now)).toBe('sai em instantes')
+  })
+
+  it('says the same as the CRM', () => {
+    const cases = [
+      { status: 'scheduled', send_at: at(11, 9), only_if_no_reply: true },
+      { status: 'scheduled', send_at: at(10, 14) },
+      { status: 'sent', send_at: at(10, 14) },
+      { status: 'skipped', send_at: at(10, 14), outcome: null },
+      { status: 'failed', send_at: at(10, 14), outcome: 'x' },
+      { status: 'cancelled', send_at: at(12, 8) },
+    ]
+    for (const item of cases) {
+      expect(describeScheduled(item, now)).toBe(serverDescribeScheduled(item, now))
+    }
+  })
+
+  it('says what happened to the others', () => {
+    expect(describeScheduled({ status: 'sending', send_at: at(10, 14) }, now)).toBe('enviando')
+    expect(describeScheduled({ status: 'sent', send_at: at(10, 14) }, now)).toBe('enviada · hoje às 14:00')
+    expect(
+      describeScheduled({ status: 'skipped', send_at: at(10, 14), outcome: 'O cliente respondeu antes, então não foi enviada.' }, now),
+    ).toBe('não enviada: O cliente respondeu antes, então não foi enviada.')
+    expect(describeScheduled({ status: 'cancelled', send_at: at(11, 9) }, now)).toBe('cancelada')
+    expect(describeScheduled({ status: 'failed', send_at: at(10, 14), outcome: 'Fora da janela' }, now)).toBe(
+      'não saiu: Fora da janela',
+    )
   })
 })

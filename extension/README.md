@@ -123,13 +123,26 @@ para o campo de mensagem quando o campo está vazio — se já tem texto,
 ele já foi assinado, ou a pessoa preferiu não assinar. Sem nome, nada é
 assinado.
 
+**Agendar.** Na lista de respostas, **Enviar agora | Agendar**. Em
+Agendar aparecem o dia e a hora (amanhã às 9h, de início), **Só se o
+cliente não responder até lá** — que transforma a mensagem num
+follow-up — e um campo para escrever a mensagem. Cada resposta ganha
+**Agendar** (um clique: dá para cancelar depois). Uma resposta com
+arquivo leva o arquivo. Abaixo das respostas ficam as **Agendadas** do
+contato, com **Cancelar**; a ficha do contato no CRM mostra a mesma
+lista, na aba Tarefas. Quem envia é o agendador do CRM (migration 064),
+pelo número do CRM, mesmo com o WhatsApp Web fechado; por isso Agendar
+só aparece nas mesmas condições do Enviar.
+
 **Sequências.** Abaixo das respostas, as sequências do CRM: mensagens
 com esperas entre elas, montadas nas Automações com o gatilho
 **Sequência (disparo manual)**. Cada uma mostra quantas mensagens tem e
 quanto tempo leva. **Iniciar** → **Confirmar** dispara para o contato
 da conversa: a primeira mensagem sai na hora e as outras seguem pelo
 agendador do CRM, mesmo com o WhatsApp Web fechado. Enquanto está em
-andamento, aparece **Parar**. Iniciar segue as mesmas condições do
+andamento, aparece **Parar**. Uma sequência marcada com "Parar se o
+cliente responder" (nas Automações) para sozinha na espera seguinte
+quando o cliente escreve. Iniciar segue as mesmas condições do
 Enviar; o CRM ainda recusa iniciar a mesma sequência duas vezes para o
 mesmo contato e passa de 100 inícios por dia.
 

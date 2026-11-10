@@ -67,6 +67,8 @@ export interface PublicSequence {
   description: string | null;
   messages: number;
   duration_minutes: number;
+  /** Stops by itself once the customer replies (Fase 5). */
+  stop_on_reply: boolean;
   /** Running for the contact asked about; false when none was. */
   running: boolean;
 }
@@ -97,13 +99,18 @@ export async function listSequences(
 ): Promise<PublicSequence[]> {
   const { data: rows, error } = await db
     .from('automations')
-    .select('id, name, description')
+    .select('id, name, description, trigger_config')
     .eq('account_id', accountId)
     .eq('trigger_type', 'manual')
     .eq('is_active', true)
     .order('name', { ascending: true });
   if (error) throw new SequenceError('internal', 'Falha ao listar as sequências', 500);
-  const sequences = (rows ?? []) as { id: string; name: string; description: string | null }[];
+  const sequences = (rows ?? []) as {
+    id: string;
+    name: string;
+    description: string | null;
+    trigger_config?: { stop_on_reply?: unknown } | null;
+  }[];
   if (sequences.length === 0) return [];
 
   const ids = sequences.map((s) => s.id);
@@ -120,6 +127,7 @@ export async function listSequences(
       name: s.name,
       description: s.description ?? null,
       ...summarizeSequence(steps),
+      stop_on_reply: s.trigger_config?.stop_on_reply === true,
       running: running.has(s.id),
     };
   });

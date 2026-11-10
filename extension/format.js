@@ -296,3 +296,41 @@ export function describeDuration(minutes) {
   const days = Math.round(m / 1440);
   return days === 1 ? "1 dia" : `${days} dias`;
 }
+
+/**
+ * The value a `datetime-local` field starts with when scheduling:
+ * tomorrow at 09:00, in this computer's time.
+ */
+export function defaultScheduleValue(now = new Date()) {
+  const two = (n) => String(n).padStart(2, "0");
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0);
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}T09:00`;
+}
+
+/**
+ * One line about a scheduled message, the way a person would say it:
+ * "amanhã às 09:00 · se não responder", "enviada · hoje às 14:00",
+ * "não enviada: o cliente respondeu antes…".
+ */
+export function describeScheduled(item, now = new Date()) {
+  const due = describeDue(item?.send_at, now);
+  const when = due ? due.label.replace(/^atrasada · /, "") : "";
+  switch (item?.status) {
+    case "scheduled": {
+      const base = due && due.tone === "overdue" ? "sai em instantes" : when;
+      return item.only_if_no_reply ? `${base} · se não responder` : base;
+    }
+    case "sending":
+      return "enviando";
+    case "sent":
+      return when ? `enviada · ${when}` : "enviada";
+    case "skipped":
+      return `não enviada: ${item.outcome || "o cliente respondeu antes"}`;
+    case "cancelled":
+      return "cancelada";
+    case "failed":
+      return `não saiu: ${item.outcome || "erro no envio"}`;
+    default:
+      return when;
+  }
+}

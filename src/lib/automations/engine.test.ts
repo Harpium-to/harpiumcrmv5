@@ -11,6 +11,8 @@ const h = vi.hoisted(() => ({
     fromCalls: [] as string[],
     updateCalls: [] as { table: string; filters: [string, string, unknown][] }[],
     upsertCalls: [] as { table: string; payload: unknown }[],
+    logCreatedAt: "2026-11-10T10:00:00Z" as string | null,
+    customerReplies: 0,
   },
 }));
 
@@ -47,8 +49,13 @@ vi.mock("./admin-client", () => {
     if (table === "automation_logs") {
       if (type === "insert") return { data: { id: "log1" }, error: null };
       if (type === "update") return { data: null, error: null };
-      return { data: { steps_executed: [], status: "success" }, error: null };
+      return {
+        data: { steps_executed: [], status: "success", created_at: state.logCreatedAt },
+        error: null,
+      };
     }
+    if (table === "conversations") return { data: [{ id: "conv1" }], error: null };
+    if (table === "messages") return { data: null, count: state.customerReplies, error: null };
     if (table === "automation_steps") return { data: state.steps, error: null };
     return { data: null, error: null };
   }
@@ -68,6 +75,8 @@ vi.mock("./admin-client", () => {
       upsert: (p: unknown) => ((ops.type = "upsert"), (ops.payload = p), b),
       eq: (k: string, v: unknown) => (ops.filters.push(["eq", k, v]), b),
       gte: () => b,
+      gt: () => b,
+      in: () => b,
       is: () => b,
       order: () => b,
       limit: () => b,
@@ -96,7 +105,7 @@ vi.mock("./meta-send", () => ({
   engineSendInteractive: vi.fn(async () => ({ whatsapp_message_id: "m1" })),
 }));
 
-import { runAutomationsForTrigger, triggerMatches } from "./engine";
+import { customerRepliedSinceStart, runAutomationsForTrigger, triggerMatches } from "./engine";
 import type { Automation } from "@/types";
 
 const ACCOUNT = "acct-1";
@@ -109,6 +118,8 @@ beforeEach(() => {
   h.state.fromCalls = [];
   h.state.updateCalls = [];
   h.state.upsertCalls = [];
+  h.state.logCreatedAt = "2026-11-10T10:00:00Z";
+  h.state.customerReplies = 0;
 });
 
 describe("runAutomationsForTrigger — tenant isolation", () => {
@@ -334,5 +345,52 @@ describe("triggerMatches — interactive_reply", () => {
   it("does not match when no reply id is present or config is empty", () => {
     expect(triggerMatches(automation(["yes"]), {})).toBe(false);
     expect(triggerMatches(automation([]), { interactive_reply_id: "yes" })).toBe(false);
+  });
+});
+
+describe("sequences (manual trigger)", () => {
+  const sequence = (cfg: Record<string, unknown>) =>
+    ({
+      id: "seq1",
+      account_id: ACCOUNT,
+      user_id: "u1",
+      name: "Follow-up",
+      trigger_type: "manual",
+      trigger_config: cfg,
+      is_active: true,
+      execution_count: 0,
+      created_at: "",
+      updated_at: "",
+    }) as unknown as Automation;
+  const pending = { contact_id: "c1", log_id: "log1" };
+
+  it("a generic dispatch never runs a sequence", async () => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [sequence({}) as unknown as Record<string, unknown>];
+    await runAutomationsForTrigger({ accountId: ACCOUNT, triggerType: "manual", contactId: "c1" });
+    expect(h.state.fromCalls).toEqual([]);
+  });
+
+  it("stops after a wait when set to, and the customer wrote since it started", async () => {
+    h.state.customerReplies = 1;
+    expect(await customerRepliedSinceStart(sequence({ stop_on_reply: true }), pending)).toBe(true);
+  });
+
+  it("goes on when the customer has not written", async () => {
+    expect(await customerRepliedSinceStart(sequence({ stop_on_reply: true }), pending)).toBe(false);
+  });
+
+  it("goes on when not set to stop, or for any other automation", async () => {
+    h.state.customerReplies = 1;
+    expect(await customerRepliedSinceStart(sequence({}), pending)).toBe(false);
+    const other = { ...sequence({ stop_on_reply: true }), trigger_type: "new_message_received" } as Automation;
+    expect(await customerRepliedSinceStart(other, pending)).toBe(false);
+    expect(h.state.fromCalls).toEqual([]);
+  });
+
+  it("goes on when it can't tell when the run started", async () => {
+    h.state.customerReplies = 1;
+    h.state.logCreatedAt = null;
+    expect(await customerRepliedSinceStart(sequence({ stop_on_reply: true }), pending)).toBe(false);
   });
 });

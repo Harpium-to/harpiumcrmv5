@@ -64,7 +64,7 @@ const NOW = Date.parse('2026-11-10T15:00:00Z');
 function world(over: Partial<Record<string, Row[]>> = {}) {
   return {
     automations: [
-      { id: SEQ, account_id: ACC, user_id: 'u1', name: 'Follow-up', description: 'Três toques', trigger_type: 'manual', is_active: true },
+      { id: SEQ, account_id: ACC, user_id: 'u1', name: 'Follow-up', description: 'Três toques', trigger_type: 'manual', trigger_config: { stop_on_reply: true }, is_active: true },
       { id: 'other', account_id: ACC, user_id: 'u1', name: 'Boas-vindas', trigger_type: 'first_inbound_message', is_active: true },
     ],
     automation_steps: [
@@ -115,6 +115,7 @@ describe('listSequences', () => {
         description: 'Três toques',
         messages: 2,
         duration_minutes: 1440,
+        stop_on_reply: true,
         running: true,
       },
     ]);
