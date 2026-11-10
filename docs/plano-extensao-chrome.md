@@ -338,8 +338,8 @@ exige duas coisas que ainda não existem:
 - a API pública enviar pelo WhatsApp por QR. Hoje `POST /api/v1/messages`
   só usa a API oficial, e o canal por QR (UAZAPI) só envia texto.
 
-*4B (planejada em 10/11/2026; ainda sem código).* O que precisa mesmo
-sair pelo CRM.
+*4B (em andamento).* O que precisa mesmo sair pelo CRM. Etapas 1 e 2
+feitas em 10/11/2026 (extensão 0.10.0, migration 062); 3 a 5 por fazer.
 
 **Dependia do PR #12** (WhatsApp D1, "dois caminhos", de outra
 conversa), que **entrou em produção em 10/11/2026**, com a migration
@@ -358,18 +358,24 @@ ser reconciliado com o `main` por quem cuida dele.
 
 Etapas, na ordem:
 
-1. **Saber de que número a mensagem sai.** A extensão lê o número
+1. ✅ **Saber de que número a mensagem sai.** A extensão lê o número
    logado no WhatsApp Web; o CRM informa o número conectado e o caminho
-   escolhido (`GET /api/v1/me`). "Enviar pelo CRM" só aparece quando os
-   dois são o mesmo número. Sem isso, a mensagem pode sair de outro
-   número. *Conferido no WhatsApp Web real em 10/11/2026:*
+   escolhido (`GET /api/v1/whatsapp/sender`, escopo `messages:send`,
+   lido da Meta ou da instância do QR code a cada consulta, nunca de
+   cache). "Enviar pelo CRM" só aparece quando os dois são o mesmo
+   número. Sem isso, a mensagem pode sair de outro número. Uma rota
+   própria em vez do `/me`: só a chave que pode enviar precisa saber. *Conferido no WhatsApp Web real em 10/11/2026:*
    `require("WAWebUserPrefsMeUser").getMaybeMePnUser()` devolve o número
    logado (servidor `c.us`; veio com 12 dígitos, sem o nono, então a
    comparação usa a mesma equivalência do nono dígito). Cabe no
    `page-bridge.js`, ao lado da leitura da conversa aberta.
-2. **Enviar texto pelo CRM.** Botão "Enviar" nas respostas rápidas, ao
-   lado do "colocar no campo". A chave da extensão ganha `messages:send`
-   (migration).
+2. ✅ **Enviar texto pelo CRM.** Botão "Enviar" nas respostas rápidas, ao
+   lado do "colocar no campo", com confirmação (Enviar → Confirmar em
+   até 5 segundos). Só aparece quando o número logado é o do CRM e a
+   conversa é, pelo número, o contato que o painel mostra. Resposta com
+   variável sem dado não é enviada. A chave da extensão ganha
+   `messages:send` (migration 062). Regra em `extension/send-check.js`,
+   testada. *Falta testar com um número real*, combinado com você.
 3. **Mídia nas respostas rápidas.** Imagem, áudio (como mensagem de
    voz), vídeo e arquivo: envio do arquivo em Configurações › Respostas
    rápidas, prévia no painel e envio pelo CRM. Migration (mídia em

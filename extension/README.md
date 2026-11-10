@@ -87,7 +87,29 @@ no CRM. Usa os escopos `conversations:read` e `conversations:write`
 prontos do CRM (Configurações › Respostas rápidas), com busca pelo
 título ou pelo texto. Um clique **coloca o texto no campo de mensagem
 do WhatsApp** — depois do que já estiver digitado — e a pessoa aperta
-Enter para enviar. A extensão não envia.
+Enter para enviar.
+
+**Enviar pelo CRM.** Ao lado de cada resposta pode aparecer **Enviar**,
+que manda o texto pelo número conectado ao CRM, sem passar pelo campo
+de mensagem. São dois cliques: **Enviar** e, em até 5 segundos,
+**Confirmar**. O botão só aparece quando tudo isto vale:
+
+- a chave pode enviar (escopo `messages:send`, que a migration 062 dá
+  às chaves da extensão);
+- o CRM informa de que número a mensagem sairia
+  (`GET /api/v1/whatsapp/sender`) e esse é **o mesmo número logado neste
+  WhatsApp Web** (com a regra do nono dígito). Senão, o cliente
+  receberia a mensagem de outro número;
+- a conversa aberta é com uma pessoa de número conhecido, e o painel
+  mostra o contato do CRM com esse mesmo número.
+
+Quando falta alguma coisa, o painel diz qual numa linha acima das
+respostas, e "colocar no campo" continua funcionando. Uma resposta com
+variável sem dado (`{{empresa}}` de um contato sem empresa) não é
+enviada: o painel pede para colocar no campo e completar.
+
+O número logado é lido pelo `page-bridge.js`, junto com a conversa
+aberta (`WAWebUserPrefsMeUser`).
 
 - `{{nome}}`, `{{primeiro_nome}}` e `{{empresa}}` são preenchidos com
   os dados do contato no CRM; sem cadastro, com o nome que o WhatsApp
@@ -167,8 +189,9 @@ pintou, sem depender dos nomes de classe dela (`theme.js`).
   texto de mensagem é lido, guardado ou enviado para lugar nenhum.
 - **Não funciona em grupos.** Um grupo não tem um contato único para
   mostrar, então o painel diz isso em vez de escolher um participante.
-- **Não envia mensagens.** As respostas rápidas param no campo de
-  mensagem; quem envia é a pessoa, depois de ler.
+- **Não envia nada sozinha.** Uma resposta rápida vai para o campo de
+  mensagem, ou sai pelo CRM quando a pessoa clica em Enviar e depois em
+  Confirmar. Nada sai sem esses dois cliques.
 
 ## Como ela sabe qual conversa está aberta
 
@@ -182,13 +205,15 @@ Por isso a extensão tem um arquivo, `page-bridge.js`, que roda no mesmo
 ambiente do código do WhatsApp (`"world": "MAIN"` no manifesto) e
 responde a uma única pergunta do painel: qual conversa está aberta? A
 resposta é o identificador dela e, quando é um `@lid`, o número que o
-WhatsApp tem para aquele contato. Esse arquivo:
+WhatsApp tem para aquele contato. Junto vai o número logado neste
+WhatsApp Web, para o painel só oferecer "Enviar pelo CRM" quando o CRM
+enviaria desse mesmo número. Esse arquivo:
 
 - não tem acesso à chave nem ao CRM (não existe `chrome.*` ali);
 - não lê mensagens, nomes nem a lista de conversas;
 - é tratado pelo painel como dado não confiável: cada campo é validado
-  (`chatFromPage`, em `chat-id.js`) e o que não for claramente um
-  número é descartado.
+  (`chatFromPage` e `myPhoneFromPage`, em `chat-id.js`) e o que não
+  for claramente um número é descartado.
 
 A leitura antiga pelo `data-id` continua como reserva, para versões do
 WhatsApp que ainda o preencham.

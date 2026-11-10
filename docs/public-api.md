@@ -171,6 +171,33 @@ Domain error codes beyond the table above: `whatsapp_not_configured`
 (400), `meta_error` (502 — the request reached Meta and it rejected the
 send), `template_malformed` (500).
 
+### `GET /api/v1/whatsapp/sender`
+
+The WhatsApp number a message sent through this API leaves from right
+now. Scope: `messages:send`. For a client that must not send from a
+number other than the one its user sees — the Chrome extension offers
+to send only when this is the number logged in to WhatsApp Web.
+
+```json
+{
+  "data": {
+    "provider": "meta",
+    "path": "oficial",
+    "phone": "5563992286787"
+  }
+}
+```
+
+- `provider`: `meta`, `uazapi` (QR code), `evolution`, or `null` when
+  nothing is connected — the door `POST /api/v1/messages` would use.
+- `path`: the path the CRM chose (`oficial` / `nao_oficial`, migration
+  `061`), or `null` when not chosen.
+- `phone`: digits with country code, read from the provider on every
+  call (Meta's API, or the QR-code instance while it is connected).
+  `null` when it couldn't be read, and always for Evolution: don't send
+  on an assumption. The Chrome extension's personal keys get
+  `messages:send` from migration `062`.
+
 ### `GET /api/v1/contacts`
 
 List contacts, newest first. Scope: `contacts:read`. Paginated (see

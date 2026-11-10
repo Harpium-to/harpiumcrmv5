@@ -5,6 +5,7 @@ import {
   chatFromPage,
   chatIdentityFromDataIds,
   chatPhoneFromDataIds,
+  myPhoneFromPage,
   phoneFromHeaderTitles,
   usableChatName,
 } from './chat-id.js'
@@ -284,5 +285,32 @@ describe('usableChatName', () => {
   it('returns null for nothing', () => {
     expect(usableChatName('')).toBeNull()
     expect(usableChatName(undefined)).toBeNull()
+  })
+})
+
+// The logged-in number rides on the same answer. Only a phone number
+// counts: the panel compares it with the CRM's before offering to send.
+describe('myPhoneFromPage', () => {
+  const answer = (me, extra = {}) =>
+    JSON.stringify({ v: 1, ready: true, chat: null, me, ...extra })
+
+  it('reads the number', () => {
+    expect(myPhoneFromPage(answer('556392286787'))).toBe('556392286787')
+  })
+
+  it('is null when there is none, or it is not a phone number', () => {
+    expect(myPhoneFromPage(answer(null))).toBeNull()
+    expect(myPhoneFromPage(answer(undefined))).toBeNull()
+    expect(myPhoneFromPage(answer(556392286787))).toBeNull()
+    expect(myPhoneFromPage(answer('5563 9228-6787'))).toBeNull()
+    expect(myPhoneFromPage(answer('1234567'))).toBeNull()
+    expect(myPhoneFromPage(answer('556392286787@c.us'))).toBeNull()
+  })
+
+  it('is null for an answer that is not ready or not understood', () => {
+    expect(myPhoneFromPage(answer('556392286787', { ready: false }))).toBeNull()
+    expect(myPhoneFromPage(answer('556392286787', { v: 2 }))).toBeNull()
+    expect(myPhoneFromPage('não é json')).toBeNull()
+    expect(myPhoneFromPage(null)).toBeNull()
   })
 })

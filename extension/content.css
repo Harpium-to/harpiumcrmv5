@@ -953,6 +953,58 @@
   white-space: pre-line;
 }
 
+/* A reply and, when the CRM may send from this number, its "Enviar"
+   beside it. Never one inside the other: a button can't hold a button. */
+#crm-connector-panel .crmc-reply-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+#crm-connector-panel .crmc-reply-row > .crmc-reply {
+  flex: 1;
+  min-width: 0;
+}
+
+#crm-connector-panel .crmc-reply-send {
+  flex: none;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--crmc-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-reply-send:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-reply-send:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 1px;
+}
+
+/* Second click sends: it must look like it. */
+#crm-connector-panel .crmc-reply-send.crmc-reply-confirm {
+  border-color: var(--crmc-primary);
+  background: var(--crmc-primary);
+  color: var(--crmc-primary-fg);
+}
+
+#crm-connector-panel .crmc-reply-send:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+#crm-connector-panel .crmc-replies-note {
+  font-size: 12px;
+}
+
 /* ---- Tasks ------------------------------------------------ */
 
 #crm-connector-panel .crmc-task-title-input {

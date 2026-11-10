@@ -15,8 +15,10 @@
 //   Answers one question, when content.js asks it: which chat is
 //   open? The answer is the chat's id and, when WhatsApp addresses the
 //   person by a `@lid`, the phone number WhatsApp itself has for that
-//   contact. Nothing else leaves here — no message text, no names, no
-//   list of chats.
+//   contact. Alongside, the number logged in to this WhatsApp Web, so
+//   the panel offers "Enviar pelo CRM" only when the CRM would send
+//   from that same number. Nothing else leaves here — no message text,
+//   no names, no list of chats.
 //
 // WHAT IT CANNOT DO
 //   Anything with the CRM. There is no `chrome.*` API in this world
@@ -55,6 +57,17 @@
     return answer;
   }
 
+  /** The number logged in to this WhatsApp Web, or null. */
+  function myNumber() {
+    try {
+      const me = window.require("WAWebUserPrefsMeUser").getMaybeMePnUser();
+      return me && me.server === "c.us" ? String(me.user || "") || null : null;
+    } catch {
+      // Moved or not loaded: the panel just won't offer to send.
+      return null;
+    }
+  }
+
   // Asked and answered inside one `dispatchEvent` call: listeners run
   // synchronously, in both worlds, so content.js has the answer by the
   // time its own dispatch returns. A string, because an object in
@@ -62,10 +75,10 @@
   document.addEventListener(ASK, () => {
     let payload;
     try {
-      payload = { v: 1, ready: true, chat: activeChat() };
+      payload = { v: 1, ready: true, chat: activeChat(), me: myNumber() };
     } catch {
       // Not loaded yet, or WhatsApp moved it.
-      payload = { v: 1, ready: false, chat: null };
+      payload = { v: 1, ready: false, chat: null, me: null };
     }
     document.dispatchEvent(new CustomEvent(ANSWER, { detail: JSON.stringify(payload) }));
   });
