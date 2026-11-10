@@ -12,24 +12,24 @@ describe('buildHandoffSummary', () => {
       replyCount: 2,
     })
     expect(summary).toBe(
-      '🤖 AI agent handed off after 2 replies. Last customer message: “I want a refund”',
+      '🤖 A IA passou a conversa para a equipe depois de 2 respostas. Última mensagem do cliente: “I want a refund”',
     )
   })
 
-  it('uses the singular "reply" for a count of one', () => {
+  it('uses the singular "resposta" for a count of one', () => {
     const summary = buildHandoffSummary({
       messages: [{ role: 'user', content: 'help' }],
       replyCount: 1,
     })
-    expect(summary).toContain('after 1 reply.')
+    expect(summary).toContain('depois de 1 resposta.')
   })
 
-  it('says "without replying" when the bot bailed on the first inbound', () => {
+  it('says "sem responder" when the bot bailed on the first inbound', () => {
     const summary = buildHandoffSummary({
       messages: [{ role: 'user', content: 'agent please' }],
       replyCount: 0,
     })
-    expect(summary).toContain('handed off without replying.')
+    expect(summary).toContain('para a equipe sem responder.')
     expect(summary).toContain('“agent please”')
   })
 
@@ -61,7 +61,7 @@ describe('buildHandoffSummary', () => {
       messages: [{ role: 'assistant', content: 'greeting' }],
       replyCount: 0,
     })
-    expect(summary).toBe('🤖 AI agent handed off without replying.')
+    expect(summary).toBe('🤖 A IA passou a conversa para a equipe sem responder.')
   })
 
   it('names the reply cap when that is why it handed off', () => {
@@ -71,7 +71,7 @@ describe('buildHandoffSummary', () => {
       reason: 'reply_cap',
     })
     expect(summary).toBe(
-      '🤖 AI agent handed off after 10 replies — reply limit reached. Last customer message: “ainda está aí?”',
+      '🤖 A IA passou a conversa para a equipe depois de 10 respostas (limite da conversa). Última mensagem do cliente: “ainda está aí?”',
     )
   })
 })

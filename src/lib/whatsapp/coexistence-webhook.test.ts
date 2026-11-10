@@ -31,11 +31,15 @@ function memoryDb(seed: Record<string, Row[]> = {}) {
       limit: Infinity,
       single: false,
     }
+    // `contacts.phone_normalized` is a generated column (migration 022):
+    // Postgres fills it from `phone`, so the fake does too.
+    const value = (r: Row, col: string) =>
+      col === 'phone_normalized' && !(col in r) ? String(r.phone ?? '').replace(/\D/g, '') : r[col]
     const matches = (r: Row) =>
       state.filters.every(([kind, col, val]) => {
-        if (kind === 'eq') return r[col] === val
-        if (kind === 'in') return (val as unknown[]).includes(r[col])
-        if (kind === 'like') return String(r[col] ?? '').endsWith(String(val).replace(/^%/, ''))
+        if (kind === 'eq') return value(r, col) === val
+        if (kind === 'in') return (val as unknown[]).includes(value(r, col))
+        if (kind === 'like') return String(value(r, col) ?? '').endsWith(String(val).replace(/^%/, ''))
         return true
       })
     const run = () => {

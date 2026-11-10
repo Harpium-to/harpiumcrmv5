@@ -539,9 +539,15 @@ html[data-theme="rose"] {
 
   /* Route-change enter. Applied in DashboardShell to a wrapper keyed
    * on the pathname, so every route in the app inherits it without
-   * touching a single page file. */
+   * touching a single page file.
+   *
+   * `backwards`, not `both`: the end state is the element's natural
+   * one anyway, and keeping it would leave `filter: blur(0px)` on the
+   * wrapper for good. Any filter (or transform) makes the wrapper the
+   * containing block of every `position: fixed` descendant, so a
+   * full-screen overlay inside a page would shrink to the page. */
   .fx-page {
-    animation: fx-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: fx-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
 
   .fx-cut-line {

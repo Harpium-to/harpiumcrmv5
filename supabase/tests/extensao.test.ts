@@ -5,7 +5,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 
-import { asUser, errorCode, sql } from './harness'
+import { applyMigration, asUser, errorCode, sql } from './harness'
 import { buildWorld, U, type World } from './world'
 
 const create = (db: PGlite, user: string, n: number) =>
@@ -36,7 +36,19 @@ describe('054 — extension keys', () => {
     expect(keys).toHaveLength(1)
     expect(keys[0]).toMatchObject({
       kind: 'extension',
-      scopes: ['contacts:read', 'contacts:write', 'deals:read', 'deals:write'],
+      // 054's four, the quick replies of 059, and tasks and
+      // conversations from 060.
+      scopes: [
+        'contacts:read',
+        'contacts:write',
+        'deals:read',
+        'deals:write',
+        'quick_replies:read',
+        'tasks:read',
+        'tasks:write',
+        'conversations:read',
+        'conversations:write',
+      ],
       name: 'Extensão do Chrome · Bob',
     })
   })
@@ -96,5 +108,47 @@ describe('054 — extension keys', () => {
       `SELECT revoked_at, kind FROM api_keys WHERE key_hash = 'hash-int'`,
     )
     expect(row).toEqual({ revoked_at: null, kind: 'api' })
+  })
+})
+
+describe('059 — extension keys read quick replies', () => {
+  let w: World
+  beforeAll(async () => {
+    w = await buildWorld()
+  })
+
+  const OLD = ['contacts:read', 'contacts:write', 'deals:read', 'deals:write']
+  const scopesOf = (hash: string) =>
+    sql<{ scopes: string[] }>(w.db, 'SELECT scopes FROM api_keys WHERE key_hash = $1', [
+      hash,
+    ]).then((rows) => rows[0].scopes)
+
+  it('gives the scope to the keys that already existed, and only to those', async () => {
+    // As production is before 059 runs: an extension key with 054's four
+    // scopes, one already revoked, and an account-level key.
+    await sql(
+      w.db,
+      `INSERT INTO api_keys (account_id, created_by, user_id, kind, name, key_prefix, key_hash, scopes, revoked_at)
+       VALUES ($1, $2, $2, 'extension', 'ativa', 'p1', 'old-active', $4, NULL),
+              ($1, $3, $3, 'extension', 'revogada', 'p2', 'old-revoked', $4, NOW())`,
+      [w.A, U.bob, U.alice, OLD],
+    )
+    await sql(
+      w.db,
+      `INSERT INTO api_keys (account_id, created_by, name, key_prefix, key_hash, scopes)
+       VALUES ($1, $2, 'Integração', 'p3', 'account-level', ARRAY['contacts:read'])`,
+      [w.A, U.alice],
+    )
+
+    await applyMigration(w.db, '059_extensao_respostas_rapidas.sql')
+
+    expect(await scopesOf('old-active')).toEqual([...OLD, 'quick_replies:read'])
+    expect(await scopesOf('old-revoked')).toEqual(OLD)
+    expect(await scopesOf('account-level')).toEqual(['contacts:read'])
+  })
+
+  it('is safe to run again', async () => {
+    await applyMigration(w.db, '059_extensao_respostas_rapidas.sql')
+    expect(await scopesOf('old-active')).toEqual([...OLD, 'quick_replies:read'])
   })
 })

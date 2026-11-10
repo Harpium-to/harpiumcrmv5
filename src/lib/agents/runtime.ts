@@ -142,11 +142,16 @@ export async function recordSkippedRun(
  * Same single-row shape as `recordSkippedRun`, for a decision that is
  * not a stand-down: hitting the reply cap hands the thread to a human
  * (`handoff`) without ever asking the model, and the monitor should
- * count it as a handoff, not as a skip.
+ * count it as a handoff, not as a skip. `output` is the notice the
+ * customer was sent; `failed` means that notice did not go out.
  */
 export async function recordInstantRun(
   db: SupabaseClient,
-  args: StartRunArgs & { status: 'skipped' | 'handoff'; reason: string },
+  args: StartRunArgs & {
+    status: 'skipped' | 'handoff' | 'failed'
+    reason: string
+    output?: string | null
+  },
 ): Promise<void> {
   try {
     const { error } = await db.from('agent_runs').insert({
@@ -159,6 +164,7 @@ export async function recordInstantRun(
       trigger: 'inbound_message',
       matched_keyword: args.matchedKeyword,
       inbound_preview: preview(args.inbound),
+      output_preview: preview(args.output),
       reason: args.reason,
       duration_ms: 0,
       finished_at: new Date().toISOString(),

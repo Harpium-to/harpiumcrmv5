@@ -69,14 +69,47 @@ describe("dedupeByPhone", () => {
 describe("findExistingContact", () => {
   // Minimal SupabaseClient stub: resolves the .from().select().eq().like()
   // chain to a fixed candidate set.
-  function stubDb(rows: Array<{ id: string; phone: string }>): SupabaseClient {
+  function stubDb(
+    rows: Array<{ id: string; phone: string }>,
+    calls: Array<[string, string]> = [],
+  ): SupabaseClient {
     const builder = {
       select: () => builder,
       eq: () => builder,
-      like: () => Promise.resolve({ data: rows, error: null }),
+      like: (column: string, pattern: string) => {
+        calls.push([column, pattern]);
+        return Promise.resolve({ data: rows, error: null });
+      },
     };
     return { from: () => builder } as unknown as SupabaseClient;
   }
+
+  it("pre-filters on the digits-only column, not the phone as typed", async () => {
+    // "+55 (31) 99999-8888" does not end in "99998888"; its
+    // phone_normalized does.
+    const calls: Array<[string, string]> = [];
+    const db = stubDb([{ id: "c1", phone: "+55 (31) 99999-8888" }], calls);
+    const hit = await findExistingContact(db, "acct", "5531999998888");
+    expect(calls).toEqual([["phone_normalized", "%99998888"]]);
+    expect(hit?.id).toBe("c1");
+  });
+
+  it("prefers the same digits over a looser last-8 match", async () => {
+    // Same last 8 digits, different area codes: different people.
+    const db = stubDb([
+      { id: "sp", phone: "+5511999998888" },
+      { id: "bh", phone: "+5531999998888" },
+    ]);
+    expect((await findExistingContact(db, "acct", "5531999998888"))?.id).toBe("bh");
+  });
+
+  it("prefers the other ninth-digit form over a looser last-8 match", async () => {
+    const db = stubDb([
+      { id: "sp", phone: "+5511999998888" },
+      { id: "bh", phone: "+553199998888" },
+    ]);
+    expect((await findExistingContact(db, "acct", "+55 31 99999-8888"))?.id).toBe("bh");
+  });
 
   it("returns a trunk-variant match via phonesMatch", async () => {
     const db = stubDb([{ id: "c1", phone: "37063949836" }]);

@@ -158,6 +158,20 @@ export interface ContactNote {
   created_at: string;
 }
 
+/** A to-do about a contact, for a person (migration 060). */
+export interface ContactTask {
+  id: string;
+  contact_id: string;
+  title: string;
+  /** When it should be done; null for a task with no date. */
+  due_at: string | null;
+  /** When it was marked done; null while open. */
+  done_at: string | null;
+  /** Who it is for — the person reminded when it comes due. */
+  assigned_to: string | null;
+  created_at: string;
+}
+
 export type ConversationStatus = 'open' | 'pending' | 'closed';
 
 export interface Conversation {
@@ -203,7 +217,9 @@ export interface Conversation {
 export type NotificationType =
   | 'conversation_assigned'
   /** The agency asked the CRM owner for more access (051). */
-  | 'agency_access_request';
+  | 'agency_access_request'
+  /** A task for this person came due (060). */
+  | 'task_due';
 
 export interface Notification {
   id: string;

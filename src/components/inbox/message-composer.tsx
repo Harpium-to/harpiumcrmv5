@@ -55,6 +55,7 @@ import {
 import { validateInteractivePayload } from "@/lib/whatsapp/interactive";
 import type { InteractiveMessagePayload, QuickReply } from "@/types";
 import { QuickReplyPicker } from "./quick-reply-picker";
+import { fillQuickReply, type QuickReplyContact } from "@/lib/quick-replies/variables";
 
 /** Media content types an agent can send from the composer. */
 export type ComposerMediaKind = "image" | "video" | "document" | "audio";
@@ -118,6 +119,8 @@ interface MessageComposerProps {
   onOpenTemplates: () => void;
   replyTo?: ReplyDraft | null;
   onClearReply?: () => void;
+  /** Whose data fills `{{nome}}` and the other quick-reply variables. */
+  quickReplyContact?: QuickReplyContact | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -140,6 +143,7 @@ export function MessageComposer({
   onOpenTemplates,
   replyTo,
   onClearReply,
+  quickReplyContact,
 }: MessageComposerProps) {
   const t = useTranslations("Inbox.composer");
 
@@ -363,7 +367,9 @@ export function MessageComposer({
         openInteractiveBuilder(qr.interactive_payload);
         return;
       }
-      const body = qr.content_text ?? "";
+      // Variables are filled here, before the text reaches the box, so
+      // what the agent reviews is what the customer will read.
+      const body = fillQuickReply(qr.content_text ?? "", quickReplyContact ?? {}).text;
       // Separate the snippet from any existing draft with a newline so the
       // words don't run together ("Thanks" + "we'll…" → "Thankswe'll…").
       setText((prev) =>
@@ -378,7 +384,7 @@ export function MessageComposer({
         }
       });
     },
-    [openInteractiveBuilder, adjustHeight],
+    [openInteractiveBuilder, adjustHeight, quickReplyContact],
   );
 
   // Upload a captured file to chat-media and stage it as a draft.
