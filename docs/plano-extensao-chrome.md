@@ -488,8 +488,16 @@ conversa:
 **Fase 9 — Integrações.**
 - Google Agenda, exportação de contatos, atalho para webhooks.
 
-**Botões dentro do WhatsApp Web (pedido em 10/11/2026; sem fase
-marcada).** O WaSeller, além do painel, põe botões na própria tela do
+**Botões dentro do WhatsApp Web (pedido em 10/11/2026). A barra no alto
+da conversa foi feita em 10/11 (extensão 0.16.0, sem migration):** oito
+atalhos que abrem o painel na parte certa, flutuando no espaço vazio do
+cabeçalho (medido no WhatsApp real: com o painel recolhido cabem os
+oito; com ele aberto não cabe nenhum, e ela some). Desligável nas
+opções. As outras três (coluna ao lado da conversa, linha do campo de
+mensagem, trilho da esquerda) ficam por fazer: a do campo de mensagem
+cobriria as últimas mensagens se não entrar na página do WhatsApp.
+
+Ideia original: O WaSeller, além do painel, põe botões na própria tela do
 WhatsApp, e a extensão deve ter os seus:
 - uma barra no alto da conversa (etiqueta, etapa, tarefa, assumir);
 - uma coluna de ícones ao lado da conversa (ficha, agenda, notas,

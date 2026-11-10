@@ -268,8 +268,9 @@ const handlers = {
 
   /** The panel's own preferences (today: whether it is collapsed). */
   /**
-   * This person's panel choices: collapsed or not, and the signature
-   * (on or off, and the name to sign with; "" means the CRM's name).
+   * This person's panel choices: collapsed or not, the shortcuts in the
+   * chat header, and the signature (on or off, and the name to sign
+   * with; "" means the CRM's name).
    */
   async getPrefs() {
     const stored = (await chrome.storage.local.get(PREFS_KEY))[PREFS_KEY] || {};
@@ -277,6 +278,8 @@ const handlers = {
       ok: true,
       data: {
         collapsed: Boolean(stored.collapsed),
+        // On unless turned off in the options page.
+        shortcuts: stored.shortcuts !== false,
         sign: Boolean(stored.sign),
         signName: typeof stored.signName === "string" ? stored.signName.slice(0, 60) : "",
       },
@@ -288,6 +291,7 @@ const handlers = {
     const current = (await chrome.storage.local.get(PREFS_KEY))[PREFS_KEY] || {};
     const next = { ...current };
     if ("collapsed" in changes) next.collapsed = Boolean(changes.collapsed);
+    if ("shortcuts" in changes) next.shortcuts = Boolean(changes.shortcuts);
     if ("sign" in changes) next.sign = Boolean(changes.sign);
     if ("signName" in changes) next.signName = String(changes.signName ?? "").slice(0, 60);
     await chrome.storage.local.set({ [PREFS_KEY]: next });
