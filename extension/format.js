@@ -199,3 +199,53 @@ export function chatPhone(phone) {
   const digits = String(phone ?? "").replace(/\D/g, "");
   return digits.length >= 10 && digits.length <= 15 ? digits : null;
 }
+
+/**
+ * When a task is due, said the way a person would — "hoje às 14:00",
+ * "amanhã às 09:00", "atrasada · ontem às 16:30" — with a tone:
+ * "overdue", "today" or "later". Null for no date.
+ *
+ * A copy of `describeDue` in src/lib/tasks/due.ts: the CRM shows the
+ * same tasks. format.test.js keeps the two saying the same thing.
+ */
+export function describeDue(dueAt, now = new Date()) {
+  if (!dueAt) return null;
+  const due = new Date(dueAt);
+  if (!Number.isFinite(due.getTime())) return null;
+
+  const two = (n) => String(n).padStart(2, "0");
+  const dayOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((dayOf(due) - dayOf(now)) / 86_400_000);
+
+  const time = `${two(due.getHours())}:${two(due.getMinutes())}`;
+  const date =
+    `${two(due.getDate())}/${two(due.getMonth() + 1)}` +
+    (due.getFullYear() === now.getFullYear() ? "" : `/${due.getFullYear()}`);
+  const day = days === 0 ? "hoje" : days === 1 ? "amanhã" : days === -1 ? "ontem" : date;
+  const when = `${day} às ${time}`;
+
+  if (due.getTime() < now.getTime()) return { label: `atrasada · ${when}`, tone: "overdue" };
+  return { label: when, tone: days === 0 ? "today" : "later" };
+}
+
+/** How many open tasks are late or for today: the reminder count. */
+export function countDueNow(tasks, now = new Date()) {
+  return (tasks ?? []).filter((task) => {
+    if (task?.done_at) return false;
+    const due = describeDue(task?.due_at, now);
+    return due !== null && due.tone !== "later";
+  }).length;
+}
+
+/**
+ * The value of a `datetime-local` field as an ISO date-time in UTC —
+ * what the API takes — or null for an empty or unreadable field. The
+ * field is in the person's own time zone, and so is `new Date()` of
+ * its value.
+ */
+export function localInputToIso(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const date = new Date(text);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}

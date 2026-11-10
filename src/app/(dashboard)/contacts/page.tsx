@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -83,8 +84,12 @@ export default function ContactsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [editContactTags, setEditContactTags] = useState<ContactTag[]>([]);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailContactId, setDetailContactId] = useState<string | null>(null);
+  // A link straight to one contact — `/contacts?contact=<id>` — opens
+  // their details: the Chrome extension's "Abrir no CRM" and a task
+  // reminder in the bell both arrive this way.
+  const linkedContactId = useSearchParams().get('contact');
+  const [detailOpen, setDetailOpen] = useState(Boolean(linkedContactId));
+  const [detailContactId, setDetailContactId] = useState<string | null>(linkedContactId);
   const [importOpen, setImportOpen] = useState(false);
   const [customFieldsOpen, setCustomFieldsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);

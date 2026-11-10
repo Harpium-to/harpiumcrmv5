@@ -40,6 +40,7 @@ import {
   LayoutTemplate,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { ContactTasks } from '@/components/contacts/contact-tasks';
 
 interface ContactDetailViewProps {
   open: boolean;
@@ -477,6 +478,12 @@ export function ContactDetailView({
                   {t('tabs.notes')}
                 </TabsTrigger>
                 <TabsTrigger
+                  value="tasks"
+                  className="data-active:bg-muted data-active:text-primary text-muted-foreground"
+                >
+                  {t('tabs.tasks')}
+                </TabsTrigger>
+                <TabsTrigger
                   value="custom"
                   className="data-active:bg-muted data-active:text-primary text-muted-foreground"
                 >
@@ -580,6 +587,11 @@ export function ContactDetailView({
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              {/* Tasks Tab */}
+              <TabsContent value="tasks" className="flex-1 overflow-y-auto px-4 py-3">
+                <ContactTasks key={contactId} contactId={contactId} />
               </TabsContent>
 
               {/* Notes Tab */}

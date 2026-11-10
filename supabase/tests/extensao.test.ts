@@ -36,13 +36,18 @@ describe('054 — extension keys', () => {
     expect(keys).toHaveLength(1)
     expect(keys[0]).toMatchObject({
       kind: 'extension',
-      // 054's four, plus the quick replies of migration 059.
+      // 054's four, the quick replies of 059, and tasks and
+      // conversations from 060.
       scopes: [
         'contacts:read',
         'contacts:write',
         'deals:read',
         'deals:write',
         'quick_replies:read',
+        'tasks:read',
+        'tasks:write',
+        'conversations:read',
+        'conversations:write',
       ],
       name: 'Extensão do Chrome · Bob',
     })

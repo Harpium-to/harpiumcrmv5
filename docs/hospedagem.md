@@ -157,6 +157,11 @@ avançam. O app não se chama sozinho.
 Todos exigem o cabeçalho `x-cron-secret` com o valor de
 `AUTOMATION_CRON_SECRET`.
 
+O `automations/cron` também envia os **lembretes de tarefas** (o aviso
+no sino quando uma tarefa vence, migration 060). Não há job separado
+para isso: com ele parado, as tarefas continuam aparecendo, mas ninguém
+é avisado na hora.
+
 **Com o cron-job.org** (gratuito): crie um job para cada endpoint. Em
 **Advanced › Headers**, adicione `x-cron-secret` com o seu segredo.
 Para conferir: a resposta deve ser `200`. `401` é segredo errado e

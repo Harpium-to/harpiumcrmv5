@@ -25,6 +25,7 @@
 
   /* Keep in step with PANEL_WIDTH in content.js and the #app rule. */
   --crmc-width: 320px;
+  color-scheme: light;
 
   --crmc-bg: oklch(0.975 0.006 72);
   --crmc-surface: oklch(0.995 0.003 72);
@@ -59,6 +60,9 @@
 }
 
 #crm-connector-panel[data-mode="dark"] {
+  /* The browser's own pieces — the date picker, a select's list — in
+     the dark too. */
+  color-scheme: dark;
   --crmc-bg: oklch(0.175 0.012 72);
   --crmc-surface: oklch(0.235 0.012 72);
   --crmc-muted: oklch(0.275 0.012 72);
@@ -569,9 +573,11 @@
 }
 
 #crm-connector-panel .crmc-tabbtn {
-  flex: 1;
+  flex: 1 1 auto;
   margin: 0 0 -1px;
-  padding: 8px 4px;
+  padding: 8px 2px;
+  /* Four tabs share the column: a count stays beside its label. */
+  white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -601,7 +607,7 @@
   display: inline-block;
   min-width: 16px;
   margin-left: 2px;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 999px;
   background: var(--crmc-muted);
   font-size: 10px;
@@ -945,6 +951,150 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: pre-line;
+}
+
+/* ---- Tasks ------------------------------------------------ */
+
+#crm-connector-panel .crmc-task-title-input {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+}
+
+#crm-connector-panel .crmc-taskwhen {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+
+#crm-connector-panel .crmc-taskwhen .crmc-input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px;
+}
+
+#crm-connector-panel .crmc-tasks,
+#crm-connector-panel .crmc-mytasks {
+  margin: 14px 0 0;
+}
+
+#crm-connector-panel .crmc-tasks > .crmc-muted:first-child,
+#crm-connector-panel .crmc-mytasks > .crmc-muted:first-child {
+  margin-top: 0;
+}
+
+#crm-connector-panel .crmc-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+}
+
+/* The tick: an empty circle that fills on the way to "done". */
+#crm-connector-panel .crmc-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  border: 1.5px solid var(--crmc-fg-muted);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-check:hover {
+  border-color: var(--crmc-primary);
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-check:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 2px;
+}
+
+#crm-connector-panel .crmc-task-main {
+  flex: 1;
+  min-width: 0;
+}
+
+#crm-connector-panel .crmc-task-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#crm-connector-panel .crmc-task-when,
+#crm-connector-panel .crmc-task-who {
+  margin: 3px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+/* Late is said in words ("atrasada · …") and in colour; today only
+   gets the weight. */
+#crm-connector-panel .crmc-task[data-tone="overdue"] .crmc-task-when {
+  color: var(--crmc-danger);
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-task[data-tone="today"] .crmc-task-when {
+  color: var(--crmc-fg);
+  font-weight: 600;
+}
+
+/* How many of my tasks are late or for today. */
+#crm-connector-panel .crmc-badge {
+  margin-left: 5px;
+  background: var(--crmc-danger);
+  color: var(--crmc-bg);
+  font-weight: 700;
+}
+
+#crm-connector-panel .crmc-badge[hidden] {
+  display: none;
+}
+
+/* ---- The conversation in the CRM --------------------------- */
+
+#crm-connector-panel .crmc-conv:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-conv {
+  margin: 0 0 12px;
+}
+
+#crm-connector-panel .crmc-conv-box {
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-muted);
+}
+
+/* Someone is waiting for a person: the one banner that asks for
+   attention. */
+#crm-connector-panel .crmc-conv-box[data-tone="waiting"] {
+  border-color: var(--crmc-danger);
+}
+
+#crm-connector-panel .crmc-conv-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-conv-summary {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-conv-box .crmc-btn {
+  margin: 8px 0 0;
 }
 
 /* ---- The board -------------------------------------------- */
