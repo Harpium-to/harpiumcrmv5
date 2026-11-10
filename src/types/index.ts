@@ -471,7 +471,10 @@ export type AutomationTriggerType =
   | 'time_based'
   /** Customer tapped a reply button / list row whose id matches; lets
    *  multi-step menus be chained across automations. */
-  | 'interactive_reply';
+  | 'interactive_reply'
+  /** A sequence: started by a person on one contact, from the Chrome
+   *  extension (POST /api/v1/sequences/{id}/start). Never by an event. */
+  | 'manual';
 
 export type AutomationStepType =
   | 'send_message'

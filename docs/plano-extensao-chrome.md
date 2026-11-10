@@ -341,8 +341,9 @@ exige duas coisas que ainda não existem:
 *4B (em andamento).* O que precisa mesmo sair pelo CRM. Etapas 1 e 2
 em produção desde 10/11/2026 (extensão 0.10.0, PR #21, migration 062
 aplicada); etapa 3 em produção desde 10/11 (extensão 0.11.0, PR #22,
-migration 063 aplicada); etapa 4 feita em 10/11 (extensão 0.12.0, sem
-migration); 5 por fazer.
+migration 063 aplicada); etapa 4 em produção desde 10/11 (extensão
+0.12.0, PR #23, sem migration); etapa 5 feita em 10/11 (extensão
+0.13.0, sem migration).
 
 **Dependia do PR #12** (WhatsApp D1, "dois caminhos", de outra
 conversa), que **entrou em produção em 10/11/2026**, com a migration
@@ -397,9 +398,17 @@ Etapas, na ordem:
    não) e para o campo de mensagem quando ele está vazio. O inbox do
    CRM não assina: se fizer falta, é uma preferência por pessoa no CRM,
    com migration.
-5. **Funil de mensagens.** Uma sequência com intervalos, disparada com
-   1 clique na conversa. Reaproveita as automações (gatilho manual),
-   que já sabem esperar e continuar pelo agendador.
+5. ✅ **Funil de mensagens ("Sequências").** Uma automação com o
+   gatilho novo **Sequência (disparo manual)**: mensagens, esperas e
+   ações, sem condições. Na extensão, abaixo das respostas: Iniciar →
+   Confirmar, e Parar enquanto está em andamento. A primeira mensagem
+   sai na hora e o resto pelo agendador das automações. Limites: pelo
+   menos 1 minuto entre duas mensagens (ao salvar e ao iniciar), uma
+   vez por contato de cada vez, 100 inícios por CRM em 24 horas
+   (`src/lib/api/v1/sequences.ts`). API: `/api/v1/sequences`, com
+   `messages:send`. O nome "Sequências" evita confundir com o "Funil"
+   do quadro de negócios. Intervalos de segundos, como o WaSeller faz
+   no navegador, não entram: o agendador anda de minuto em minuto.
 
 Riscos próprios desta etapa:
 - **É a primeira que envia de verdade.** Os testes precisam de um

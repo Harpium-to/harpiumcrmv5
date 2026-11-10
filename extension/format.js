@@ -283,3 +283,16 @@ export function signText(text, name) {
   if (!who || !body.trim()) return body;
   return `*${who}:*\n${body}`;
 }
+
+/**
+ * How long a sequence takes, said briefly: "agora", "30 min", "2 h",
+ * "1 dia", "3 dias". Rounded; it is a hint, not a schedule.
+ */
+export function describeDuration(minutes) {
+  const m = Number(minutes);
+  if (!Number.isFinite(m) || m <= 0) return "agora";
+  if (m < 60) return `${Math.round(m)} min`;
+  if (m < 1440) return `${Math.round(m / 60)} h`;
+  const days = Math.round(m / 1440);
+  return days === 1 ? "1 dia" : `${days} dias`;
+}

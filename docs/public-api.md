@@ -204,6 +204,28 @@ to send only when this is the number logged in to WhatsApp Web.
   on an assumption. The Chrome extension's personal keys get
   `messages:send` from migration `062`.
 
+### Sequences
+
+A sequence is an automation with the **Sequência (disparo manual)**
+trigger: messages with waits between them, started by hand on one
+contact. Built in the CRM's automation builder; a sequence has no
+conditions, and any two of its messages are at least a minute apart.
+All three endpoints need `messages:send`.
+
+- `GET /api/v1/sequences?contact_id=<uuid>` — the active sequences:
+  `{ "id", "name", "description", "messages", "duration_minutes",
+  "running" }`. `running` is for the contact given (false without one).
+- `POST /api/v1/sequences/{id}/start` with `{ "contact_id" }` — sends
+  the first messages now; the scheduler (`/api/automations/cron`)
+  carries on after each wait. `201 { "data": { "log_id" } }`. Refused
+  with `409` when the sequence is off (`inactive`), already running for
+  the contact (`already_running`) or the contact has no conversation
+  (`no_conversation`); `422 invalid_sequence` when it breaks the rules
+  above; `429 daily_limit` after 100 starts in 24 hours in the CRM.
+- `POST /api/v1/sequences/{id}/stop` with `{ "contact_id" }` — drops
+  what was still waiting to be sent. `{ "data": { "stopped": n } }`,
+  `0` when it wasn't running.
+
 ### `GET /api/v1/contacts`
 
 List contacts, newest first. Scope: `contacts:read`. Paginated (see

@@ -155,6 +155,13 @@ let senderState = { baseUrl: null, status: "idle", provider: null, phone: null, 
 let pendingSend = null;
 let sendingReply = false;
 const SEND_CONFIRM_MS = 5000;
+// Sequences (Fase 4B, step 5): the CRM's automations started by hand,
+// listed under the replies for the contact on the panel. `pendingSeq`
+// is the one whose "Iniciar" was clicked once and waits for
+// "Confirmar".
+let seqState = { contactId: null, status: "idle", items: [] };
+let pendingSeq = null;
+let seqBusy = false;
 // What a person calls the file of a quick reply (migration 063).
 const MEDIA_LABELS = { image: "Imagem", video: "Vídeo", document: "Arquivo", audio: "Áudio" };
 
@@ -215,6 +222,7 @@ let countDueNow = () => 0;
 let localInputToIso = () => null;
 let signText = (text) => String(text ?? "");
 let cleanSignatureName = (name) => String(name ?? "").trim();
+let describeDuration = () => "";
 // From send-check.js. Without it the panel never offers to send.
 let sendCheck = () => ({ ok: false, why: null });
 
@@ -506,6 +514,8 @@ function ensurePanel() {
     if (action === "replies-close") setRepliesOpen(false);
     if (action === "reply-use") void useReply(target.getAttribute("data-id"));
     if (action === "reply-send") void sendReply(target.getAttribute("data-id"));
+    if (action === "seq-start") void startSequence(target.getAttribute("data-id"));
+    if (action === "seq-stop") void stopSequence(target.getAttribute("data-id"));
     if (action === "mytasks-open") setMyTasksOpen(true);
     if (action === "mytasks-close") setMyTasksOpen(false);
     if (action === "task-done") void setTaskDone(findTask(target.getAttribute("data-id")), true);
@@ -1938,11 +1948,13 @@ function setRepliesOpen(open) {
            placeholder="Buscar pelo título ou pelo texto" aria-label="Buscar resposta rápida" />
     <div class="crmc-sign"></div>
     <p class="crmc-replies-status" role="status" aria-live="polite"></p>
-    <div class="crmc-replies"></div>`;
+    <div class="crmc-replies"></div>
+    <div class="crmc-seqs"></div>`;
   paintSignature();
   paintReplies();
   sheet().querySelector(".crmc-replies-search")?.focus();
   void loadReplies();
+  void loadSequences(true);
   void loadSender();
 }
 
@@ -2019,6 +2031,159 @@ function paintReplies() {
           </div>`;
       })
       .join("") + manage;
+  paintSequences();
+}
+
+// ------------------------------------------------------------
+// Sequences
+// ------------------------------------------------------------
+
+/** Ask the CRM for its sequences, for the contact on the panel. */
+async function loadSequences(force = false) {
+  const contactId = currentContact?.id ?? null;
+  if (!repliesOpen) return;
+  if (!force && seqState.contactId === contactId && seqState.status !== "idle") return;
+  if (!contactId) {
+    seqState = { contactId: null, status: "idle", items: [] };
+    paintSequences();
+    return;
+  }
+  if (seqState.contactId !== contactId) {
+    seqState = { contactId, status: "loading", items: [] };
+    paintSequences();
+  }
+  const result = await send("sequences", { contactId });
+  if (currentContact?.id !== contactId) return;
+  if (result.ok) {
+    seqState = {
+      contactId,
+      status: "ready",
+      items: Array.isArray(result.data) ? result.data : [],
+    };
+  } else {
+    // 403: the key may not send (before 062); 404: a CRM without
+    // sequences yet. Either way there is nothing to offer.
+    seqState = { contactId, status: "error", items: [] };
+  }
+  paintSequences();
+}
+
+function paintSequences() {
+  const el = sheet()?.querySelector(".crmc-seqs");
+  if (!el || !repliesOpen) return;
+  // A different contact on the panel: what is listed is someone else's.
+  if ((currentContact?.id ?? null) !== seqState.contactId) {
+    el.innerHTML = "";
+    void loadSequences();
+    return;
+  }
+  if (seqState.status !== "ready" || !seqState.items.length) {
+    el.innerHTML = "";
+    return;
+  }
+  const check = currentSendCheck();
+  if (pendingSeq && (!check.ok || pendingSeq.contactId !== seqState.contactId)) clearPendingSeq();
+  el.innerHTML = `
+    <p class="crmc-name crmc-seqs-title">Sequências</p>
+    ${check.ok ? "" : `<p class="crmc-muted crmc-replies-note">Para iniciar uma sequência, o envio direto precisa estar ligado.</p>`}
+    ${seqState.items
+      .map((seq) => {
+        const id = escapeHtml(seq.id);
+        const plural = seq.messages === 1 ? "mensagem" : "mensagens";
+        const summary = `${seq.messages} ${plural} · ${describeDuration(seq.duration_minutes)}`;
+        const confirming = pendingSeq?.id === seq.id;
+        const action = seq.running
+          ? `<button class="crmc-reply-send" data-act="seq-stop" data-id="${id}" ${seqBusy ? "disabled" : ""}
+                     aria-label="Parar ${escapeHtml(seq.name)}">Parar</button>`
+          : check.ok
+            ? `<button class="crmc-reply-send${confirming ? " crmc-reply-confirm" : ""}" data-act="seq-start"
+                       data-id="${id}" ${seqBusy ? "disabled" : ""}
+                       aria-label="${confirming ? "Confirmar início de" : "Iniciar"} ${escapeHtml(seq.name)}">
+                 ${confirming ? "Confirmar" : "Iniciar"}
+               </button>`
+            : "";
+        return `
+          <div class="crmc-reply-row crmc-seq">
+            <div class="crmc-result crmc-seq-main">
+              <span class="crmc-result-name">${escapeHtml(seq.name)}</span>
+              <span class="crmc-reply-file">${escapeHtml(seq.running ? `Em andamento · ${summary}` : summary)}</span>
+              ${seq.description ? `<span class="crmc-reply-text">${escapeHtml(seq.description)}</span>` : ""}
+            </div>${action}
+          </div>`;
+      })
+      .join("")}`;
+}
+
+function clearPendingSeq() {
+  if (pendingSeq?.timer) clearTimeout(pendingSeq.timer);
+  pendingSeq = null;
+}
+
+/** First click asks for confirmation; the second, within 5 s, starts it. */
+async function startSequence(id) {
+  if (seqBusy) return;
+  const seq = seqState.items.find((s) => s.id === id);
+  const contactId = currentContact?.id;
+  if (!seq || !contactId || !currentSendCheck().ok) return;
+
+  if (pendingSeq?.id !== id || pendingSeq.contactId !== contactId) {
+    clearPendingSeq();
+    clearPendingSend();
+    pendingSeq = {
+      id,
+      contactId,
+      timer: setTimeout(() => {
+        pendingSeq = null;
+        setRepliesStatus("");
+        paintSequences();
+      }, SEND_CONFIRM_MS),
+    };
+    const who = currentContact?.name ? ` para ${currentContact.name}` : "";
+    const when =
+      seq.duration_minutes > 0 ? `ao longo de ${describeDuration(seq.duration_minutes)}` : "agora";
+    setRepliesStatus(
+      `Clique em Confirmar para iniciar “${seq.name}”${who}: ${seq.messages} ${
+        seq.messages === 1 ? "mensagem" : "mensagens"
+      } pelo CRM, ${when}.`,
+    );
+    paintSequences();
+    return;
+  }
+
+  clearPendingSeq();
+  seqBusy = true;
+  setRepliesStatus(`Iniciando “${seq.name}”…`);
+  paintSequences();
+  const result = await send("startSequence", { id, contactId });
+  seqBusy = false;
+  if (result.ok) {
+    setRepliesStatus(`“${seq.name}” iniciada. A primeira mensagem sai agora; as outras seguem sozinhas.`);
+  } else {
+    setRepliesStatus(`Não iniciei “${seq.name}”: ${failureText(result, "iniciar sequências")}`, "error");
+  }
+  await loadSequences(true);
+}
+
+/** Stop what is left of a sequence for the contact on the panel. */
+async function stopSequence(id) {
+  if (seqBusy) return;
+  const seq = seqState.items.find((s) => s.id === id);
+  const contactId = currentContact?.id;
+  if (!seq || !contactId) return;
+  seqBusy = true;
+  paintSequences();
+  const result = await send("stopSequence", { id, contactId });
+  seqBusy = false;
+  if (result.ok) {
+    setRepliesStatus(
+      result.data?.stopped
+        ? `“${seq.name}” parada. O que já tinha saído, saiu.`
+        : `“${seq.name}” já tinha terminado.`,
+    );
+  } else {
+    setRepliesStatus(`Não parei “${seq.name}”: ${failureText(result, "parar sequências")}`, "error");
+  }
+  await loadSequences(true);
 }
 
 /** The name this person signs with now, or "" for none. */
@@ -2144,6 +2309,7 @@ async function sendReply(replyId) {
   const chatKey = currentChat?.key ?? null;
   if (pendingSend?.id !== replyId || pendingSend.chatKey !== chatKey) {
     clearPendingSend();
+    clearPendingSeq();
     pendingSend = {
       id: replyId,
       chatKey,
@@ -2796,6 +2962,7 @@ void (async () => {
     localInputToIso = format.localInputToIso;
     signText = format.signText;
     cleanSignatureName = format.cleanSignatureName;
+    describeDuration = format.describeDuration;
   } catch {
     // The fallbacks above stand in.
   }

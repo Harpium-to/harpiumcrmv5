@@ -890,6 +890,10 @@
         "time_based": {
           "label": "Time-Based",
           "hint": "On a recurring schedule"
+        },
+        "manual": {
+          "label": "Sequence (manual start)",
+          "hint": "Starts when someone fires it for one contact, from the Chrome extension. Only messages, waits and actions; wait at least 1 minute between two messages."
         }
       },
       "trigger": "Trigger",
