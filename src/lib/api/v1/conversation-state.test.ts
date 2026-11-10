@@ -49,6 +49,7 @@ describe('serializeConversationState', () => {
       assigned_to: { id: 'u1', name: 'Ana Lima' },
       assigned_to_me: true,
       last_message_at: '2026-11-10T12:05:00Z',
+      flow: null,
     });
   });
 
@@ -83,5 +84,17 @@ describe('serializeConversationState', () => {
       serializeConversationState(before058, { botOn: true, personId: 'u1', assigneeName: null })
         .waiting_since
     ).toBeNull();
+  });
+});
+
+describe('serializeConversationState — the flow running', () => {
+  it('carries the flow it was given', () => {
+    const flow = { run_id: 'r1', flow_id: 'f1', name: 'Triagem' };
+    expect(
+      serializeConversationState(
+        { id: 'c', status: 'open' },
+        { botOn: false, personId: null, assigneeName: null, flow },
+      ).flow,
+    ).toEqual(flow);
   });
 });

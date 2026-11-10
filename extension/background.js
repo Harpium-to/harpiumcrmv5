@@ -505,6 +505,32 @@ const handlers = {
     return callApi("/messages", { method: "POST", body: JSON.stringify(body) });
   },
 
+  /** Give a conversation back to the AI — the inbox's "Retomar IA". */
+  async handBack({ id }) {
+    if (!id) return { ok: false, error: "no_id" };
+    return callApi(`/conversations/${encodeURIComponent(id)}/handback`, { method: "POST" });
+  },
+
+  /** Stop the chatbot flow running on a conversation. */
+  async pauseFlow({ id }) {
+    if (!id) return { ok: false, error: "no_id" };
+    return callApi(`/conversations/${encodeURIComponent(id)}/flow/pause`, { method: "POST" });
+  },
+
+  /** The CRM's chatbot flows that start by hand. */
+  async flows() {
+    return callApi("/flows");
+  },
+
+  /** Start a manual flow on a contact; the CRM checks its limits. */
+  async startFlow({ id, contactId }) {
+    if (!id || !contactId) return { ok: false, error: "no_id" };
+    return callApi(`/flows/${encodeURIComponent(id)}/start`, {
+      method: "POST",
+      body: JSON.stringify({ contact_id: contactId }),
+    });
+  },
+
   /** What is scheduled for a contact (migration 064). Not cached. */
   async scheduled({ contactId }) {
     if (!contactId) return { ok: false, error: "no_id" };

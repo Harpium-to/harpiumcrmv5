@@ -1302,6 +1302,35 @@
   margin: 8px 0 0;
 }
 
+#crm-connector-panel .crmc-conv-box .crmc-conv-text + .crmc-conv-text {
+  margin-top: 4px;
+}
+
+/* Assumir, Devolver para a IA, Pausar fluxo: side by side when they fit. */
+#crm-connector-panel .crmc-conv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+#crm-connector-panel .crmc-conv-actions .crmc-btn {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-flows:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+#crm-connector-panel .crmc-flows > .crmc-muted {
+  margin: 0;
+}
+
 /* ---- The board -------------------------------------------- */
 
 /* A child of the panel, placed against the viewport: it covers
