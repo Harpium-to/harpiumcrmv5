@@ -139,6 +139,19 @@ let repliesOpen = false;
 let repliesQuery = "";
 let repliesState = { baseUrl: null, status: "idle", items: [], notice: null };
 
+// Sending a quick reply through the CRM (Fase 4B). `myWhatsAppPhone`
+// is the number logged in to this WhatsApp Web, read with the open
+// chat; `senderState` is the number the CRM would send from. The panel
+// offers "Enviar" only when the two are the same (send-check.js).
+// `pendingSend` is the reply whose "Enviar" was clicked once and now
+// waits for "Confirmar"; it lapses after a few seconds or when the
+// chat changes.
+let myWhatsAppPhone = null;
+let senderState = { baseUrl: null, status: "idle", provider: null, phone: null, at: 0 };
+let pendingSend = null;
+let sendingReply = false;
+const SEND_CONFIRM_MS = 5000;
+
 // The board: open or not, its search, and the pipeline it shows.
 // `moved` is set once a card was moved, so the record beside the chat
 // knows to reload its own deals when the board closes.
@@ -170,6 +183,7 @@ const TEMPERATURES = [
 // Filled by the dynamic import at the bottom. Until it resolves the
 // panel reports "no chat", which is correct: nothing has been read yet.
 let chatFromPage = () => null;
+let myPhoneFromPage = () => null;
 let chatFromDataIds = () => null;
 let phoneFromHeaderTitles = () => null;
 let usableChatName = () => null;
@@ -193,6 +207,8 @@ let chatPhone = () => null;
 let describeDue = () => null;
 let countDueNow = () => 0;
 let localInputToIso = () => null;
+// From send-check.js. Without it the panel never offers to send.
+let sendCheck = () => ({ ok: false, why: null });
 
 // page-bridge.js answers inside the dispatch below (see there), so the
 // reply is already in `pageAnswer` when `dispatchEvent` returns.
@@ -225,7 +241,9 @@ function readOpenChat() {
 
   // WhatsApp's own answer first; the message rows only when it has
   // none — or says "no chat" while one is plainly on screen.
-  let found = chatFromPage(askPage());
+  const answer = askPage();
+  myWhatsAppPhone = myPhoneFromPage(answer);
+  let found = chatFromPage(answer);
   let from = "page";
   if (!found || (found.state === "none" && main)) {
     if (!main) return { state: "none" };
@@ -477,6 +495,7 @@ function ensurePanel() {
     if (action === "replies-open") setRepliesOpen(true);
     if (action === "replies-close") setRepliesOpen(false);
     if (action === "reply-use") void useReply(target.getAttribute("data-id"));
+    if (action === "reply-send") void sendReply(target.getAttribute("data-id"));
     if (action === "mytasks-open") setMyTasksOpen(true);
     if (action === "mytasks-close") setMyTasksOpen(false);
     if (action === "task-done") void setTaskDone(findTask(target.getAttribute("data-id")), true);
@@ -1860,10 +1879,14 @@ async function takeOverConversation() {
 // ------------------------------------------------------------
 // Quick replies
 //
-// The CRM's text snippets, one click from WhatsApp's message box. The
-// text is PUT in the box, not sent: the person reads it — with the
+// The CRM's text snippets, one click from WhatsApp's message box. A
+// click PUTS the text in the box: the person reads it — with the
 // contact's name already filled in — and presses Enter themselves.
-// Nothing leaves without a human looking at it.
+//
+// "Enviar" sends it through the CRM instead (Fase 4B), and only shows
+// when the CRM would send from the number logged in here, to the
+// contact on the panel (send-check.js). It takes two clicks: "Enviar",
+// then "Confirmar". Nothing leaves without a human asking twice.
 //
 // The list opens as a sheet over the record rather than replacing it,
 // so a half-written note is still there when the sheet closes.
@@ -1900,6 +1923,7 @@ function setRepliesOpen(open) {
   paintReplies();
   sheet().querySelector(".crmc-replies-search")?.focus();
   void loadReplies();
+  void loadSender();
 }
 
 function setRepliesStatus(message, tone) {
@@ -1935,18 +1959,154 @@ function paintReplies() {
     return;
   }
   const contact = replyContact();
+  const check = currentSendCheck();
+  // A confirmation waiting for another chat is not this chat's.
+  if (pendingSend && (!check.ok || pendingSend.chatKey !== currentChat?.key)) clearPendingSend();
+  const note = check.ok
+    ? `<p class="crmc-muted crmc-replies-note">Clique numa resposta para colocá-la no campo de
+         mensagem, ou em Enviar para mandar direto pelo CRM.</p>`
+    : check.why
+      ? `<p class="crmc-muted crmc-replies-note">${escapeHtml(check.why)}</p>`
+      : "";
   el.innerHTML =
+    note +
     shown
       .map((reply) => {
         // The preview is the text as it will go, name and all.
         const preview = fillTemplate(reply.text, contact).text;
+        const id = escapeHtml(reply.id);
+        const confirming = pendingSend?.id === reply.id;
+        const sendButton = check.ok
+          ? `<button class="crmc-reply-send${confirming ? " crmc-reply-confirm" : ""}"
+                     data-act="reply-send" data-id="${id}"
+                     ${sendingReply ? "disabled" : ""}
+                     aria-label="${confirming ? "Confirmar envio de" : "Enviar"} ${escapeHtml(reply.title)} pelo CRM">
+               ${confirming ? "Confirmar" : "Enviar"}
+             </button>`
+          : "";
         return `
-          <button class="crmc-result crmc-reply" data-act="reply-use" data-id="${escapeHtml(reply.id)}">
-            <span class="crmc-result-name">${escapeHtml(reply.title)}</span>
-            <span class="crmc-reply-text">${escapeHtml(preview)}</span>
-          </button>`;
+          <div class="crmc-reply-row">
+            <button class="crmc-result crmc-reply" data-act="reply-use" data-id="${id}">
+              <span class="crmc-result-name">${escapeHtml(reply.title)}</span>
+              <span class="crmc-reply-text">${escapeHtml(preview)}</span>
+            </button>${sendButton}
+          </div>`;
       })
       .join("") + manage;
+}
+
+/** Whether "Enviar" may show for the open chat, and why not. */
+function currentSendCheck() {
+  const sender = senderState.baseUrl === currentBaseUrl ? senderState : null;
+  return sendCheck({
+    sender,
+    myPhone: myWhatsAppPhone,
+    chat: currentChat,
+    contact: currentContact,
+  });
+}
+
+/** Ask the CRM which number it sends from (the worker keeps it a minute). */
+async function loadSender() {
+  const baseUrl = currentBaseUrl;
+  if (!baseUrl) return;
+  if (senderState.baseUrl !== baseUrl) {
+    senderState = { baseUrl, status: "loading", provider: null, phone: null, at: 0 };
+  }
+  const result = await send("sender");
+  if (currentBaseUrl !== baseUrl) return;
+  if (result.ok) {
+    senderState = {
+      baseUrl,
+      status: "ready",
+      provider: result.data?.provider ?? null,
+      phone: result.data?.phone ?? null,
+      at: Date.now(),
+    };
+  } else {
+    const status =
+      result.error === "unauthorized" && result.status === 403
+        ? "denied"
+        : result.status === 404
+          ? "missing"
+          : "error";
+    senderState = { baseUrl, status, provider: null, phone: null, at: Date.now() };
+  }
+  paintReplies();
+}
+
+function clearPendingSend() {
+  if (pendingSend?.timer) clearTimeout(pendingSend.timer);
+  pendingSend = null;
+}
+
+/**
+ * First click: ask for confirmation. Second click, on the same reply in
+ * the same chat within a few seconds: send it through the CRM.
+ */
+async function sendReply(replyId) {
+  if (sendingReply) return;
+  const reply = repliesState.items.find((r) => r.id === replyId);
+  if (!reply) return;
+  const check = currentSendCheck();
+  if (!check.ok) {
+    clearPendingSend();
+    paintReplies();
+    return;
+  }
+
+  const { text, missing } = fillTemplate(reply.text, replyContact());
+  if (missing.length) {
+    clearPendingSend();
+    setRepliesStatus(
+      "Faltou preencher " +
+        missing.map((v) => `{{${v}}}`).join(", ") +
+        ". Clique na resposta para colocá-la no campo de mensagem e complete antes de enviar.",
+      "error",
+    );
+    paintReplies();
+    return;
+  }
+
+  const chatKey = currentChat?.key ?? null;
+  if (pendingSend?.id !== replyId || pendingSend.chatKey !== chatKey) {
+    clearPendingSend();
+    pendingSend = {
+      id: replyId,
+      chatKey,
+      timer: setTimeout(() => {
+        pendingSend = null;
+        setRepliesStatus("");
+        paintReplies();
+      }, SEND_CONFIRM_MS),
+    };
+    const who = currentContact?.name ? ` para ${currentContact.name}` : "";
+    setRepliesStatus(`Clique em Confirmar para enviar “${reply.title}”${who} pelo CRM.`);
+    paintReplies();
+    return;
+  }
+
+  clearPendingSend();
+  sendingReply = true;
+  setRepliesStatus(`Enviando “${reply.title}”…`);
+  paintReplies();
+  const gen = generation;
+  const result = await send("sendText", { to: check.to, text });
+  sendingReply = false;
+  if (result.ok) {
+    // Said even if the chat changed meanwhile: it did go, to that chat.
+    setRepliesStatus(
+      gen === generation
+        ? `“${reply.title}” enviada pelo CRM. Ela aparece na conversa em instantes.`
+        : `“${reply.title}” foi enviada pelo CRM para a conversa anterior.`,
+    );
+  } else {
+    setRepliesStatus(
+      `Não enviei “${reply.title}”: ${failureText(result, "enviar mensagens")}`,
+      "error",
+    );
+  }
+  paintReplies();
 }
 
 async function loadReplies() {
@@ -2505,6 +2665,7 @@ void (async () => {
   try {
     const mod = await import(chrome.runtime.getURL("chat-id.js"));
     chatFromPage = mod.chatFromPage;
+    myPhoneFromPage = mod.myPhoneFromPage;
     chatFromDataIds = mod.chatFromDataIds;
     phoneFromHeaderTitles = mod.phoneFromHeaderTitles;
     usableChatName = mod.usableChatName;
@@ -2512,6 +2673,11 @@ void (async () => {
   } catch {
     renderMessage("Não consegui carregar a extensão. Recarregue a página.");
     return;
+  }
+  try {
+    sendCheck = (await import(chrome.runtime.getURL("send-check.js"))).sendCheck;
+  } catch {
+    // The panel never offers to send; putting text in the box still works.
   }
   try {
     pickMode = (await import(chrome.runtime.getURL("theme.js"))).pickMode;

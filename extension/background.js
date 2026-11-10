@@ -53,6 +53,10 @@ const PREFS_KEY = "prefs";
 // worker is, which is the right lifetime for a cache.
 let pipelinesCache = { baseUrl: null, at: 0, data: null };
 let repliesCache = { baseUrl: null, at: 0, data: null };
+// See the `sender` handler. Short: the answer is what keeps a message
+// from leaving by the wrong number, so it must not outlive a re-pairing.
+let senderCache = { baseUrl: null, at: 0, data: null };
+const SENDER_TTL_MS = 60_000;
 
 // See the `boardDeals` handler: 3 pages of 100.
 const BOARD_PAGES = 3;
@@ -423,6 +427,37 @@ const handlers = {
     const result = await callApi("/quick-replies");
     if (result.ok) repliesCache = { baseUrl, at: Date.now(), data: result.data };
     return result;
+  },
+
+  /**
+   * The number a message sent through the CRM leaves from. The panel
+   * compares it with the number logged in to WhatsApp Web before it
+   * offers to send. 403 means the key may not send (before migration
+   * 062); the panel then just doesn't offer.
+   */
+  async sender() {
+    const { baseUrl } = await readSettings();
+    const fresh = senderCache.baseUrl === baseUrl && Date.now() - senderCache.at < SENDER_TTL_MS;
+    if (fresh) return { ok: true, data: senderCache.data };
+    const result = await callApi("/whatsapp/sender");
+    if (result.ok) senderCache = { baseUrl, at: Date.now(), data: result.data };
+    return result;
+  },
+
+  /**
+   * Send a text through the CRM, to `to` (+digits). The CRM finds the
+   * contact and conversation by that number and sends from the number
+   * connected to it; the panel has already checked that both line up.
+   */
+  async sendText({ to, text }) {
+    if (typeof to !== "string" || !/^\+\d{8,15}$/.test(to)) {
+      return { ok: false, error: "bad_phone" };
+    }
+    if (typeof text !== "string" || !text.trim()) return { ok: false, error: "no_text" };
+    return callApi("/messages", {
+      method: "POST",
+      body: JSON.stringify({ to, type: "text", text }),
+    });
   },
 
   async settings() {

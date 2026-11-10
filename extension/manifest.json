@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Harpium CRM",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "minimum_chrome_version": "111",
   "description": "O Harpium CRM ao lado da conversa no WhatsApp Web: veja quem é o contato, crie o lead, marque a temperatura e mova o negócio no funil sem sair dali.",
   "permissions": [
@@ -62,6 +62,8 @@
         "chat-id.js",
         "theme.js",
         "format.js",
+        "send-check.js",
+        "phone.js",
         "icons/icon-48.png"
       ],
       "matches": [

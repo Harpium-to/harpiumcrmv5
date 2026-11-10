@@ -66,6 +66,24 @@ export function chatFromPage(answer) {
 }
 
 /**
+ * The number logged in to this WhatsApp Web, from the same answer as
+ * `chatFromPage`: digits, or null when the answer has none or it is
+ * not a phone number. Untrusted input like the rest of the answer.
+ */
+export function myPhoneFromPage(answer) {
+  if (typeof answer !== "string" || !answer) return null;
+  let payload;
+  try {
+    payload = JSON.parse(answer);
+  } catch {
+    return null;
+  }
+  if (!payload || payload.v !== 1 || payload.ready !== true) return null;
+  const me = payload.me;
+  return typeof me === "string" && /^\d{8,15}$/.test(me) ? me : null;
+}
+
+/**
  * The same answer, read from the `data-id` attributes of the message
  * rows — for WhatsApp builds that still put the chat id there.
  *
