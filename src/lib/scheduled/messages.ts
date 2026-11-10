@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { isMissingFunction, isMissingTable } from '@/lib/auth/account-context';
 import { isQuickReplyMediaKind, type QuickReplyMediaKind } from '@/lib/quick-replies/media';
 import { sendMessageToConversation } from '@/lib/whatsapp/send-message';
+import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation';
 
 // ============================================================
 // Messages scheduled for a contact (migration 064; Fase 5 of
@@ -278,9 +279,15 @@ export async function cancelScheduledMessage(
 
 export interface ProcessDeps {
   send: typeof sendMessageToConversation;
+  /** Opens a conversation for a contact who never had one. */
+  openConversation: (db: SupabaseClient, accountId: string, phone: string) => Promise<string>;
 }
 
-const defaultProcessDeps: ProcessDeps = { send: sendMessageToConversation };
+const defaultProcessDeps: ProcessDeps = {
+  send: sendMessageToConversation,
+  openConversation: async (db, accountId, phone) =>
+    (await resolveConversationByPhone(db, accountId, phone)).conversationId,
+};
 
 async function finish(
   db: SupabaseClient,
@@ -332,8 +339,20 @@ async function processOne(db: SupabaseClient, row: ScheduledRow, deps: ProcessDe
       .order('last_message_at', { ascending: false, nullsFirst: false });
     const conversations = (convs ?? []) as { id: string }[];
     if (conversations.length === 0) {
-      await finish(db, row.id, 'failed', 'O contato não tem conversa no CRM.');
-      return 'failed';
+      // A contact who never wrote — a bulk send's recipient, say: open
+      // the conversation the way the public API does, by their number.
+      const { data: contact } = await db
+        .from('contacts')
+        .select('phone')
+        .eq('id', row.contact_id)
+        .eq('account_id', accountId)
+        .maybeSingle();
+      const phone = (contact as { phone?: string | null } | null)?.phone;
+      if (!phone) {
+        await finish(db, row.id, 'failed', 'O contato não tem telefone no CRM.');
+        return 'failed';
+      }
+      conversations.push({ id: await deps.openConversation(db, accountId, phone) });
     }
 
     if (

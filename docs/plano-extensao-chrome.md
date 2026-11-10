@@ -481,7 +481,23 @@ conversa:
 - Ligar ou desligar a IA do CRM inteiro ficou nas Configurações, só
   para admin, como decidido em 10/11.
 
-**Fase 8 — Disparos e status.** (decidido em 10/11/2026)
+**Fase 8 — Disparos e status.** (decidido em 10/11/2026; disparo pelo
+QR feito em 10/11, migration 065, sem mudança na extensão)
+- Feito: **Disparos pelo QR code** na tela de Disparos do CRM, para
+  admins. Texto ou resposta rápida (com arquivo) para uma etiqueta ou
+  uma lista de números colada — só os que são contatos do CRM recebem.
+  "Ver quantos" mostra o total e de quando a quando; para disparar, a
+  pessoa marca que entende o risco de bloqueio. Cada destinatário vira
+  uma mensagem agendada (064), com as variáveis preenchidas, uma a cada
+  30–90 s sorteados, até 200 por dia, um disparo depois do outro
+  (`src/lib/bulk/`). Acompanhar e Parar na mesma tela. Só aparece para
+  CRM no caminho do QR code; na API oficial ficam os modelos.
+- De quebra, o envio das agendadas abre a conversa de quem nunca falou
+  com o CRM, pelo número, como a API pública já fazia.
+- Não entrou: um botão de disparo na extensão (a lista e o
+  acompanhamento cabem melhor na tela do CRM) e descadastro (os
+  contatos não têm "não quero receber"; é preciso pensar nisso antes de
+  disparos maiores).
 - Disparo para uma lista ou etiqueta. Pelo número do QR: com limite —
   até 200 envios por dia no CRM, um a cada 30–90 s (sorteado), pelo
   agendador, com aviso de risco antes de disparar, acompanhar e parar.
