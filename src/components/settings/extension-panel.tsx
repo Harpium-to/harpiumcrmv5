@@ -130,9 +130,9 @@ export function ExtensionPanelView({
       />
 
       <section className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-3">
-        <Feature title="Quem é">Nome, empresa, e-mail e etiquetas do contato da conversa aberta.</Feature>
-        <Feature title="Cadastro na hora">Contato novo? Um clique cria o lead com o nome do WhatsApp.</Feature>
-        <Feature title="Funil">Temperatura (frio, morno, quente) e etapa do negócio, direto do chat.</Feature>
+        <Feature title="Quem é">Nome, empresa, e-mail e etiquetas do contato da conversa aberta, com edição ali mesmo.</Feature>
+        <Feature title="Cadastro e anotações">Contato novo vira lead com um clique. As anotações da equipe ficam na ficha.</Feature>
+        <Feature title="Funil">Temperatura, etapa, novo negócio e fechamento como ganho ou perdido, direto do chat.</Feature>
         <p className="flex items-start gap-2 text-xs text-muted-foreground sm:col-span-3">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
           A extensão não lê suas conversas: ela só pega o número do chat aberto. Nenhum texto

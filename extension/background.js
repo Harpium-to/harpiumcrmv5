@@ -49,6 +49,10 @@ const LINKS_KEY = "links";
 const MAX_LINKS_PER_CRM = 500;
 const PREFS_KEY = "prefs";
 
+// See the `pipelines` handler. In memory only: it is gone whenever the
+// worker is, which is the right lifetime for a cache.
+let pipelinesCache = { baseUrl: null, at: 0, data: null };
+
 async function readSettings() {
   const stored = await chrome.storage.local.get(SETTINGS_KEYS);
   const baseUrl = (stored.baseUrl || "").replace(/\/+$/, "");
@@ -269,9 +273,21 @@ const handlers = {
     return callApi(`/deals?contact_id=${encodeURIComponent(contactId)}&status=open`);
   },
 
-  /** Every pipeline with its stages, for the stage picker. */
+  /**
+   * Every pipeline with its stages, for the stage pickers.
+   *
+   * The panel asks on every chat it opens, and a board changes a few
+   * times a year: the answer is kept for a minute (per CRM address),
+   * which takes a call off each chat switch without making a new stage
+   * wait long to show up.
+   */
   async pipelines() {
-    return callApi("/pipelines");
+    const { baseUrl } = await readSettings();
+    const fresh = pipelinesCache.baseUrl === baseUrl && Date.now() - pipelinesCache.at < 60_000;
+    if (fresh) return { ok: true, data: pipelinesCache.data };
+    const result = await callApi("/pipelines");
+    if (result.ok) pipelinesCache = { baseUrl, at: Date.now(), data: result.data };
+    return result;
   },
 
   async moveDeal({ id, stageId }) {
@@ -280,6 +296,48 @@ const handlers = {
       method: "PATCH",
       body: JSON.stringify({ stage_id: stageId }),
     });
+  },
+
+  /** Mark a deal won or lost — or open again, to undo that. */
+  async setDealStatus({ id, status }) {
+    if (!id || !["open", "won", "lost"].includes(status)) return { ok: false, error: "no_id" };
+    return callApi(`/deals/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  async createDeal({ contactId, title, value, pipelineId, stageId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi("/deals", {
+      method: "POST",
+      body: JSON.stringify({
+        contact_id: contactId,
+        title,
+        value,
+        ...(pipelineId ? { pipeline_id: pipelineId } : {}),
+        ...(stageId ? { stage_id: stageId } : {}),
+      }),
+    });
+  },
+
+  /** The contact's recent notes, newest first. */
+  async notes({ contactId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/notes`);
+  },
+
+  async addNote({ contactId, text }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/notes`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  /** The CRM's tags, to offer while editing a contact's. */
+  async tags() {
+    return callApi("/tags");
   },
 
   async settings() {

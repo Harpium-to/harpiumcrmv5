@@ -31,11 +31,11 @@ export type ApiScope = (typeof API_SCOPES)[number];
 export const SCOPE_DESCRIPTIONS: Record<ApiScope, string> = {
   'messages:send': 'Enviar mensagens de WhatsApp',
   'messages:read': 'Ler mensagens e o status de entrega',
-  'contacts:read': 'Listar e ler contatos',
-  'contacts:write': 'Criar e atualizar contatos',
+  'contacts:read': 'Listar e ler contatos, suas anotações e as etiquetas',
+  'contacts:write': 'Criar e atualizar contatos e escrever anotações',
   'conversations:read': 'Listar e ler conversas',
   'deals:read': 'Listar e ler negócios e funis',
-  'deals:write': 'Atualizar negócios (mudar etapa, marcar ganho/perdido)',
+  'deals:write': 'Criar e atualizar negócios (mudar etapa, marcar ganho/perdido)',
   'broadcasts:send': 'Lançar campanhas de disparo',
   'webhooks:manage': 'Cadastrar e gerenciar webhooks de eventos',
 };

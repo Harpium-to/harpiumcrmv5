@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 
-import { parseDealPatch, serializeDeal, serializePipeline } from './deals';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import {
+  parseDealCreate,
+  parseDealPatch,
+  resolveDealPlacement,
+  serializeDeal,
+  serializePipeline,
+} from './deals';
 
 describe('serializeDeal', () => {
   const row = {
@@ -94,5 +102,152 @@ describe('parseDealPatch', () => {
     expect(parseDealPatch({ expected_close_date: '2026-12-01' })).toMatchObject({ ok: true });
     expect(parseDealPatch({ expected_close_date: null })).toMatchObject({ ok: true });
     expect(parseDealPatch({ expected_close_date: '01/12/2026' })).toMatchObject({ ok: false });
+  });
+});
+
+describe('parseDealCreate', () => {
+  it('needs a contact and a title; everything else has a default', () => {
+    expect(parseDealCreate({ contact_id: 'c1', title: '  Plano anual ' })).toEqual({
+      ok: true,
+      values: {
+        contact_id: 'c1',
+        title: 'Plano anual',
+        value: 0,
+        notes: null,
+        expected_close_date: null,
+        pipeline_id: null,
+        stage_id: null,
+      },
+    });
+    expect(parseDealCreate({ title: 'Plano' }).ok).toBe(false);
+    expect(parseDealCreate({ contact_id: '', title: 'Plano' }).ok).toBe(false);
+    expect(parseDealCreate({ contact_id: 'c1' }).ok).toBe(false);
+    expect(parseDealCreate({ contact_id: 'c1', title: '   ' }).ok).toBe(false);
+  });
+
+  it('takes the optional fields under the same rules as PATCH', () => {
+    const parsed = parseDealCreate({
+      contact_id: 'c1',
+      title: 'Plano',
+      value: 4800,
+      notes: 'Quer começar em dezembro',
+      expected_close_date: '2026-12-01',
+      pipeline_id: 'p1',
+      stage_id: 's2',
+    });
+    expect(parsed).toEqual({
+      ok: true,
+      values: {
+        contact_id: 'c1',
+        title: 'Plano',
+        value: 4800,
+        notes: 'Quer começar em dezembro',
+        expected_close_date: '2026-12-01',
+        pipeline_id: 'p1',
+        stage_id: 's2',
+      },
+    });
+    expect(parseDealCreate({ contact_id: 'c1', title: 'Plano', value: -1 }).ok).toBe(false);
+    expect(parseDealCreate({ contact_id: 'c1', title: 'Plano', value: '4800' }).ok).toBe(false);
+    expect(parseDealCreate({ contact_id: 'c1', title: 'Plano', stage_id: '' }).ok).toBe(false);
+    expect(parseDealCreate({ contact_id: 'c1', title: 'Plano', pipeline_id: 7 }).ok).toBe(false);
+    expect(
+      parseDealCreate({ contact_id: 'c1', title: 'Plano', expected_close_date: '01/12/2026' }).ok
+    ).toBe(false);
+  });
+
+  it('ignores status: a new deal is always open', () => {
+    const parsed = parseDealCreate({ contact_id: 'c1', title: 'Plano', status: 'won' });
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect('status' in parsed.values).toBe(false);
+  });
+});
+
+describe('resolveDealPlacement', () => {
+  // Two accounts, each with a board. `pipeline_stages` has no account
+  // of its own — that is the whole reason this function exists.
+  const tables: Record<string, Array<Record<string, unknown>>> = {
+    pipelines: [
+      { id: 'p1', account_id: 'acc', created_at: '2026-01-01' },
+      { id: 'p2', account_id: 'acc', created_at: '2026-02-01' },
+      { id: 'px', account_id: 'other', created_at: '2025-01-01' },
+      { id: 'empty', account_id: 'acc', created_at: '2026-03-01' },
+    ],
+    pipeline_stages: [
+      { id: 's1b', pipeline_id: 'p1', position: 1 },
+      { id: 's1a', pipeline_id: 'p1', position: 0 },
+      { id: 's2a', pipeline_id: 'p2', position: 0 },
+      { id: 'sx', pipeline_id: 'px', position: 0 },
+    ],
+  };
+
+  function db(source = tables): SupabaseClient {
+    const from = (table: string) => {
+      let rows = [...(source[table] ?? [])];
+      const builder = {
+        select: () => builder,
+        eq: (col: string, val: unknown) => {
+          rows = rows.filter((r) => r[col] === val);
+          return builder;
+        },
+        order: (col: string) => {
+          rows.sort((a, b) => (String(a[col]) < String(b[col]) ? -1 : 1));
+          return builder;
+        },
+        limit: (n: number) => {
+          rows = rows.slice(0, n);
+          return builder;
+        },
+        maybeSingle: () => Promise.resolve({ data: rows[0] ?? null, error: null }),
+      };
+      return builder;
+    };
+    return { from } as unknown as SupabaseClient;
+  }
+
+  it('with nothing named, starts on the first stage of the first pipeline', async () => {
+    expect(await resolveDealPlacement(db(), 'acc', null, null)).toEqual({
+      ok: true,
+      pipeline_id: 'p1',
+      stage_id: 's1a',
+    });
+  });
+
+  it('with a pipeline, starts on its first stage', async () => {
+    expect(await resolveDealPlacement(db(), 'acc', 'p2', null)).toEqual({
+      ok: true,
+      pipeline_id: 'p2',
+      stage_id: 's2a',
+    });
+  });
+
+  it('with a stage, uses it and finds its pipeline', async () => {
+    expect(await resolveDealPlacement(db(), 'acc', null, 's1b')).toEqual({
+      ok: true,
+      pipeline_id: 'p1',
+      stage_id: 's1b',
+    });
+    expect(await resolveDealPlacement(db(), 'acc', 'p1', 's1b')).toEqual({
+      ok: true,
+      pipeline_id: 'p1',
+      stage_id: 's1b',
+    });
+  });
+
+  it("refuses another account's stage or pipeline", async () => {
+    expect((await resolveDealPlacement(db(), 'acc', null, 'sx')).ok).toBe(false);
+    expect((await resolveDealPlacement(db(), 'acc', 'px', null)).ok).toBe(false);
+    expect((await resolveDealPlacement(db(), 'acc', 'px', 'sx')).ok).toBe(false);
+  });
+
+  it('refuses a stage that is not on the named pipeline', async () => {
+    expect((await resolveDealPlacement(db(), 'acc', 'p2', 's1a')).ok).toBe(false);
+  });
+
+  it('refuses ids that do not exist, a pipeline with no stages, and an account with no pipeline', async () => {
+    expect((await resolveDealPlacement(db(), 'acc', null, 'nope')).ok).toBe(false);
+    expect((await resolveDealPlacement(db(), 'acc', 'nope', null)).ok).toBe(false);
+    expect((await resolveDealPlacement(db(), 'acc', 'empty', null)).ok).toBe(false);
+    expect((await resolveDealPlacement(db(), 'nobody', null, null)).ok).toBe(false);
   });
 });
