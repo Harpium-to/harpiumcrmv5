@@ -464,9 +464,22 @@ exercitar os eventos de arrastar, não o gesto) e se o WhatsApp reage ao
 arrasto como se fosse um arquivo. O seletor do card funciona de
 qualquer jeito.
 
-**Fase 7 — Autorresponder e chatbot.**
-- Ligar, desligar e escolher o fluxo pela extensão.
-- Pausar o robô numa conversa.
+**Fase 7 — Autorresponder e chatbot ✅ (feita em 10/11/2026, extensão
+0.15.0, sem migration; feita junto com a 5, a pedido).** O robô por
+conversa:
+- A faixa da ficha mostra a IA, a pessoa e o **fluxo** que conduz a
+  conversa (`flow` no estado da conversa). Enquanto um fluxo conduz,
+  ela não diz que a IA responde: o webhook não chama a IA para uma
+  mensagem que o fluxo consumiu.
+- **Devolver para a IA** (`/conversations/{id}/handback`, o "Retomar IA"
+  do inbox) e **Pausar fluxo** (`/conversations/{id}/flow/pause`, termina
+  como `paused_by_agent`).
+- **Fluxos** com gatilho manual — que até aqui nada disparava — ganham
+  Iniciar → Confirmar na lista de respostas (`/api/v1/flows`,
+  `/api/v1/flows/{id}/start`; um fluxo por contato de cada vez, 100
+  inícios manuais por CRM em 24 horas).
+- Ligar ou desligar a IA do CRM inteiro ficou nas Configurações, só
+  para admin, como decidido em 10/11.
 
 **Fase 8 — Disparos e status.**
 - Disparo para uma lista ou etiqueta.

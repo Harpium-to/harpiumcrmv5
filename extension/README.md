@@ -146,6 +146,15 @@ quando o cliente escreve. Iniciar segue as mesmas condições do
 Enviar; o CRM ainda recusa iniciar a mesma sequência duas vezes para o
 mesmo contato e passa de 100 inícios por dia.
 
+**Robô na conversa.** A faixa no alto da ficha diz quem conduz a
+conversa no CRM: a IA, uma pessoa ou um **fluxo** do chatbot. Ali
+ficam **Assumir**, **Devolver para a IA** (o "Retomar IA" do inbox: tira
+a pausa, solta quem tinha assumido e devolve as respostas da IA) e
+**Pausar fluxo**. Abaixo das respostas, a lista **Fluxos** traz os
+fluxos do CRM com gatilho manual, com Iniciar → Confirmar, nas mesmas
+condições do Enviar; um contato roda um fluxo de cada vez. Ligar ou
+desligar a IA do CRM inteiro continua nas Configurações do CRM.
+
 **Respostas com arquivo.** Uma resposta rápida pode ter uma foto, um
 vídeo, um documento ou um áudio (migration 063, criada em
 Configurações › Respostas rápidas › Mídia). No painel ela mostra o tipo

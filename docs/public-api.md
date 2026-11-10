@@ -432,6 +432,37 @@ Take the conversation over: pauses the bot on it and makes the person
 the key belongs to its owner — what "Assumir" does in the inbox. Scope:
 `conversations:write`. No body. Returns the state above. Safe to repeat.
 
+### `POST /api/v1/conversations/{id}/handback`
+
+Give the conversation back to the AI — the inbox's "Retomar IA": clears
+the pause and the handoff note, releases the owner and gives the bot a
+fresh reply budget here. Scope: `conversations:write`. Answers the same
+shape as `GET /api/v1/contacts/{id}/conversation`.
+
+### `POST /api/v1/conversations/{id}/flow/pause`
+
+Stop the chatbot flow running on this conversation; the run ends as
+`paused_by_agent`, as when an attendant replies. Safe to repeat. Scope:
+`conversations:write`. Answers the conversation's state.
+
+The state of a conversation (`GET /api/v1/contacts/{id}/conversation`)
+carries `flow`: `{ "run_id", "flow_id", "name" }` while a flow conducts
+it, else `null`.
+
+### Manual flows
+
+Chatbot flows whose trigger is **manual**, started on one contact. Both
+need `messages:send`.
+
+- `GET /api/v1/flows` — the active manual flows: `{ "id", "name",
+  "description" }`.
+- `POST /api/v1/flows/{id}/start` with `{ "contact_id" }` — runs the
+  flow until it waits for the customer. `201 { "data": { "run_id" } }`.
+  Refused with `409` when the flow is not active (`inactive`), the
+  contact already has a flow running (`already_running`) or no
+  conversation (`no_conversation`); `422 invalid_flow` when it has no
+  entry; `429 daily_limit` after 100 manual starts in 24 hours in the CRM.
+
 ### `GET /api/v1/conversations`
 
 List conversations, newest first. Scope: `conversations:read`.

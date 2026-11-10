@@ -160,6 +160,10 @@ const SEND_CONFIRM_MS = 5000;
 // is the one whose "Iniciar" was clicked once and waits for
 // "Confirmar".
 let seqState = { contactId: null, status: "idle", items: [] };
+// Chatbot flows started by hand (Fase 7): listed under the sequences.
+let flowsState = { baseUrl: null, status: "idle", items: [] };
+let pendingFlow = null;
+let flowBusy = false;
 // Scheduling (Fase 5): "Enviar agora" or "Agendar" in the replies
 // sheet, and what is scheduled for the contact on the panel.
 let sendMode = "now";
@@ -532,6 +536,9 @@ function ensurePanel() {
     if (action === "task-done") void setTaskDone(findTask(target.getAttribute("data-id")), true);
     if (action === "task-undo") void setTaskDone(lastDoneTask, false);
     if (action === "conv-take") void takeOverConversation();
+    if (action === "conv-handback") void conversationAction("handBack", "devolver conversas para a IA");
+    if (action === "conv-flow-pause") void conversationAction("pauseFlow", "pausar fluxos");
+    if (action === "flow-start") void startFlow(target.getAttribute("data-id"));
     if (action === "board-open") setBoardOpen(true);
     if (action === "board-close") setBoardOpen(false);
     if (action === "board-refresh") void loadBoard();
@@ -1866,7 +1873,15 @@ function paintConversation(error) {
     text = "A IA está pausada nesta conversa e ninguém assumiu.";
     canTake = true;
   }
-  if (!text) {
+  // A chatbot flow conducting the chat (Fase 7), and the way back to the
+  // AI once it was paused — the inbox's "Retomar IA".
+  const flowName = conv.flow ? conv.flow.name || "sem nome" : null;
+  const canHandBack = conv.ai === "paused";
+  // While a flow conducts the chat, the AI stays out of it (the webhook
+  // skips the auto-reply for a reply the flow consumed): saying "the AI
+  // is answering" too would be wrong.
+  if (flowName && conv.ai === "answering" && !conv.waiting_since) text = "";
+  if (!text && !flowName) {
     el.innerHTML = "";
     return;
   }
@@ -1877,12 +1892,22 @@ function paintConversation(error) {
     conv.handoff_summary && (conv.waiting_since || canTake)
       ? `<p class="crmc-conv-summary">${escapeHtml(String(conv.handoff_summary).slice(0, 400))}</p>`
       : "";
+  const actions = [
+    canTake ? `<button class="crmc-btn crmc-btn-small" data-act="conv-take">Assumir</button>` : "",
+    canHandBack
+      ? `<button class="crmc-btn crmc-btn-small crmc-btn-quiet" data-act="conv-handback">Devolver para a IA</button>`
+      : "",
+    flowName
+      ? `<button class="crmc-btn crmc-btn-small crmc-btn-quiet" data-act="conv-flow-pause">Pausar fluxo</button>`
+      : "",
+  ].join("");
   el.innerHTML = `
     <div class="crmc-conv-box" data-tone="${conv.waiting_since ? "waiting" : "info"}">
-      <p class="crmc-conv-text">${escapeHtml(text)}</p>
+      ${text ? `<p class="crmc-conv-text">${escapeHtml(text)}</p>` : ""}
+      ${flowName ? `<p class="crmc-conv-text">O fluxo “${escapeHtml(flowName)}” está conduzindo esta conversa.</p>` : ""}
       ${summary}
       ${error ? `<p class="crmc-err">${escapeHtml(error)}</p>` : ""}
-      ${canTake ? `<button class="crmc-btn crmc-btn-small" data-act="conv-take">Assumir</button>` : ""}
+      ${actions ? `<div class="crmc-conv-actions">${actions}</div>` : ""}
     </div>`;
 }
 
@@ -1895,6 +1920,25 @@ async function loadConversation(contactId) {
   // A key or a CRM without this yet: the record simply has no banner.
   convState = { contactId, data: result.ok ? result.data : null };
   paintConversation();
+  paintFlows();
+}
+
+/** One of the banner's actions on the CRM conversation, then repaint. */
+async function conversationAction(type, what) {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  const conv = convState.contactId === contactId ? convState.data : null;
+  if (!contactId || !conv) return;
+  for (const button of slot(".crmc-conv")?.querySelectorAll("button") ?? []) button.disabled = true;
+  const result = await send(type, { id: conv.id });
+  if (!stillShowing(contactId, gen)) return;
+  if (!result.ok) {
+    paintConversation(failureText(result, what));
+    return;
+  }
+  convState = { contactId, data: result.data };
+  paintConversation();
+  paintFlows();
 }
 
 async function takeOverConversation() {
@@ -1981,7 +2025,8 @@ function setRepliesOpen(open) {
     <p class="crmc-replies-status" role="status" aria-live="polite"></p>
     <div class="crmc-replies"></div>
     <div class="crmc-sched"></div>
-    <div class="crmc-seqs"></div>`;
+    <div class="crmc-seqs"></div>
+    <div class="crmc-flows"></div>`;
   const at = sheet().querySelector(".crmc-when-at");
   if (at) at.value = defaultScheduleValue();
   paintSignature();
@@ -1990,6 +2035,7 @@ function setRepliesOpen(open) {
   void loadReplies();
   void loadSequences(true);
   void loadScheduled(true);
+  void loadFlows();
   void loadSender();
 }
 
@@ -2007,6 +2053,7 @@ function paintReplies() {
   syncSendMode(currentSendCheck());
   paintScheduled();
   paintSequences();
+  paintFlows();
   const mine = repliesState.baseUrl === currentBaseUrl;
   if (!mine || repliesState.status === "loading") {
     el.innerHTML = `<p class="crmc-muted">Carregando…</p>`;
@@ -2262,6 +2309,114 @@ async function cancelScheduled(id) {
 }
 
 // ------------------------------------------------------------
+// Chatbot flows started by hand (Fase 7)
+//
+// The CRM's flows with the "manual" trigger: Iniciar → Confirmar runs
+// one with the contact on the panel, from the CRM's number. While it
+// runs, the banner on top says so and offers "Pausar fluxo".
+// ------------------------------------------------------------
+
+async function loadFlows() {
+  const baseUrl = currentBaseUrl;
+  if (!repliesOpen || !baseUrl) return;
+  const result = await send("flows");
+  if (currentBaseUrl !== baseUrl) return;
+  flowsState = result.ok
+    ? { baseUrl, status: "ready", items: Array.isArray(result.data) ? result.data : [] }
+    : { baseUrl, status: "error", items: [] };
+  paintFlows();
+}
+
+function clearPendingFlow() {
+  if (pendingFlow?.timer) clearTimeout(pendingFlow.timer);
+  pendingFlow = null;
+}
+
+function paintFlows() {
+  const el = sheet()?.querySelector(".crmc-flows");
+  if (!el || !repliesOpen) return;
+  const contact = currentContact;
+  if (flowsState.baseUrl !== currentBaseUrl || flowsState.status !== "ready" || !flowsState.items.length || !contact) {
+    el.innerHTML = "";
+    return;
+  }
+  const check = currentSendCheck();
+  if (pendingFlow && (!check.ok || pendingFlow.contactId !== contact.id)) clearPendingFlow();
+  const conv = convState.contactId === contact.id ? convState.data : null;
+  const running = conv?.flow?.flow_id ?? null;
+  el.innerHTML = `
+    <p class="crmc-name crmc-seqs-title">Fluxos</p>
+    ${check.ok ? "" : `<p class="crmc-muted crmc-replies-note">Para iniciar um fluxo, o envio direto precisa estar ligado.</p>`}
+    ${flowsState.items
+      .map((flow) => {
+        const id = escapeHtml(flow.id);
+        const confirming = pendingFlow?.id === flow.id;
+        const action =
+          running === flow.id
+            ? ""
+            : check.ok
+              ? `<button class="crmc-reply-send${confirming ? " crmc-reply-confirm" : ""}" data-act="flow-start"
+                         data-id="${id}" ${flowBusy || running ? "disabled" : ""}
+                         aria-label="${confirming ? "Confirmar início de" : "Iniciar"} ${escapeHtml(flow.name)}">
+                   ${confirming ? "Confirmar" : "Iniciar"}
+                 </button>`
+              : "";
+        return `
+          <div class="crmc-reply-row crmc-seq">
+            <div class="crmc-result crmc-seq-main">
+              <span class="crmc-result-name">${escapeHtml(flow.name)}</span>
+              ${running === flow.id ? `<span class="crmc-reply-file">Rodando com este contato</span>` : ""}
+              ${flow.description ? `<span class="crmc-reply-text">${escapeHtml(flow.description)}</span>` : ""}
+            </div>${action}
+          </div>`;
+      })
+      .join("")}`;
+}
+
+/** First click asks for confirmation; the second, within 5 s, starts it. */
+async function startFlow(id) {
+  if (flowBusy) return;
+  const flow = flowsState.items.find((f) => f.id === id);
+  const contactId = currentContact?.id;
+  if (!flow || !contactId || !currentSendCheck().ok) return;
+
+  if (pendingFlow?.id !== id || pendingFlow.contactId !== contactId) {
+    clearPendingFlow();
+    clearPendingSeq();
+    clearPendingSend();
+    pendingFlow = {
+      id,
+      contactId,
+      timer: setTimeout(() => {
+        pendingFlow = null;
+        setRepliesStatus("");
+        paintFlows();
+      }, SEND_CONFIRM_MS),
+    };
+    const who = currentContact?.name ? ` com ${currentContact.name}` : "";
+    setRepliesStatus(`Clique em Confirmar para iniciar o fluxo “${flow.name}”${who}, pelo CRM.`);
+    paintFlows();
+    return;
+  }
+
+  clearPendingFlow();
+  flowBusy = true;
+  setRepliesStatus(`Iniciando “${flow.name}”…`);
+  paintFlows();
+  const result = await send("startFlow", { id, contactId });
+  flowBusy = false;
+  setRepliesStatus(
+    result.ok
+      ? `Fluxo “${flow.name}” iniciado. As respostas do cliente seguem por ele.`
+      : `Não iniciei “${flow.name}”: ${failureText(result, "iniciar fluxos")}`,
+    result.ok ? undefined : "error",
+  );
+  // The banner on top says it is running, with "Pausar fluxo".
+  if (currentContact?.id === contactId) await loadConversation(contactId);
+  paintFlows();
+}
+
+// ------------------------------------------------------------
 // Sequences
 // ------------------------------------------------------------
 
@@ -2358,6 +2513,7 @@ async function startSequence(id) {
   if (pendingSeq?.id !== id || pendingSeq.contactId !== contactId) {
     clearPendingSeq();
     clearPendingSend();
+    clearPendingFlow();
     pendingSeq = {
       id,
       contactId,
@@ -2539,6 +2695,7 @@ async function sendReply(replyId) {
   if (pendingSend?.id !== replyId || pendingSend.chatKey !== chatKey) {
     clearPendingSend();
     clearPendingSeq();
+    clearPendingFlow();
     pendingSend = {
       id: replyId,
       chatKey,

@@ -4,7 +4,7 @@
 //
 // Pauses the bot on this conversation and makes the person the key
 // belongs to its owner — what "Assumir" does in the inbox. Safe to
-// repeat. Handing the conversation back to the bot is done in the CRM.
+// repeat. /handback gives it back to the bot.
 //
 // Account-scoped: another account's conversation is a 404.
 // ============================================================
