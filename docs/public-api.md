@@ -48,9 +48,12 @@ it. Grant the minimum.
 | `contacts:read`      | List and read contacts, their notes, and the account's tags |
 | `contacts:write`     | Create and update contacts; add notes    |
 | `conversations:read` | List and read conversations              |
+| `conversations:write` | Take a conversation over (pause the bot, assign it) |
 | `deals:read`         | List and read deals and pipelines        |
 | `deals:write`        | Create and update deals (move stage, mark won/lost) |
 | `quick_replies:read` | List the account's quick replies         |
+| `tasks:read`         | List contacts' tasks                     |
+| `tasks:write`        | Create, edit and complete tasks          |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
 
@@ -80,6 +83,7 @@ may be reworded.
 | 400    | `bad_request`  | Malformed input                                  |
 | 404    | `not_found`    | No such resource                                 |
 | 500    | `internal`     | Server error                                     |
+| 503    | `unavailable`  | The deployment lacks a migration the endpoint needs |
 
 ## Rate limits
 
@@ -274,6 +278,71 @@ Interactive quick replies (buttons, lists) are not returned.
 returned as written — fill them from the contact before using the text.
 The Chrome extension's personal keys get this scope from migration
 `059`.
+
+### Tasks
+
+A task is a to-do about a contact, for a person — "ligar na quinta".
+Needs migration `060`; without it these endpoints answer `503`.
+
+```json
+{
+  "id": "…", "title": "Ligar na quinta",
+  "due_at": "2026-11-12T17:00:00+00:00", "done_at": null,
+  "contact_id": "…",
+  "contact": { "id": "…", "name": "Maria Souza", "phone": "+5531999998888" },
+  "assigned_to": { "id": "…", "name": "Ana Lima" },
+  "created_at": "…"
+}
+```
+
+- **`GET /api/v1/contacts/{id}/tasks`** — the contact's open tasks,
+  soonest first, undated ones last. Scope: `tasks:read`. `?status=done`
+  or `all` for the rest. At most 100.
+- **`POST /api/v1/contacts/{id}/tasks`** — add one. Scope: `tasks:write`.
+  Body: `title` (required, up to 200 characters) and `due_at` (optional).
+  The task is for the person the key belongs to, who gets a notification
+  in the CRM when it comes due.
+- **`GET /api/v1/tasks`** — open tasks across contacts. Scope:
+  `tasks:read`. `?assigned=me` keeps the ones for the person the key
+  belongs to; `?status=` as above.
+- **`PATCH /api/v1/tasks/{id}`** — scope `tasks:write`. Send any of
+  `title`, `due_at` and `done` (`true` marks it done now, `false`
+  reopens it). Moving `due_at` makes the task remind again.
+
+`due_at` is an ISO date-time **with its offset**
+(`2026-11-12T14:00:00-03:00`), or `null` for no date. A bare date is a
+`400`: midnight UTC is the evening before in Brazil.
+
+### `GET /api/v1/contacts/{id}/conversation`
+
+Where the contact's WhatsApp conversation stands in the CRM. Scope:
+`conversations:read`. `data` is `null` when the CRM has no conversation
+with the contact.
+
+```json
+{
+  "data": {
+    "id": "…", "status": "open", "channel": "whatsapp",
+    "ai": "answering",
+    "handoff_summary": null,
+    "waiting_since": null,
+    "assigned_to": null, "assigned_to_me": false,
+    "last_message_at": "…"
+  }
+}
+```
+
+`ai` is `answering` (the bot replies here), `paused` (the account has
+the bot on, but a person took this conversation or it handed off) or
+`off` (the account has no auto-reply). `waiting_since` is since when the
+customer waits for a person after a handoff — `null` when nobody is
+waiting, or on a deployment without migration `058`.
+
+### `POST /api/v1/conversations/{id}/takeover`
+
+Take the conversation over: pauses the bot on it and makes the person
+the key belongs to its owner — what "Assumir" does in the inbox. Scope:
+`conversations:write`. No body. Returns the state above. Safe to repeat.
 
 ### `GET /api/v1/conversations`
 

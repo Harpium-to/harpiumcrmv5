@@ -17,8 +17,10 @@ Cada pessoa gera a própria chave no CRM, em **Configurações › Extensão
 do Chrome**; ela já vem com os escopos certos. Também serve uma chave
 de **Configurações › API** com `contacts:read` e `contacts:write`; para
 ver e mover negócios, também `deals:read` e `deals:write`; para as
-respostas rápidas, `quick_replies:read`. Sem um deles o painel funciona
-e só avisa que não tem acesso àquela parte.
+respostas rápidas, `quick_replies:read`; para tarefas, `tasks:read` e
+`tasks:write`; para a faixa da conversa e o Assumir,
+`conversations:read` e `conversations:write`. Sem um deles o painel
+funciona e só avisa que não tem acesso àquela parte.
 
 ## O que ela faz
 
@@ -39,7 +41,8 @@ número. Se o CRM responder com um contato de número só parecido (mesmos
 **A ficha.** No topo, o nome, o número e a **temperatura** do lead
 (Frio / Morno / Quente): um clique grava no CRM. O controle só aparece
 quando o CRM já tem a migration 045. Abaixo, três abas; a que estiver
-aberta continua aberta na próxima conversa.
+aberta continua aberta na próxima conversa. (A aba Tarefas está
+descrita mais abaixo.)
 
 - **Negócios** — os negócios em aberto do contato. Cada um tem a etapa
   do funil num seletor (trocar ali é o mesmo que arrastar o card no
@@ -55,6 +58,30 @@ aberta continua aberta na próxima conversa.
 
 Cada parte da ficha é redesenhada sozinha: mudar a temperatura ou a
 etapa de um negócio não apaga uma anotação pela metade.
+
+**Tarefas.** Uma tarefa é um lembrete sobre o contato, para uma pessoa:
+"ligar na quinta".
+
+- A aba **Tarefas** da ficha lista as tarefas em aberto do contato, da
+  mais próxima para a mais distante, e tem o campo para criar outra,
+  com data e hora opcionais. Marcar o círculo conclui; fica uma linha
+  para desfazer.
+- O botão **Tarefas** do rodapé abre **Minhas tarefas**: as tarefas em
+  aberto da pessoa, de todos os contatos, com atalho para abrir a
+  conversa. O número ao lado é quantas estão atrasadas ou são para hoje.
+  Ele se atualiza a cada 5 minutos enquanto o WhatsApp Web está aberto.
+- Na hora marcada, o CRM também avisa no sino (rotina no servidor).
+- As mesmas tarefas aparecem na tela do contato no CRM.
+- Precisa da migration 060 (tabela de tarefas e os escopos
+  `tasks:read` e `tasks:write` na chave da extensão).
+
+**A conversa no CRM.** No alto da ficha, uma faixa diz como a conversa
+está no CRM, quando há o que dizer: a IA respondendo, o cliente
+esperando um atendente (com o resumo que a IA deixou), ou com quem a
+conversa está. **Assumir** pausa a IA naquela conversa e a atribui a
+quem clicou — o mesmo que o botão do inbox. Devolver para a IA é feito
+no CRM. Usa os escopos `conversations:read` e `conversations:write`
+(migration 060); sem eles, a faixa simplesmente não aparece.
 
 **Respostas rápidas.** O botão no rodapé do painel abre os textos
 prontos do CRM (Configurações › Respostas rápidas), com busca pelo

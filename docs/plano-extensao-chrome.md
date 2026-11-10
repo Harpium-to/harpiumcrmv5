@@ -287,16 +287,37 @@ testar no WhatsApp real).* **Sem migration.**
 - Os funis ficam guardados por 1 minuto na extensão, para não pedir de
   novo a cada troca de conversa.
 
-*3B (a fazer). Precisa da migration 059, aplicada no Supabase.*
-- Tarefas e lembretes de pessoas (tabela nova).
-- Estado da conversa no CRM (IA respondendo, aguardando atendente) e
-  **Assumir**. Depende do PR #10 (migration 058) no `main` e de escopos
-  de conversa na chave da extensão.
+*3B ✅ (código pronto, extensão 0.9.0, falta aplicar a migration 060 e
+testar no WhatsApp real).* Branch `feat/extensao-fase3b-tarefas`.
+**Migration 060.**
+- **Tarefas**: aba na ficha do painel, "Minhas tarefas" no rodapé com o
+  contador das atrasadas e das de hoje, e a aba Tarefas na tela do
+  contato no CRM. Tabela `contact_tasks`; a equipe vê, atendente ou
+  acima escreve.
+- **Lembretes**: no painel, o contador (atualiza a cada 5 min com o
+  WhatsApp Web aberto); no CRM, uma notificação no sino na hora
+  marcada. A notificação sai do agendador das automações
+  (`/api/automations/cron`), para não exigir outro job.
+- **Conversa no CRM**: faixa no alto da ficha (IA respondendo, cliente
+  esperando, com quem está) e **Assumir**. Feito sem depender do PR
+  #10: usa as colunas que já existem; quando a 058 entrar, o "esperando
+  há X" passa a aparecer sozinho.
+- API: tarefas (`/contacts/{id}/tasks`, `/tasks`, `/tasks/{id}`), estado
+  da conversa (`/contacts/{id}/conversation`) e assumir
+  (`/conversations/{id}/takeover`). Escopos novos `tasks:read`,
+  `tasks:write` e `conversations:write`.
+- De quebra: `/contacts?contact=<id>` passa a abrir o contato. O
+  "Abrir no CRM" do painel e o aviso de tarefa chegam por aí; antes, o
+  link só abria a lista.
+
+Fora desta etapa: atribuir tarefa a outra pessoa pela tela (toda tarefa
+nasce para quem criou), tarefas repetidas e devolver a conversa para a
+IA pelo painel.
 
 **Fase 4 — Mensagens com 1 clique.** Dividida em duas.
 
-*4A ✅ (em produção desde 10/11/2026, extensão 0.7.0, PR #17; falta
-aplicar a migration 059 e testar no WhatsApp real).* **Migration 059.**
+*4A ✅ (em produção desde 10/11/2026, extensão 0.7.0, PR #17; migration
+059 aplicada em 10/11/2026; falta testar no WhatsApp real).*
 - Respostas rápidas de texto do CRM dentro do WhatsApp Web, com busca.
   Um clique **coloca o texto no campo de mensagem**; a pessoa envia.
 - Variáveis `{{nome}}`, `{{primeiro_nome}}` e `{{empresa}}`, preenchidas
@@ -329,9 +350,9 @@ exige duas coisas que ainda não existem:
 - Mensagem agendada por conversa.
 - Follow-up automático quando o cliente não responde.
 
-**Fase 6 — Kanban dentro do WhatsApp Web ✅ (código pronto, extensão
-0.8.0, falta testar no WhatsApp real).** Feita antes da 3B, da 4B e da
-5, a pedido. Branch `feat/extensao-fase6-kanban`. **Sem migration.**
+**Fase 6 — Kanban dentro do WhatsApp Web ✅ (em produção desde
+10/11/2026, extensão 0.8.0, PR #18; falta testar no WhatsApp real).**
+Feita antes da 3B, da 4B e da 5, a pedido. **Sem migration.**
 - Botão "Funil" no rodapé do painel abre o quadro por cima do WhatsApp:
   uma coluna por etapa, com quantidade e soma.
 - Mover: arrastar o card ou usar o seletor dele. O card muda na hora e

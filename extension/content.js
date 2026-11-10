@@ -104,6 +104,23 @@ let editingContact = false;
 let editTags = [];
 let tagsCache = { baseUrl: null, names: null };
 
+// Tasks. `tasksState` is the open tasks of the contact on screen (a
+// tab of the record); `myTasks` is this person's own open tasks across
+// contacts, behind the footer's count, reloaded every few minutes.
+// `lastDoneTask` is the one just ticked, so it can be un-ticked.
+let tasksState = { contactId: null, status: "idle", tasks: [], notice: null };
+let myTasks = { baseUrl: null, status: "idle", tasks: [], notice: null, at: 0 };
+let lastDoneTask = null;
+let lastTaskError = null;
+const MY_TASKS_EVERY_MS = 5 * 60_000;
+
+// Where the contact's conversation stands in the CRM (bot answering,
+// waiting for a person, taken over); null when the CRM has none.
+let convState = { contactId: null, data: null };
+
+// Which sheet covers the record: "replies", "tasks" or none.
+let sheetKind = null;
+
 // The quick-replies sheet: open or not, what was typed in its search,
 // and the CRM's replies (asked again each time the sheet opens; the
 // service worker answers from memory when it asked a minute ago).
@@ -162,6 +179,9 @@ let boardColumns = (stages, deals) =>
     total: null,
   }));
 let chatPhone = () => null;
+let describeDue = () => null;
+let countDueNow = () => 0;
+let localInputToIso = () => null;
 
 // page-bridge.js answers inside the dispatch below (see there), so the
 // reply is already in `pageAnswer` when `dispatchEvent` returns.
@@ -346,14 +366,16 @@ function ensurePanel() {
     <div class="crmc-body"></div>
     <section class="crmc-sheet" aria-label="Respostas rápidas"></section>
     <footer class="crmc-foot">
-      <button class="crmc-btn crmc-btn-quiet" data-act="replies-open">Respostas rápidas</button>
+      <button class="crmc-btn crmc-btn-quiet" data-act="replies-open">Respostas</button>
       <button class="crmc-btn crmc-btn-quiet" data-act="board-open">Funil</button>
+      <button class="crmc-btn crmc-btn-quiet" data-act="mytasks-open" title="Minhas tarefas">Tarefas<span class="crmc-count crmc-badge" hidden></span></button>
     </footer>
     <section class="crmc-board" aria-label="Funil"></section>
   `;
   document.body.appendChild(panel);
   // A panel rebuilt after WhatsApp replaced the page starts closed.
   repliesOpen = false;
+  sheetKind = null;
   boardOpen = false;
   wireBoardDragging(panel.querySelector(".crmc-board"));
 
@@ -408,6 +430,11 @@ function ensurePanel() {
     if (action === "replies-open") setRepliesOpen(true);
     if (action === "replies-close") setRepliesOpen(false);
     if (action === "reply-use") void useReply(target.getAttribute("data-id"));
+    if (action === "mytasks-open") setMyTasksOpen(true);
+    if (action === "mytasks-close") setMyTasksOpen(false);
+    if (action === "task-done") void setTaskDone(findTask(target.getAttribute("data-id")), true);
+    if (action === "task-undo") void setTaskDone(lastDoneTask, false);
+    if (action === "conv-take") void takeOverConversation();
     if (action === "board-open") setBoardOpen(true);
     if (action === "board-close") setBoardOpen(false);
     if (action === "board-refresh") void loadBoard();
@@ -444,6 +471,7 @@ function ensurePanel() {
     const form = event.target;
     const kind = form?.dataset?.form;
     if (kind === "note") void submitNote(form);
+    else if (kind === "task") void submitTask(form);
     else if (kind === "deal") void submitDeal(form);
     else if (kind === "contact") void submitContact(form);
     else {
@@ -459,6 +487,7 @@ function ensurePanel() {
       addTagFromInput();
     }
     if (event.key === "Escape" && repliesOpen) setRepliesOpen(false);
+    if (event.key === "Escape" && sheetKind === "tasks") setMyTasksOpen(false);
   });
 
   // The board covers WhatsApp, so Escape must close it wherever the
@@ -604,6 +633,7 @@ function renderContact(contact) {
   currentContact = contact;
   render(`
     <div class="crmc-who"></div>
+    <div class="crmc-conv"></div>
     <div class="crmc-tempslot"></div>
     <nav class="crmc-tabs" role="tablist" aria-label="Seções do contato"></nav>
     <div class="crmc-pane" role="tabpanel"></div>
@@ -613,6 +643,7 @@ function renderContact(contact) {
     </a>
   `);
   paintWho();
+  paintConversation();
   paintTemperature();
   paintTabs();
   paintPane();
@@ -623,8 +654,10 @@ function showContact(contact, { linked = false } = {}) {
   currentLinked = linked;
   dealFormOpen = false;
   editingContact = false;
+  lastDoneTask = null;
   renderContact(contact);
   void loadDeals(contact.id);
+  void loadConversation(contact.id);
   // The previews now have the CRM's name for this person.
   paintReplies();
 }
@@ -691,6 +724,7 @@ async function setTemperature(value) {
 
 const TABS = [
   ["deals", "Negócios"],
+  ["tasks", "Tarefas"],
   ["notes", "Notas"],
   ["info", "Dados"],
 ];
@@ -700,11 +734,12 @@ function paintTabs() {
   if (!el || !currentContact) return;
   const dealsKnown =
     dealsState.contactId === currentContact.id && dealsState.status === "ready";
+  const numbers = {
+    deals: dealsKnown ? dealsState.deals.length : 0,
+    tasks: contactTaskCount(),
+  };
   el.innerHTML = TABS.map(([id, label]) => {
-    const count =
-      id === "deals" && dealsKnown && dealsState.deals.length
-        ? ` <span class="crmc-count">${dealsState.deals.length}</span>`
-        : "";
+    const count = numbers[id] ? ` <span class="crmc-count">${numbers[id]}</span>` : "";
     return `<button class="crmc-tabbtn" role="tab" data-act="tab" data-tab="${id}"
                     aria-selected="${activeTab === id}">${label}${count}</button>`;
   }).join("");
@@ -736,6 +771,23 @@ function paintPane() {
       <div class="crmc-notes"></div>`;
     paintNotes();
     if (notesState.contactId !== contact.id) void loadNotes(contact.id);
+    return;
+  }
+
+  if (activeTab === "tasks") {
+    el.innerHTML = `
+      <form class="crmc-form" data-form="task">
+        <input class="crmc-input crmc-task-title-input" name="title" maxlength="200" autocomplete="off"
+               placeholder="O que precisa ser feito?" aria-label="Nova tarefa" />
+        <div class="crmc-taskwhen">
+          <input class="crmc-input" name="due" type="datetime-local" aria-label="Para quando (opcional)" />
+          <button class="crmc-btn crmc-btn-small" type="submit">Adicionar</button>
+        </div>
+        <p class="crmc-err" hidden></p>
+      </form>
+      <div class="crmc-tasks"></div>`;
+    paintTasks();
+    if (tasksState.contactId !== contact.id) void loadTasks(contact.id);
     return;
   }
 
@@ -1432,6 +1484,333 @@ function createTyped(digits) {
 }
 
 // ------------------------------------------------------------
+// Tasks, and where the conversation stands in the CRM
+//
+// A task is a to-do about a contact, for a person: "ligar na quinta".
+// The record has a tab with the contact's tasks; the footer has the
+// person's own open tasks across contacts, with a count of the ones
+// late or for today — the reminder, for as long as WhatsApp Web is
+// open. (The CRM's bell gets one too, from the server.)
+// ------------------------------------------------------------
+
+/** Why a part of the panel has nothing to show, in the operator's terms. */
+function accessNotice(result, what, migration) {
+  if (result.error === "unauthorized" && result.status === 403) {
+    return `Sua chave ainda não tem acesso a ${what}. O CRM precisa da atualização ${migration}; depois dela, não é preciso gerar outra chave.`;
+  }
+  return failureText(result, `ver ${what}`);
+}
+
+function renderTaskRow(task, { withContact }) {
+  const id = escapeHtml(task.id);
+  const due = describeDue(task.due_at);
+  const phone = chatPhone(task.contact?.phone);
+  const mine = myTasks.tasks.some((t) => t.id === task.id);
+  const about = withContact
+    ? `${escapeHtml(task.contact?.name || task.contact?.phone || "Sem contato")}${
+        phone
+          ? ` · <button class="crmc-link" data-act="board-chat" data-phone="${phone}"
+                       title="Abre a conversa deste contato. O WhatsApp Web recarrega.">Abrir conversa</button>`
+          : ""
+      }`
+    : !mine && task.assigned_to?.name
+      ? `Para ${escapeHtml(task.assigned_to.name)}`
+      : "";
+  return `
+    <div class="crmc-task" data-tone="${due?.tone ?? "none"}">
+      <button class="crmc-check" data-act="task-done" data-id="${id}"
+              aria-label="Concluir: ${escapeHtml(task.title)}"></button>
+      <div class="crmc-task-main">
+        <p class="crmc-task-title">${escapeHtml(task.title)}</p>
+        ${due ? `<p class="crmc-task-when">${escapeHtml(due.label)}</p>` : ""}
+        ${about ? `<p class="crmc-task-who">${about}</p>` : ""}
+      </div>
+    </div>`;
+}
+
+/**
+ * Under a list of tasks: the one just ticked, or what went wrong. With
+ * `contactId`, only a task of that contact — a task ticked in "Minhas
+ * tarefas" has no business under another contact's list.
+ */
+function renderUndone(contactId) {
+  if (lastTaskError) return `<p class="crmc-err">${escapeHtml(lastTaskError)}</p>`;
+  if (contactId && lastDoneTask?.contact_id !== contactId) return "";
+  return lastDoneTask
+    ? `<p class="crmc-muted crmc-undo">“${escapeHtml(lastDoneTask.title)}” concluída.
+         <button class="crmc-link" data-act="task-undo">Desfazer</button></p>`
+    : "";
+}
+
+// ---- The contact's tasks (a tab of the record) ---------------
+
+function contactTaskCount() {
+  const contact = currentContact;
+  if (!contact) return 0;
+  if (tasksState.contactId === contact.id && tasksState.status === "ready") {
+    return tasksState.tasks.length;
+  }
+  // Until the tab is opened, what is known is this person's own tasks.
+  return myTasks.tasks.filter((t) => t.contact_id === contact.id).length;
+}
+
+function paintTasks() {
+  const el = slot(".crmc-tasks");
+  const contact = currentContact;
+  if (!el || !contact) return;
+  if (tasksState.contactId !== contact.id || tasksState.status === "loading") {
+    el.innerHTML = `<p class="crmc-muted">Carregando…</p>`;
+    return;
+  }
+  if (tasksState.status !== "ready") {
+    el.innerHTML = `<p class="crmc-muted">${escapeHtml(tasksState.notice)}</p>`;
+    return;
+  }
+  el.innerHTML =
+    (tasksState.tasks.length
+      ? tasksState.tasks.map((task) => renderTaskRow(task, { withContact: false })).join("")
+      : `<p class="crmc-muted">Nenhuma tarefa em aberto para este contato.</p>`) +
+    renderUndone(contact.id);
+}
+
+async function loadTasks(contactId) {
+  const gen = generation;
+  tasksState = { contactId, status: "loading", tasks: [], notice: null };
+  paintTasks();
+
+  const result = await send("tasks", { contactId });
+  if (!stillShowing(contactId, gen)) return;
+
+  tasksState = result.ok
+    ? { contactId, status: "ready", tasks: Array.isArray(result.data) ? result.data : [], notice: null }
+    : { contactId, status: "error", tasks: [], notice: accessNotice(result, "tarefas", "060") };
+  paintTabs();
+  paintTasks();
+}
+
+async function submitTask(form) {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  const title = form.elements.title.value.trim();
+  if (!contactId || !title) return;
+  const dueAt = localInputToIso(form.elements.due.value);
+
+  showFormError(form, "");
+  setFormBusy(form, true);
+  const result = await send("addTask", { contactId, title, dueAt });
+  if (!stillShowing(contactId, gen)) return;
+  setFormBusy(form, false);
+
+  if (!result.ok) {
+    showFormError(form, accessNotice(result, "tarefas", "060"));
+    return;
+  }
+  form.reset();
+  lastDoneTask = null;
+  lastTaskError = null;
+  void loadTasks(contactId);
+  void loadMyTasks();
+}
+
+/**
+ * Done — or, with `done` false, open again. Works from the record's
+ * tab and from "Minhas tarefas" alike: both lists are reloaded, since
+ * a task shown in one is usually in the other too.
+ */
+async function setTaskDone(task, done) {
+  if (!task) return;
+  const result = await send("setTaskDone", { id: task.id, done });
+  if (!result.ok) {
+    lastTaskError = failureText(result, "concluir tarefas");
+    paintTasks();
+    paintMyTasks();
+    return;
+  }
+  lastTaskError = null;
+  lastDoneTask = done ? task : null;
+  if (currentContact && tasksState.contactId === currentContact.id) {
+    void loadTasks(currentContact.id);
+  }
+  void loadMyTasks();
+}
+
+function findTask(taskId) {
+  return (
+    tasksState.tasks.find((t) => t.id === taskId) || myTasks.tasks.find((t) => t.id === taskId)
+  );
+}
+
+// ---- The person's own tasks (footer count and sheet) ---------
+
+function paintTaskBadge() {
+  const badge = ensurePanel().querySelector(".crmc-badge");
+  if (!badge) return;
+  const due = myTasks.status === "ready" ? countDueNow(myTasks.tasks) : 0;
+  badge.textContent = due ? String(due) : "";
+  badge.hidden = !due;
+  badge.parentElement?.setAttribute(
+    "title",
+    due ? `${due} ${due === 1 ? "tarefa atrasada ou para hoje" : "tarefas atrasadas ou para hoje"}` : "Minhas tarefas",
+  );
+}
+
+function paintMyTasks() {
+  const el = sheet()?.querySelector(".crmc-mytasks");
+  if (!el || sheetKind !== "tasks") return;
+  if (myTasks.baseUrl !== currentBaseUrl || myTasks.status === "loading" || myTasks.status === "idle") {
+    el.innerHTML = `<p class="crmc-muted">Carregando…</p>`;
+    return;
+  }
+  if (myTasks.status !== "ready") {
+    el.innerHTML = `<p class="crmc-muted">${escapeHtml(myTasks.notice)}</p>`;
+    return;
+  }
+  el.innerHTML =
+    (myTasks.tasks.length
+      ? myTasks.tasks.map((task) => renderTaskRow(task, { withContact: true })).join("")
+      : `<p class="crmc-muted">Nenhuma tarefa em aberto. Crie uma na aba Tarefas de um contato.</p>`) +
+    renderUndone();
+}
+
+async function loadMyTasks() {
+  const baseUrl = currentBaseUrl;
+  if (!baseUrl) return;
+  const known = myTasks.baseUrl === baseUrl && myTasks.status === "ready";
+  if (!known) myTasks = { baseUrl, status: "loading", tasks: [], notice: null, at: Date.now() };
+  else myTasks = { ...myTasks, at: Date.now() };
+
+  const result = await send("myTasks");
+  if (currentBaseUrl !== baseUrl) return;
+  if (result.ok) {
+    myTasks = {
+      baseUrl,
+      status: "ready",
+      tasks: Array.isArray(result.data) ? result.data : [],
+      notice: null,
+      at: Date.now(),
+    };
+  } else if (!known) {
+    myTasks = {
+      baseUrl,
+      status: "error",
+      tasks: [],
+      notice: accessNotice(result, "tarefas", "060"),
+      at: Date.now(),
+    };
+  }
+  paintTaskBadge();
+  paintMyTasks();
+  paintTabs();
+}
+
+/** Every few minutes, so a task that came due shows up in the count. */
+function refreshMyTasksIfStale() {
+  if (!currentBaseUrl || !ensurePanel().classList.contains("crmc-connected")) return;
+  if (Date.now() - myTasks.at > MY_TASKS_EVERY_MS) void loadMyTasks();
+  else paintTaskBadge(); // the clock alone can make a task late
+}
+
+function setMyTasksOpen(open) {
+  if (open) setRepliesOpen(false);
+  sheetKind = open ? "tasks" : sheetKind === "tasks" ? null : sheetKind;
+  ensurePanel().classList.toggle("crmc-sheet-open", sheetKind !== null);
+  if (!open) return;
+
+  lastDoneTask = null;
+  sheet().innerHTML = `
+    <div class="crmc-sheet-head">
+      <p class="crmc-name">Minhas tarefas</p>
+      <button class="crmc-link" data-act="mytasks-close">Fechar</button>
+    </div>
+    <div class="crmc-mytasks"></div>`;
+  paintMyTasks();
+  void loadMyTasks();
+}
+
+// ---- The conversation in the CRM -----------------------------
+
+function paintConversation(error) {
+  const el = slot(".crmc-conv");
+  const contact = currentContact;
+  if (!el || !contact) return;
+  const conv = convState.contactId === contact.id ? convState.data : null;
+  if (!conv) {
+    el.innerHTML = "";
+    return;
+  }
+
+  let text = "";
+  let canTake = false;
+  if (conv.waiting_since) {
+    const since = formatWhen(conv.waiting_since);
+    text = conv.assigned_to_me
+      ? `Esta conversa espera por você${since ? ` ${since}` : ""}.`
+      : `O cliente espera um atendente${since ? ` ${since}` : ""}.`;
+    canTake = !conv.assigned_to_me;
+  } else if (conv.ai === "answering") {
+    text = "A IA está respondendo esta conversa.";
+    canTake = true;
+  } else if (conv.assigned_to_me) {
+    text =
+      conv.ai === "paused"
+        ? "Você assumiu esta conversa. A IA está pausada aqui."
+        : "Esta conversa está com você no CRM.";
+  } else if (conv.assigned_to) {
+    text = `Esta conversa está com ${conv.assigned_to.name || "outra pessoa"} no CRM.`;
+  } else if (conv.ai === "paused") {
+    text = "A IA está pausada nesta conversa e ninguém assumiu.";
+    canTake = true;
+  }
+  if (!text) {
+    el.innerHTML = "";
+    return;
+  }
+
+  // What the bot wrote when it passed the conversation on — only while
+  // somebody still has to act on it.
+  const summary =
+    conv.handoff_summary && (conv.waiting_since || canTake)
+      ? `<p class="crmc-conv-summary">${escapeHtml(String(conv.handoff_summary).slice(0, 400))}</p>`
+      : "";
+  el.innerHTML = `
+    <div class="crmc-conv-box" data-tone="${conv.waiting_since ? "waiting" : "info"}">
+      <p class="crmc-conv-text">${escapeHtml(text)}</p>
+      ${summary}
+      ${error ? `<p class="crmc-err">${escapeHtml(error)}</p>` : ""}
+      ${canTake ? `<button class="crmc-btn crmc-btn-small" data-act="conv-take">Assumir</button>` : ""}
+    </div>`;
+}
+
+async function loadConversation(contactId) {
+  const gen = generation;
+  convState = { contactId, data: null };
+  paintConversation();
+  const result = await send("conversation", { contactId });
+  if (!stillShowing(contactId, gen)) return;
+  // A key or a CRM without this yet: the record simply has no banner.
+  convState = { contactId, data: result.ok ? result.data : null };
+  paintConversation();
+}
+
+async function takeOverConversation() {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  const conv = convState.contactId === contactId ? convState.data : null;
+  if (!contactId || !conv) return;
+
+  for (const button of slot(".crmc-conv")?.querySelectorAll("button") ?? []) button.disabled = true;
+  const result = await send("takeOver", { id: conv.id });
+  if (!stillShowing(contactId, gen)) return;
+
+  if (!result.ok) {
+    paintConversation(failureText(result, "assumir conversas"));
+    return;
+  }
+  convState = { contactId, data: result.data };
+  paintConversation();
+}
+
+// ------------------------------------------------------------
 // Quick replies
 //
 // The CRM's text snippets, one click from WhatsApp's message box. The
@@ -1456,7 +1835,9 @@ function replyContact() {
 
 function setRepliesOpen(open) {
   repliesOpen = open;
-  ensurePanel().classList.toggle("crmc-sheet-open", open);
+  if (open) sheetKind = "replies";
+  else if (sheetKind === "replies") sheetKind = null;
+  ensurePanel().classList.toggle("crmc-sheet-open", sheetKind !== null);
   if (!open) return;
 
   repliesQuery = "";
@@ -1671,6 +2052,7 @@ function board() {
 }
 
 function setBoardOpen(open) {
+  if (open) setMyTasksOpen(false);
   const wasOpen = boardOpen;
   boardOpen = open;
   ensurePanel().classList.toggle("crmc-board-open", open);
@@ -1962,7 +2344,10 @@ async function refresh(force) {
   ensurePanel().classList.toggle("crmc-connected", Boolean(configured));
   if (!configured) {
     setRepliesOpen(false);
+    setMyTasksOpen(false);
     setBoardOpen(false);
+  } else if (myTasks.baseUrl !== currentBaseUrl) {
+    void loadMyTasks();
   }
   paintReplies();
   if (!configured) {
@@ -2096,6 +2481,9 @@ void (async () => {
     filterDeals = format.filterDeals;
     boardColumns = format.boardColumns;
     chatPhone = format.chatPhone;
+    describeDue = format.describeDue;
+    countDueNow = format.countDueNow;
+    localInputToIso = format.localInputToIso;
   } catch {
     // The fallbacks above stand in.
   }
@@ -2103,6 +2491,7 @@ void (async () => {
   await refresh(true);
   setInterval(() => {
     applyMode();
+    refreshMyTasksIfStale();
     void refresh(false);
   }, POLL_MS);
 })();

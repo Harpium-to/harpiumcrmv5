@@ -367,6 +367,46 @@ const handlers = {
     });
   },
 
+  /** A contact's open tasks, soonest first. */
+  async tasks({ contactId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/tasks`);
+  },
+
+  /** The open tasks of the person this key belongs to, across contacts. */
+  async myTasks() {
+    return callApi("/tasks?assigned=me");
+  },
+
+  async addTask({ contactId, title, dueAt }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/tasks`, {
+      method: "POST",
+      body: JSON.stringify({ title, ...(dueAt ? { due_at: dueAt } : {}) }),
+    });
+  },
+
+  /** Mark a task done, or open again to undo that. */
+  async setTaskDone({ id, done }) {
+    if (!id) return { ok: false, error: "no_id" };
+    return callApi(`/tasks/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ done: Boolean(done) }),
+    });
+  },
+
+  /** Where the contact's conversation stands in the CRM; null if none. */
+  async conversation({ contactId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/contacts/${encodeURIComponent(contactId)}/conversation`);
+  },
+
+  /** Pause the bot on a conversation and make this person its owner. */
+  async takeOver({ id }) {
+    if (!id) return { ok: false, error: "no_id" };
+    return callApi(`/conversations/${encodeURIComponent(id)}/takeover`, { method: "POST" });
+  },
+
   /** The CRM's tags, to offer while editing a contact's. */
   async tags() {
     return callApi("/tags");

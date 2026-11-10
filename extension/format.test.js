@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import { fillQuickReply } from '../src/lib/quick-replies/variables'
+import { countDueNow as serverCountDueNow, describeDue as serverDescribeDue } from '../src/lib/tasks/due'
 import {
   addTagName,
   boardColumns,
   chatPhone,
+  countDueNow,
+  describeDue,
   fillTemplate,
   filterDeals,
   filterReplies,
   formatWhen,
+  localInputToIso,
   parseMoney,
 } from './format.js'
 
@@ -247,5 +251,50 @@ describe('chatPhone', () => {
     for (const phone of ['', null, undefined, '99999-8888', '123', '1'.repeat(16), 'abc']) {
       expect(chatPhone(phone), String(phone)).toBeNull()
     }
+  })
+})
+
+describe('describeDue and countDueNow', () => {
+  // The CRM shows the same tasks with describeDue from
+  // src/lib/tasks/due.ts. The two must say the same thing.
+  const at = (y, m, d, h = 0, min = 0) => new Date(y, m - 1, d, h, min)
+  const now = at(2026, 11, 10, 12, 0)
+  const DATES = [
+    at(2026, 11, 10, 14, 0),
+    at(2026, 11, 10, 9, 0),
+    at(2026, 11, 11, 9, 5),
+    at(2026, 11, 9, 16, 30),
+    at(2026, 11, 3, 8, 0),
+    at(2026, 11, 20, 16, 30),
+    at(2027, 1, 5, 10, 0),
+    at(2025, 12, 31, 23, 59),
+  ].map((d) => d.toISOString())
+
+  it('matches the CRM rule exactly', () => {
+    for (const due of [...DATES, null, undefined, '', 'não é data']) {
+      expect(describeDue(due, now), String(due)).toEqual(serverDescribeDue(due, now))
+    }
+    const tasks = DATES.map((due_at, i) => ({ due_at, done_at: i % 3 === 0 ? DATES[0] : null }))
+    expect(countDueNow(tasks, now)).toBe(serverCountDueNow(tasks, now))
+  })
+
+  it('says it the way a person would', () => {
+    expect(describeDue(DATES[0], now)).toEqual({ label: 'hoje às 14:00', tone: 'today' })
+    expect(describeDue(DATES[3], now)).toEqual({ label: 'atrasada · ontem às 16:30', tone: 'overdue' })
+    expect(countDueNow([{ due_at: DATES[0] }, { due_at: DATES[2] }, { due_at: null }], now)).toBe(1)
+    expect(countDueNow(undefined, now)).toBe(0)
+  })
+})
+
+describe('localInputToIso', () => {
+  it('reads a datetime-local value as the person’s own time', () => {
+    expect(localInputToIso('2026-11-12T14:00')).toBe(new Date(2026, 10, 12, 14, 0).toISOString())
+  })
+
+  it('gives null for an empty or unreadable field', () => {
+    expect(localInputToIso('')).toBeNull()
+    expect(localInputToIso('   ')).toBeNull()
+    expect(localInputToIso(undefined)).toBeNull()
+    expect(localInputToIso('amanhã')).toBeNull()
   })
 })
