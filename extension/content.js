@@ -9,12 +9,18 @@
 //   (`false_5511999999999@c.us_3EB0...`), it is part of the protocol
 //   rather than the styling, and it has outlived several redesigns.
 //
-//   When that fails, this shows "não consegui identificar a conversa"
-//   and stops. It does NOT fall back to a guess. The failure mode of
-//   a wrong guess is a panel showing one customer's CRM record beside
-//   another customer's chat — and whoever is reading it has no way to
-//   know, which is exactly how someone gets greeted by the wrong name
-//   or quoted the wrong price.
+//   Newer builds address more and more chats by a `@lid` id instead,
+//   which is NOT a phone number. For those the panel reads the number
+//   from the chat header when WhatsApp shows it there (someone not in
+//   the address book), and otherwise asks the operator to find the
+//   contact in the CRM. The link they make is remembered in this
+//   browser, per chat.
+//
+//   What it never does is guess. The failure mode of a wrong guess is
+//   a panel showing one customer's CRM record beside another
+//   customer's chat — and whoever is reading it has no way to know,
+//   which is exactly how someone gets greeted by the wrong name or
+//   quoted the wrong price.
 //
 //   Group chats (`@g.us`) are skipped for the same reason: a group
 //   has no single contact to show.
@@ -25,8 +31,18 @@
 const PANEL_ID = "crm-connector-panel";
 const POLL_MS = 800;
 
-let currentPhone = null;
+// The chat on screen: `{ key, phone, lid }` or null. `key` is what a
+// hand-made link is stored under (`phone:<digits>` or `lid:<digits>`);
+// `phone` is null for a lid chat whose number WhatsApp doesn't show.
+let currentChat = null;
+let currentSignature;
+// Bumped on every chat change. Async work started for an earlier
+// generation is dropped when it returns: drawing it would put one
+// customer's data beside another customer's chat.
+let generation = 0;
+
 let currentContact = null;
+let currentLinked = false;
 let currentBaseUrl = "";
 let panel = null;
 
@@ -49,17 +65,26 @@ const TEMPERATURES = [
 
 // Filled by the dynamic import at the bottom. Until it resolves the
 // panel reports "no chat", which is correct: nothing has been read yet.
-let chatPhoneFromDataIds = () => null;
+let chatIdentityFromDataIds = () => null;
+let phoneFromHeaderTitles = () => null;
 let usableChatName = () => null;
 
-/** The phone digits of the open 1:1 chat, or null. */
-function readOpenChatPhone() {
+/** The open 1:1 chat, or null. */
+function readOpenChat() {
   const main = document.querySelector("#main");
   if (!main) return null;
   const ids = [...main.querySelectorAll("[data-id]")].map((node) =>
     node.getAttribute("data-id"),
   );
-  return chatPhoneFromDataIds(ids);
+  const identity = chatIdentityFromDataIds(ids);
+  if (!identity) return null;
+  if (identity.phone) {
+    return { key: `phone:${identity.phone}`, phone: identity.phone, lid: null };
+  }
+  const titles = [...main.querySelectorAll("header [title]")].map((node) =>
+    node.getAttribute("title"),
+  );
+  return { key: `lid:${identity.lid}`, phone: phoneFromHeaderTitles(titles), lid: identity.lid };
 }
 
 /** The name WhatsApp shows for the open chat, for pre-filling a create. */
@@ -88,6 +113,16 @@ function send(type, payload) {
 // The panel
 // ------------------------------------------------------------
 
+function setCollapsed(collapsed) {
+  const node = ensurePanel();
+  node.classList.toggle("crmc-collapsed", collapsed);
+  const button = node.querySelector('[data-act="collapse"]');
+  if (button) {
+    button.textContent = collapsed ? "+" : "—";
+    button.title = collapsed ? "Expandir" : "Recolher";
+  }
+}
+
 function ensurePanel() {
   if (panel && document.body.contains(panel)) return panel;
   panel = document.createElement("aside");
@@ -103,14 +138,23 @@ function ensurePanel() {
   document.body.appendChild(panel);
 
   panel.addEventListener("click", (event) => {
-    const action = event.target?.getAttribute?.("data-act");
-    if (!action) return;
-    if (action === "collapse") panel.classList.toggle("crmc-collapsed");
+    const target = event.target?.closest?.("[data-act]");
+    if (!target || !panel.contains(target)) return;
+    const action = target.getAttribute("data-act");
+    if (action === "collapse") {
+      const collapsed = !panel.classList.contains("crmc-collapsed");
+      setCollapsed(collapsed);
+      void send("setPrefs", { collapsed });
+    }
     if (action === "settings") void send("openOptions");
     if (action === "create") void createContact();
     if (action === "retry") void refresh(true);
+    if (action === "search") renderLinkSearch();
+    if (action === "pick") void linkContact(target.getAttribute("data-id"));
+    if (action === "unlink") void unlink();
+    if (action === "create-typed") void createTyped(target.getAttribute("data-phone"));
     if (action === "temperature") {
-      void setTemperature(event.target.getAttribute("data-value"));
+      void setTemperature(target.getAttribute("data-value"));
     }
   });
 
@@ -118,6 +162,22 @@ function ensurePanel() {
     const select = event.target;
     if (!select?.classList?.contains("crmc-stage")) return;
     void moveDeal(select.getAttribute("data-deal"), select.value);
+  });
+
+  panel.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = event.target?.querySelector?.("input");
+    if (input) void runSearch(input.value);
+  });
+
+  // Typing in the search box must not reach WhatsApp's own keyboard
+  // handling (shortcuts, focusing its message box).
+  for (const type of ["keydown", "keyup", "keypress"]) {
+    panel.addEventListener(type, (event) => event.stopPropagation());
+  }
+
+  void send("getPrefs").then((prefs) => {
+    if (prefs.ok && prefs.data?.collapsed) setCollapsed(true);
   });
 
   return panel;
@@ -153,6 +213,30 @@ function renderMessage(text, actionLabel, action) {
         : ""
     }
   `);
+}
+
+/** A failed call to the CRM, said in the operator's terms. */
+function renderFailure(result) {
+  if (result.error === "unauthorized") {
+    renderMessage("A chave de API foi recusada.", "Configurar", "settings");
+  } else if (result.error === "network") {
+    renderMessage("Não consegui falar com o CRM.", "Tentar de novo", "retry");
+  } else {
+    renderMessage(result.detail || "Algo deu errado.", "Tentar de novo", "retry");
+  }
+}
+
+function contactUrl(contactId) {
+  return `${currentBaseUrl}/contacts?contact=${encodeURIComponent(contactId)}`;
+}
+
+/** One contact as a choice: name and number, picked with a click. */
+function renderChoice(contact) {
+  return `
+    <button class="crmc-result" data-act="pick" data-id="${escapeHtml(contact.id)}">
+      <span class="crmc-result-name">${escapeHtml(contact.name || contact.phone)}</span>
+      <span class="crmc-result-sub">${escapeHtml(contact.phone)}</span>
+    </button>`;
 }
 
 function renderTemperature(contact) {
@@ -252,6 +336,7 @@ async function loadDeals(contactId) {
 
 async function moveDeal(dealId, stageId) {
   const contactId = currentContact?.id;
+  const gen = generation;
   const deal = dealsState.deals.find((d) => d.id === dealId);
   if (!contactId || !deal || deal.stage?.id === stageId) return;
 
@@ -260,7 +345,7 @@ async function moveDeal(dealId, stageId) {
 
   // Same rule as the temperature: a reply for a chat that is no longer
   // open must not be drawn into the one that is.
-  if (currentContact?.id !== contactId) return;
+  if (gen !== generation || currentContact?.id !== contactId) return;
 
   if (!result.ok) {
     dealsState = {
@@ -282,9 +367,8 @@ async function moveDeal(dealId, stageId) {
   paintDeals();
 }
 
-function renderContact(contact, baseUrl, notice) {
+function renderContact(contact, notice) {
   currentContact = contact;
-  currentBaseUrl = baseUrl;
   const tags = (contact.tags || [])
     .map((t) => `<span class="crmc-tag">${escapeHtml(t.name)}</span>`)
     .join("");
@@ -292,6 +376,12 @@ function renderContact(contact, baseUrl, notice) {
   render(`
     <p class="crmc-name">${escapeHtml(contact.name || contact.phone)}</p>
     <p class="crmc-sub">${escapeHtml(contact.phone)}</p>
+    ${
+      currentLinked
+        ? `<p class="crmc-linked">Vínculo lembrado neste navegador ·
+             <button class="crmc-link" data-act="unlink">Desfazer</button></p>`
+        : ""
+    }
     ${contact.company ? `<p class="crmc-row"><span>Empresa</span>${escapeHtml(contact.company)}</p>` : ""}
     ${contact.email ? `<p class="crmc-row"><span>Email</span>${escapeHtml(contact.email)}</p>` : ""}
     ${
@@ -304,29 +394,201 @@ function renderContact(contact, baseUrl, notice) {
     ${tags ? `<div class="crmc-tags">${tags}</div>` : ""}
     <div class="crmc-deals">${renderDeals(contact.id)}</div>
     <a class="crmc-btn" target="_blank" rel="noreferrer noopener"
-       href="${escapeHtml(baseUrl)}/contacts?contact=${encodeURIComponent(contact.id)}">
+       href="${escapeHtml(contactUrl(contact.id))}">
       Abrir no CRM
     </a>
   `);
 }
 
-async function createContact() {
-  const phone = currentPhone;
-  if (!phone) return;
+/** Show a contact for the open chat and load its deals. */
+function showContact(contact, { linked = false } = {}) {
+  currentLinked = linked;
+  renderContact(contact);
+  void loadDeals(contact.id);
+}
+
+/** No record for this number: offer to create, or to link another. */
+function renderNotFound(chat) {
+  render(`
+    <p class="crmc-name">Sem cadastro</p>
+    <p class="crmc-sub">+${escapeHtml(chat.phone)}</p>
+    <button class="crmc-btn" data-act="create">Criar no CRM</button>
+    <button class="crmc-link crmc-link-block" data-act="search">
+      Já está no CRM com outro número? Vincular
+    </button>
+  `);
+}
+
+/** The same number is in the CRM more than once: the operator picks. */
+function renderChooser(matches) {
+  render(`
+    <p class="crmc-name">${matches.length} cadastros com este número</p>
+    <p class="crmc-msg">Escolha qual é esta conversa. A escolha fica lembrada neste navegador.</p>
+    <div class="crmc-results">${matches.map(renderChoice).join("")}</div>
+  `);
+}
+
+/**
+ * Find a contact in the CRM to link to this chat by hand: a lid chat
+ * whose number WhatsApp doesn't show, or a customer saved under
+ * another number.
+ */
+function renderLinkSearch() {
+  const chat = currentChat;
+  if (!chat) return;
+  const hidden = !chat.phone;
+  render(`
+    <p class="crmc-name">${escapeHtml(
+      hidden ? readOpenChatName() || "Número não exibido" : `+${chat.phone}`,
+    )}</p>
+    <p class="crmc-msg">${
+      hidden
+        ? "O WhatsApp não mostra o número desta conversa. Busque o contato no CRM para vincular."
+        : "Busque o contato no CRM para vincular a esta conversa."
+    } Fica lembrado neste navegador.</p>
+    <form class="crmc-search">
+      <input class="crmc-input" type="search" autocomplete="off"
+             placeholder="Nome ou telefone com DDI" aria-label="Buscar contato no CRM" />
+      <button class="crmc-btn crmc-btn-small" type="submit">Buscar</button>
+    </form>
+    <div class="crmc-results"></div>
+    ${hidden ? "" : `<button class="crmc-link crmc-link-block" data-act="retry">Voltar</button>`}
+  `);
+  body().querySelector(".crmc-input")?.focus();
+}
+
+async function runSearch(rawQuery) {
+  const query = String(rawQuery || "").trim();
+  const gen = generation;
+  const slot = () => body().querySelector(".crmc-results");
+  if (!slot()) return;
+  if (query.length < 2) {
+    slot().innerHTML = `<p class="crmc-muted">Digite ao menos 2 letras ou o número.</p>`;
+    return;
+  }
+  slot().innerHTML = `<p class="crmc-muted">Buscando…</p>`;
+
+  const result = await send("search", { query });
+  if (gen !== generation || !slot()) return;
+  if (!result.ok) {
+    slot().innerHTML = `<p class="crmc-err">${
+      result.error === "unauthorized"
+        ? "A chave de API foi recusada."
+        : "Não consegui buscar no CRM."
+    }</p>`;
+    return;
+  }
+
+  const rows = Array.isArray(result.data) ? result.data : [];
+  if (rows.length) {
+    slot().innerHTML = rows.map(renderChoice).join("");
+    return;
+  }
+
+  // Creating needs the full international number: "31 99999-8888"
+  // would otherwise be saved as a number in the Netherlands (+31).
+  const digits = query.replace(/\D/g, "");
+  const international = /^\+[\d\s().‐-―-]+$/.test(query) && digits.length >= 10;
+  slot().innerHTML = `
+    <p class="crmc-muted">Nenhum contato encontrado.</p>
+    ${
+      international
+        ? `<button class="crmc-btn" data-act="create-typed" data-phone="${escapeHtml(digits)}">
+             Criar contato com +${escapeHtml(digits)}</button>`
+        : `<p class="crmc-muted">Para criar, digite o número com + e DDI (ex.: +55 31 99999-8888).</p>`
+    }`;
+}
+
+/** Remember that this chat is `contactId`, and show it. */
+async function linkContact(contactId) {
+  const chat = currentChat;
+  const gen = generation;
+  if (!chat || !contactId) return;
+
+  renderMessage("Vinculando…");
+  const saved = await send("setLink", { chatKey: chat.key, contactId });
+  if (gen !== generation) return;
+  if (!saved.ok) {
+    renderMessage("Não consegui guardar o vínculo.", "Tentar de novo", "retry");
+    return;
+  }
+  const result = await send("contact", { id: contactId });
+  if (gen !== generation) return;
+  if (!result.ok) {
+    renderFailure(result);
+    return;
+  }
+  if (!result.data) {
+    // Deleted in the CRM between the search and the click.
+    await send("clearLink", { chatKey: chat.key });
+    if (gen === generation) renderMessage("Esse contato não existe mais no CRM.", "Voltar", "retry");
+    return;
+  }
+  showContact(result.data, { linked: true });
+}
+
+async function unlink() {
+  const chat = currentChat;
+  if (!chat) return;
+  await send("clearLink", { chatKey: chat.key });
+  await refresh(true);
+}
+
+/**
+ * The CRM answered a create with a contact that is NOT this number —
+ * its find-or-create also accepts a number that shares only the last
+ * 8 digits, which can be someone in another area code. Ask.
+ */
+function renderSimilar(contact) {
+  render(`
+    <p class="crmc-name">Número parecido no CRM</p>
+    <p class="crmc-msg">O CRM já tem um contato com os mesmos últimos dígitos, mas não é o mesmo número:</p>
+    <div class="crmc-results">${renderChoice(contact)}</div>
+    <p class="crmc-muted">Se for esta pessoa, clique nela para vincular. Se for outra, cadastre pelo CRM.</p>
+    <a class="crmc-btn" target="_blank" rel="noreferrer noopener"
+       href="${escapeHtml(contactUrl(contact.id))}">Abrir no CRM</a>
+    <button class="crmc-link crmc-link-block" data-act="retry">Voltar</button>
+  `);
+}
+
+async function create(phone, { link }) {
+  const chat = currentChat;
+  const gen = generation;
+  if (!chat || !phone) return;
+
   renderMessage("Criando…");
   const result = await send("create", { phone, name: readOpenChatName() });
+  if (gen !== generation) return;
   if (!result.ok) {
     renderMessage("Não consegui criar o contato.", "Tentar de novo", "retry");
     return;
   }
-  await refresh(true);
+  if (!result.sameNumber) {
+    renderSimilar(result.data);
+    return;
+  }
+  if (link) {
+    await send("setLink", { chatKey: chat.key, contactId: result.data.id });
+    if (gen !== generation) return;
+  }
+  showContact(result.data, { linked: link });
+}
+
+function createContact() {
+  // A lid chat is found by its number only while WhatsApp shows it;
+  // once the person is saved on the phone the header shows a name, so
+  // the link is what keeps the panel working.
+  return create(currentChat?.phone, { link: Boolean(currentChat?.lid) });
+}
+
+function createTyped(digits) {
+  return create(digits, { link: true });
 }
 
 async function setTemperature(value) {
   const contact = currentContact;
+  const gen = generation;
   if (!contact || contact.temperature === value) return;
-  const phone = currentPhone;
-  const baseUrl = currentBaseUrl;
 
   for (const button of body().querySelectorAll(".crmc-seg")) button.disabled = true;
   const result = await send("update", { id: contact.id, fields: { temperature: value } });
@@ -334,17 +596,17 @@ async function setTemperature(value) {
   // The operator may have switched chats while this was in flight. The
   // reply belongs to the contact that was open then; drawing it now
   // would put one customer's card beside another customer's chat.
-  if (currentPhone !== phone) return;
+  if (gen !== generation) return;
 
   if (!result.ok) {
     const notice =
       result.error === "unauthorized"
         ? "A chave de API não tem permissão para editar contatos."
         : "Não consegui salvar a temperatura.";
-    renderContact(contact, baseUrl, notice);
+    renderContact(contact, notice);
     return;
   }
-  renderContact(result.data, baseUrl);
+  renderContact(result.data);
 }
 
 // ------------------------------------------------------------
@@ -352,14 +614,19 @@ async function setTemperature(value) {
 // ------------------------------------------------------------
 
 async function refresh(force) {
-  const phone = readOpenChatPhone();
+  const chat = readOpenChat();
+  const signature = chat ? `${chat.key}|${chat.phone ?? ""}` : "";
 
-  if (!force && phone === currentPhone) return;
-  currentPhone = phone;
+  if (!force && signature === currentSignature) return;
+  currentSignature = signature;
+  currentChat = chat;
   currentContact = null;
+  currentLinked = false;
+  const gen = ++generation;
 
   const settings = await send("settings");
-  const baseUrl = settings.ok ? settings.data.baseUrl : "";
+  if (gen !== generation) return;
+  currentBaseUrl = settings.ok ? settings.data.baseUrl : "";
   if (!settings.ok || !settings.data.configured) {
     renderMessage(
       "Configure o endereço do CRM e a chave de API.",
@@ -369,7 +636,7 @@ async function refresh(force) {
     return;
   }
 
-  if (!phone) {
+  if (!chat) {
     // Covers "no chat open", "group chat", and "could not read the
     // conversation" on purpose: from the operator's side the useful
     // information is the same — this panel has nothing to say about
@@ -379,30 +646,57 @@ async function refresh(force) {
   }
 
   renderMessage("Procurando…");
-  const result = await send("lookup", { phone });
 
-  if (!result.ok) {
-    if (result.error === "unauthorized") {
-      renderMessage("A chave de API foi recusada.", "Configurar", "settings");
-    } else if (result.error === "network") {
-      renderMessage("Não consegui falar com o CRM.", "Tentar de novo", "retry");
-    } else {
-      renderMessage(result.detail || "Algo deu errado.", "Tentar de novo", "retry");
+  // 1. A link made for this chat earlier, by hand or on create.
+  const link = await send("getLink", { chatKey: chat.key });
+  if (gen !== generation) return;
+  if (link.ok && link.data) {
+    const linked = await send("contact", { id: link.data });
+    if (gen !== generation) return;
+    if (!linked.ok) {
+      renderFailure(linked);
+      return;
     }
+    if (linked.data) {
+      showContact(linked.data, { linked: true });
+      return;
+    }
+    // Deleted in the CRM: forget the link and look it up afresh.
+    await send("clearLink", { chatKey: chat.key });
+    if (gen !== generation) return;
+  }
+
+  // 2. A lid chat with no number on screen: only the operator knows.
+  if (!chat.phone) {
+    renderLinkSearch();
     return;
   }
 
-  if (!result.data) {
-    render(`
-      <p class="crmc-name">Sem cadastro</p>
-      <p class="crmc-sub">+${escapeHtml(phone)}</p>
-      <button class="crmc-btn" data-act="create">Criar no CRM</button>
-    `);
+  // 3. By number.
+  const result = await send("lookup", { phone: chat.phone });
+  if (gen !== generation) return;
+  if (!result.ok) {
+    renderFailure(result);
     return;
   }
 
-  renderContact(result.data, baseUrl);
-  void loadDeals(result.data.id);
+  const matches = Array.isArray(result.data) ? result.data : [];
+  if (matches.length > 1) {
+    renderChooser(matches);
+    return;
+  }
+  if (matches.length === 0) {
+    renderNotFound(chat);
+    return;
+  }
+
+  if (chat.lid) {
+    // Same reason as on create: keep finding this chat after the
+    // header stops showing the number.
+    await send("setLink", { chatKey: chat.key, contactId: matches[0].id });
+    if (gen !== generation) return;
+  }
+  showContact(matches[0], { linked: Boolean(chat.lid) });
 }
 
 // Polled rather than observed: WhatsApp Web swaps the whole #main
@@ -417,7 +711,8 @@ ensurePanel();
 void (async () => {
   try {
     const mod = await import(chrome.runtime.getURL("chat-id.js"));
-    chatPhoneFromDataIds = mod.chatPhoneFromDataIds;
+    chatIdentityFromDataIds = mod.chatIdentityFromDataIds;
+    phoneFromHeaderTitles = mod.phoneFromHeaderTitles;
     usableChatName = mod.usableChatName;
   } catch {
     renderMessage("Não consegui carregar a extensão. Recarregue a página.");

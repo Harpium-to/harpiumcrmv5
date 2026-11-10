@@ -304,3 +304,115 @@
     color: #e9edef;
   }
 }
+
+/* Linking a chat to a contact by hand: a lid chat whose number
+   WhatsApp doesn't show, or the same number saved twice. */
+#crm-connector-panel .crmc-linked {
+  margin: 6px 0 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+#crm-connector-panel .crmc-link {
+  all: unset;
+  color: #008069;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-link:focus-visible {
+  outline: 2px solid #00a884;
+  outline-offset: 1px;
+}
+
+#crm-connector-panel .crmc-link-block {
+  display: block;
+  margin: 10px auto 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+#crm-connector-panel .crmc-search {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+
+#crm-connector-panel .crmc-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(134, 150, 160, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-input:focus-visible {
+  outline: 2px solid #00a884;
+  outline-offset: 0;
+}
+
+#crm-connector-panel .crmc-btn.crmc-btn-small {
+  width: auto;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-results:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0 0;
+}
+
+#crm-connector-panel .crmc-result {
+  all: unset;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(134, 150, 160, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-result:hover {
+  background: rgba(134, 150, 160, 0.14);
+}
+
+#crm-connector-panel .crmc-result:focus-visible {
+  outline: 2px solid #00a884;
+  outline-offset: 1px;
+}
+
+#crm-connector-panel .crmc-result-name {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-result-sub {
+  display: block;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  #crm-connector-panel .crmc-link {
+    color: #53bdeb;
+  }
+}

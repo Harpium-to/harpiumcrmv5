@@ -28,6 +28,23 @@
  * beside another customer's chat.
  */
 export function chatPhoneFromDataIds(dataIds) {
+  return chatIdentityFromDataIds(dataIds)?.phone ?? null;
+}
+
+/**
+ * Who the open 1:1 chat is with, as WhatsApp's own ids say:
+ * `{ phone }`, `{ lid }`, or null.
+ *
+ * `lid` is the privacy-preserving id newer builds use for more and
+ * more chats. It is NOT a phone number — its digits must never be
+ * looked up or saved as one — but it is stable per person, which is
+ * what lets the panel remember a contact the operator linked by hand.
+ *
+ * A phone id anywhere in the chat wins over a lid: it is the stronger
+ * identity, and a chat caught mid-migration may carry both.
+ */
+export function chatIdentityFromDataIds(dataIds) {
+  let lid = null;
   for (const raw of dataIds ?? []) {
     const value = typeof raw === "string" ? raw : "";
     const parts = value.split("_");
@@ -43,17 +60,44 @@ export function chatPhoneFromDataIds(dataIds) {
     // conversations with a person at all.
     if (server === "g.us" || server === "broadcast" || server === "status")
       return null;
-    // c.us is a phone contact; lid is the privacy-preserving id newer
-    // builds use, which is NOT a phone number and must not be treated
-    // as one.
-    if (server !== "c.us" && server !== "s.whatsapp.net") continue;
 
     const digits = (user || "").replace(/\D/g, "");
+
+    if (server === "lid") {
+      // Only all-digit ids: anything else is a shape this doesn't know.
+      if (!lid && digits && digits === user) lid = digits;
+      continue;
+    }
+    if (server !== "c.us" && server !== "s.whatsapp.net") continue;
+
     // Shorter than 8 digits is not a reachable number anywhere; it is
     // a parse that went wrong.
-    if (digits.length >= 8) return digits;
+    if (digits.length >= 8) return { phone: digits };
   }
-  return null;
+  return lid ? { lid } : null;
+}
+
+/**
+ * The phone number of the open chat, when its header shows one, or
+ * null.
+ *
+ * For someone not in the phone's address book WhatsApp titles the chat
+ * with the number itself, in international form ("+55 31 99999-8888").
+ * In a lid chat that is the only place the number appears.
+ *
+ * Strict: the title must be nothing but a number with its `+`. If the
+ * header has more than one such title and they disagree, there is no
+ * telling which is the chat's, so the answer is null.
+ */
+export function phoneFromHeaderTitles(titles) {
+  const found = new Set();
+  for (const raw of titles ?? []) {
+    const title = typeof raw === "string" ? raw.trim() : "";
+    if (!/^\+[\d\s()‐-―.-]+$/.test(title)) continue;
+    const digits = title.replace(/\D/g, "");
+    if (digits.length >= 10 && digits.length <= 15) found.add(digits);
+  }
+  return found.size === 1 ? [...found][0] : null;
 }
 
 /**
