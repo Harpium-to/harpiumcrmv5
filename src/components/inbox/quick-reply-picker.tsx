@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, MessageSquare, Zap } from "lucide-react";
+import { FileText, Image as ImageIcon, Loader2, MessageSquare, Mic, Video, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import type { QuickReply } from "@/types";
 import { interactivePayloadPreviewText } from "@/lib/whatsapp/interactive";
+import { QUICK_REPLY_MEDIA_LABELS } from "@/lib/quick-replies/media";
+
+const MEDIA_ICONS = { image: ImageIcon, video: Video, document: FileText, audio: Mic } as const;
 
 interface QuickReplyPickerProps {
   open: boolean;
@@ -22,7 +25,8 @@ interface QuickReplyPickerProps {
 /**
  * Lists the account's saved quick replies for insertion into the
  * composer. Text snippets fill the textarea; interactive snippets open
- * the builder pre-filled (handled by the caller's `onPick`).
+ * the builder pre-filled; a file is staged as an attachment (handled by
+ * the caller's `onPick`).
  */
 export function QuickReplyPicker({
   open,
@@ -79,6 +83,11 @@ export function QuickReplyPicker({
                   >
                     {qr.kind === "interactive" ? (
                       <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    ) : qr.kind === "media" && qr.media_kind ? (
+                      (() => {
+                        const Icon = MEDIA_ICONS[qr.media_kind];
+                        return <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />;
+                      })()
                     ) : (
                       <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     )}
@@ -89,7 +98,11 @@ export function QuickReplyPicker({
                       <span className="block truncate text-xs text-muted-foreground">
                         {qr.kind === "interactive" && qr.interactive_payload
                           ? interactivePayloadPreviewText(qr.interactive_payload)
-                          : qr.content_text}
+                          : qr.kind === "media" && qr.media_kind
+                            ? [QUICK_REPLY_MEDIA_LABELS[qr.media_kind], qr.content_text || qr.media_filename]
+                                .filter(Boolean)
+                                .join(" · ")
+                            : qr.content_text}
                       </span>
                     </span>
                   </button>

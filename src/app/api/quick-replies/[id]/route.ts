@@ -2,11 +2,16 @@ import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
+import { NO_QUICK_REPLY_MEDIA, parseQuickReplyMedia } from '@/lib/quick-replies/media'
 
 // Update / delete a single quick reply. Quick replies are account-
 // shared, so every mutation is scoped by `account_id` (the service-role
 // client bypasses the agent-gated RLS, so both the role check and the
 // account scope are enforced here).
+//
+// The file of a media reply stays in storage when the reply changes or
+// is deleted: messages already sent with it point to the same URL, and
+// the inbox would show them broken.
 
 export async function PATCH(
   request: Request,
@@ -23,6 +28,19 @@ export async function PATCH(
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
 
+  // Leaving the media kind clears the file columns (the CHECK of 063
+  // wants them empty). Only then: before 063 those columns don't exist,
+  // and naming them would break every edit.
+  const wasMedia = async () => {
+    const { data } = await supabaseAdmin()
+      .from('quick_replies')
+      .select('kind')
+      .eq('id', id)
+      .eq('account_id', ctx.accountId)
+      .maybeSingle()
+    return (data as { kind?: string } | null)?.kind === 'media'
+  }
+
   const update: Record<string, unknown> = {}
   if (typeof body.title === 'string') {
     const title = body.title.trim()
@@ -34,15 +52,28 @@ export async function PATCH(
   // drives which content column is authoritative and the other is cleared —
   // otherwise a switched row keeps a stale payload the picker mis-routes on.
   if ('kind' in body) {
-    if (body.kind !== 'text' && body.kind !== 'interactive') {
-      return NextResponse.json({ error: 'o tipo precisa ser "text" ou "interactive"' }, { status: 400 })
+    if (body.kind !== 'text' && body.kind !== 'interactive' && body.kind !== 'media') {
+      return NextResponse.json(
+        { error: 'o tipo precisa ser "text", "interactive" ou "media"' },
+        { status: 400 },
+      )
     }
     update.kind = body.kind
-    if (body.kind === 'interactive') {
+    if (body.kind === 'media') {
+      const parsed = parseQuickReplyMedia(
+        body,
+        ctx.accountId,
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+      )
+      if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
+      Object.assign(update, parsed.value)
+      update.interactive_payload = null
+    } else if (body.kind === 'interactive') {
       const result = validateInteractivePayload(body.interactive_payload)
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
       update.interactive_payload = body.interactive_payload
       update.content_text = null
+      if (await wasMedia()) Object.assign(update, NO_QUICK_REPLY_MEDIA)
     } else {
       const text = typeof body.content_text === 'string' ? body.content_text : ''
       if (!text.trim()) {
@@ -53,6 +84,7 @@ export async function PATCH(
       }
       update.content_text = text
       update.interactive_payload = null
+      if (await wasMedia()) Object.assign(update, NO_QUICK_REPLY_MEDIA)
     }
   } else {
     // No kind change — allow partial edits of whichever field the row uses.

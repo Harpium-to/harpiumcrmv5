@@ -661,7 +661,7 @@ export interface AutomationLog {
 // Quick replies — reusable snippets (migration 035)
 // ============================================================
 
-export type QuickReplyKind = 'text' | 'interactive';
+export type QuickReplyKind = 'text' | 'interactive' | 'media';
 
 export interface QuickReply {
   id: string;
@@ -675,6 +675,13 @@ export interface QuickReply {
   content_text?: string | null;
   /** Set when `kind === 'interactive'`. */
   interactive_payload?: InteractiveMessagePayload | null;
+  /** Set when `kind === 'media'` (migration 063); `content_text` is then the caption. */
+  media_kind?: 'image' | 'video' | 'document' | 'audio' | null;
+  /** Public URL in the chat-media bucket. */
+  media_url?: string | null;
+  /** Path in the chat-media bucket, for removing the file with the reply. */
+  media_path?: string | null;
+  media_filename?: string | null;
   created_at: string;
   updated_at: string;
 }

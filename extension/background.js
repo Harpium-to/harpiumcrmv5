@@ -417,14 +417,16 @@ const handlers = {
   },
 
   /**
-   * The CRM's text quick replies. Kept for a minute, like the
-   * pipelines: the list is opened many times a day and edited rarely.
+   * The CRM's quick replies: text, and those with a file (migration
+   * 063; an older CRM just returns the text ones). Kept for a minute,
+   * like the pipelines: the list is opened many times a day and edited
+   * rarely.
    */
   async quickReplies() {
     const { baseUrl } = await readSettings();
     const fresh = repliesCache.baseUrl === baseUrl && Date.now() - repliesCache.at < 60_000;
     if (fresh) return { ok: true, data: repliesCache.data };
-    const result = await callApi("/quick-replies");
+    const result = await callApi("/quick-replies?include=media");
     if (result.ok) repliesCache = { baseUrl, at: Date.now(), data: result.data };
     return result;
   },
@@ -458,6 +460,25 @@ const handlers = {
       method: "POST",
       body: JSON.stringify({ to, type: "text", text }),
     });
+  },
+
+  /**
+   * Send a quick reply's file through the CRM: a photo, a video, a
+   * document, or an audio (which goes as a voice note, no caption). The
+   * URL is the reply's own, as the CRM listed it.
+   */
+  async sendMedia({ to, kind, url, caption, filename }) {
+    if (typeof to !== "string" || !/^\+\d{8,15}$/.test(to)) {
+      return { ok: false, error: "bad_phone" };
+    }
+    if (!["image", "video", "document", "audio"].includes(kind)) {
+      return { ok: false, error: "bad_kind" };
+    }
+    if (typeof url !== "string" || !/^https:\/\//.test(url)) return { ok: false, error: "bad_url" };
+    const body = { to, type: kind, media_url: url };
+    if (kind !== "audio" && typeof caption === "string" && caption.trim()) body.text = caption;
+    if (kind === "document" && typeof filename === "string" && filename) body.filename = filename;
+    return callApi("/messages", { method: "POST", body: JSON.stringify(body) });
   },
 
   async settings() {
