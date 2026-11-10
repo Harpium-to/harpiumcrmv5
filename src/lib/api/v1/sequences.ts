@@ -7,6 +7,7 @@ import {
   waitMinutes,
 } from '@/lib/automations/validate';
 import type { Automation } from '@/types';
+import { isOptedOut, OPTED_OUT_MESSAGE } from '@/lib/contacts/opt-out';
 
 // ============================================================
 // Sequences: a run of messages with waits between them, started by a
@@ -165,13 +166,17 @@ export async function startSequence(
     throw new SequenceError('inactive', 'Esta sequência está desligada no CRM.', 409);
   }
 
+  // `*` so opted_out_at (066) is read once it exists.
   const { data: contact } = await db
     .from('contacts')
-    .select('id')
+    .select('*')
     .eq('id', contactId)
     .eq('account_id', accountId)
     .maybeSingle();
   if (!contact) throw new SequenceError('contact_not_found', 'Contato não encontrado.', 404);
+  if (isOptedOut(contact as { opted_out_at?: unknown })) {
+    throw new SequenceError('opted_out', OPTED_OUT_MESSAGE, 409);
+  }
 
   const { data: conversations } = await db
     .from('conversations')

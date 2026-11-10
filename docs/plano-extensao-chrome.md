@@ -494,10 +494,17 @@ QR feito em 10/11, migration 065, sem mudança na extensão)
   CRM no caminho do QR code; na API oficial ficam os modelos.
 - De quebra, o envio das agendadas abre a conversa de quem nunca falou
   com o CRM, pelo número, como a API pública já fazia.
+- **Descadastro** (feito em 10/11, migration 066): "Pediu para não
+  receber mensagens automáticas" na ficha do contato (CRM e extensão).
+  Quem está marcado fica de fora dos disparos pelo QR (no plano e na
+  hora do envio), dos disparos com modelo (tela e API), das Sequências
+  (não começa, e para na espera seguinte) e dos Fluxos iniciados à mão.
+  Mensagem escrita ou agendada por alguém ainda sai. A exportação de
+  contatos traz a coluna.
 - Não entrou: um botão de disparo na extensão (a lista e o
-  acompanhamento cabem melhor na tela do CRM) e descadastro (os
-  contatos não têm "não quero receber"; é preciso pensar nisso antes de
-  disparos maiores).
+  acompanhamento cabem melhor na tela do CRM) e o descadastro
+  automático por palavra ("SAIR", "PARAR"), que depende de mexer na
+  entrada das mensagens dos dois caminhos.
 - Disparo para uma lista ou etiqueta. Pelo número do QR: com limite —
   até 200 envios por dia no CRM, um a cada 30–90 s (sorteado), pelo
   agendador, com aviso de risco antes de disparar, acompanhar e parar.

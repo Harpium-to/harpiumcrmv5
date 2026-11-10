@@ -978,6 +978,11 @@
   background: var(--crmc-surface);
 }
 
+#crm-connector-panel .crmc-optout {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
 /* "Enviar agora | Agendar", and the time fields under it. */
 #crm-connector-panel .crmc-mode:not([hidden]) {
   display: flex;

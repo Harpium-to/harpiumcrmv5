@@ -4,6 +4,7 @@ import { isMissingFunction, isMissingTable } from '@/lib/auth/account-context';
 import { isQuickReplyMediaKind, type QuickReplyMediaKind } from '@/lib/quick-replies/media';
 import { sendMessageToConversation } from '@/lib/whatsapp/send-message';
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation';
+import { contactOptedOut } from '@/lib/contacts/opt-out';
 
 // ============================================================
 // Messages scheduled for a contact (migration 064; Fase 5 of
@@ -99,6 +100,8 @@ export interface ScheduledRow {
   outcome: string | null;
   processed_at?: string | null;
   created_at: string;
+  /** Set for a recipient of a bulk send (065). */
+  bulk_send_id?: string | null;
 }
 
 export interface PublicScheduledMessage {
@@ -364,6 +367,12 @@ async function processOne(db: SupabaseClient, row: ScheduledRow, deps: ProcessDe
       ))
     ) {
       await finish(db, row.id, 'skipped', 'O cliente respondeu antes, então não foi enviada.');
+      return 'skipped';
+    }
+
+    // A bulk send leaves out whoever opted out since it was planned (066).
+    if (row.bulk_send_id && (await contactOptedOut(db, accountId, row.contact_id))) {
+      await finish(db, row.id, 'skipped', 'O contato pediu para não receber disparos.');
       return 'skipped';
     }
 

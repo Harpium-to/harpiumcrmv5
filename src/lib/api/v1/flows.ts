@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { startManualFlowRun } from '@/lib/flows/engine';
 import type { FlowRow } from '@/lib/flows/types';
+import { isOptedOut, OPTED_OUT_MESSAGE } from '@/lib/contacts/opt-out';
 
 // ============================================================
 // Chatbot flows started by hand on one contact (Fase 7 of
@@ -78,13 +79,17 @@ export async function startFlow(
     throw new FlowStartError('inactive', 'Este fluxo não está ativo no CRM.', 409);
   }
 
+  // `*` so opted_out_at (066) is read once it exists.
   const { data: contact } = await db
     .from('contacts')
-    .select('id')
+    .select('*')
     .eq('id', contactId)
     .eq('account_id', accountId)
     .maybeSingle();
   if (!contact) throw new FlowStartError('contact_not_found', 'Contato não encontrado.', 404);
+  if (isOptedOut(contact as { opted_out_at?: unknown })) {
+    throw new FlowStartError('opted_out', OPTED_OUT_MESSAGE, 409);
+  }
 
   const { data: conversations } = await db
     .from('conversations')

@@ -126,19 +126,22 @@ export function ExtensionPanelView({
     <div className="space-y-5">
       <SettingsPanelHead
         title="Extensão do Chrome"
-        description="O cliente do CRM ao lado da conversa no WhatsApp Web: veja quem é, crie o lead, marque a temperatura e mova o negócio no funil sem trocar de aba."
+        description="O cliente do CRM ao lado da conversa no WhatsApp Web: veja quem é, crie o lead, mova o negócio no funil, responda, agende e dispare sequências sem trocar de aba."
       />
 
       <section className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm sm:grid-cols-2">
         <Feature title="Quem é">Nome, empresa, e-mail e etiquetas do contato da conversa aberta, com edição ali mesmo. Mostra se a IA está respondendo e deixa assumir a conversa.</Feature>
         <Feature title="Cadastro, anotações e tarefas">Contato novo vira lead com um clique. Anotações da equipe e tarefas com lembrete ficam na ficha.</Feature>
         <Feature title="Funil">Temperatura, etapa, novo negócio e fechamento como ganho ou perdido, direto do chat. E o quadro inteiro do funil, com arrastar e soltar.</Feature>
-        <Feature title="Respostas rápidas">Os textos prontos do CRM a um clique do campo de mensagem, com o nome do contato preenchido.</Feature>
+        <Feature title="Respostas rápidas">Os textos prontos do CRM (com foto, vídeo, áudio ou documento) a um clique do campo de mensagem, com o nome do contato preenchido — ou enviados direto pelo CRM, com a assinatura de quem atende.</Feature>
+        <Feature title="Agendar e sequências">Mensagem para dia e hora, com follow-up se o cliente não responder, e sequências de mensagens com espera entre elas. Saem pelo agendador do CRM.</Feature>
+        <Feature title="Robô na conversa">Vê se a IA ou um fluxo está respondendo, assume, devolve para a IA, pausa ou inicia um fluxo.</Feature>
         <p className="flex items-start gap-2 text-xs text-muted-foreground sm:col-span-2">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
-          A extensão não lê suas conversas: ela só pega o número do chat aberto. Nenhum texto
-          de mensagem é guardado ou enviado, e nada é enviado sozinho: a resposta rápida vai
-          para o campo de mensagem e quem envia é você. A ficha não aparece em grupos.
+          A extensão não lê suas conversas: ela só pega o número do chat aberto e o número
+          logado no WhatsApp Web. Nenhum texto de mensagem é lido ou guardado por ela. Nada sai
+          sozinho: enviar, agendar ou iniciar uma sequência pede confirmação, e só aparece quando
+          o WhatsApp aberto é o número conectado ao CRM. A ficha não aparece em grupos.
         </p>
       </section>
 

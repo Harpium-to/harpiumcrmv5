@@ -99,6 +99,11 @@ describe('startFlow', () => {
     expect(await fails(startFlow(fakeDb(world()), ACC, 'kw', CONTACT, deps()))).toBe('404 not_found');
   });
 
+  it('refuses a contact who opted out', async () => {
+    const t = world({ contacts: [{ id: CONTACT, account_id: ACC, opted_out_at: '2026-11-09T10:00:00Z' }] });
+    expect(await fails(startFlow(fakeDb(t), ACC, FLOW, CONTACT, deps()))).toBe('409 opted_out');
+  });
+
   it('refuses a flow that is not active', async () => {
     expect(await fails(startFlow(fakeDb(world()), ACC, 'draft', CONTACT, deps()))).toBe('409 inactive');
   });

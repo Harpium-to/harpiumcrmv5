@@ -216,6 +216,14 @@ buscar o contato no CRM por nome ou telefone; a escolha fica **lembrada
 neste navegador**, por conversa, e pode ser desfeita no próprio painel.
 O painel também lembra se foi recolhido.
 
+## Descadastro
+
+Na aba Dados, **Marcar que pediu para não receber mensagens
+automáticas** (e "Voltar a receber"). O contato marcado fica de fora de
+disparos, Sequências e Fluxos — o CRM recusa iniciar com uma mensagem
+que diz isso. Responder e agendar à mão continuam valendo. A ficha do
+contato no CRM tem a mesma chave.
+
 ## Adicionar à agenda
 
 Cada tarefa com data (na aba Tarefas do contato e em Minhas tarefas) tem

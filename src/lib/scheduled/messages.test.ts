@@ -272,6 +272,18 @@ describe('processScheduledMessages', () => {
     ]);
   });
 
+  it('skips a bulk-send message to a contact who opted out, but not one scheduled by hand', async () => {
+    const t = {
+      ...world([row({ id: 'bulk', bulk_send_id: 'b1' }), row({ id: 'hand' })]),
+      contacts: [{ id: CONTACT, account_id: ACC, phone: '+5511999998888', opted_out_at: '2026-11-09T10:00:00Z' }],
+    };
+    expect(await processScheduledMessages(fakeDb(t), deps())).toEqual({ sent: 1, skipped: 1, failed: 0 });
+    expect(t.scheduled_messages.map((r) => [r.id, r.status])).toEqual([
+      ['bulk', 'skipped'],
+      ['hand', 'sent'],
+    ]);
+  });
+
   it('records a failure with the reason, and goes on', async () => {
     const t = world([row(), row({ id: 'm2' })]);
     const d: ProcessDeps = {

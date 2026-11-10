@@ -525,6 +525,7 @@ function ensurePanel() {
     }
     if (action === "deal-undo") void reopenDeal();
     if (action === "edit") startEditingContact();
+    if (action === "optout-on" || action === "optout-off") void setOptOut(action === "optout-on");
     if (action === "edit-cancel") {
       editingContact = false;
       paintPane();
@@ -1276,11 +1277,41 @@ function renderContactInfo(contact) {
   const tags = (contact.tags || [])
     .map((t) => `<span class="crmc-tag">${escapeHtml(t.name)}</span>`)
     .join("");
+  // Opt-out (migration 066): out of bulk sends, sequences and flows.
+  // `opted_out` is absent on a CRM without it, and then nothing shows.
+  const optOut =
+    contact.opted_out === undefined
+      ? ""
+      : contact.opted_out
+        ? `<p class="crmc-muted crmc-optout">Pediu para não receber mensagens automáticas: fica de fora de disparos,
+             sequências e fluxos. <button class="crmc-link" data-act="optout-off">Voltar a receber</button></p>`
+        : `<p class="crmc-muted crmc-optout"><button class="crmc-link" data-act="optout-on">Marcar que pediu para não receber
+             mensagens automáticas</button></p>`;
   return `
     ${rows || tags ? "" : `<p class="crmc-muted">Sem empresa, e-mail ou etiquetas no cadastro.</p>`}
     ${rows}
     ${tags ? `<div class="crmc-tags">${tags}</div>` : ""}
+    ${optOut}
     <button class="crmc-btn crmc-btn-quiet" data-act="edit">Editar contato</button>`;
+}
+
+/** Mark or clear the contact's opt-out, then show the record again. */
+async function setOptOut(on) {
+  const contact = currentContact;
+  const gen = generation;
+  if (!contact) return;
+  const result = await send("update", { id: contact.id, fields: { opted_out: on } });
+  if (!stillShowing(contact.id, gen)) return;
+  if (!result.ok) {
+    const pane = slot(".crmc-pane");
+    const line = pane?.querySelector(".crmc-optout");
+    if (line) line.textContent = failureText(result, "editar contatos");
+    return;
+  }
+  currentContact = { ...contact, ...result.data };
+  paintPane();
+  // Sequences and flows read it too.
+  paintReplies();
 }
 
 function renderContactForm(contact) {

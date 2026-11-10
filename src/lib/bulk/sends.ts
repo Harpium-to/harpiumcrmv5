@@ -4,6 +4,7 @@ import { resolveWhatsAppProvider } from '@/lib/channels/whatsapp-route';
 import { isQuickReplyMediaKind } from '@/lib/quick-replies/media';
 import { fillQuickReply } from '@/lib/quick-replies/variables';
 import { equivalentPhoneKeys } from '@/lib/whatsapp/phone-utils';
+import { isOptedOut } from '@/lib/contacts/opt-out';
 
 import {
   BULK_DAILY_LIMIT,
@@ -107,27 +108,34 @@ interface Recipient {
   company: string | null;
 }
 
-/** The CRM contacts the audience names, once each; and the numbers it didn't find. */
+/**
+ * The CRM contacts the audience names, once each; the numbers it didn't
+ * find; and how many were left out because they opted out (066).
+ */
 export async function resolveAudience(
   db: SupabaseClient,
   accountId: string,
   audience: Audience,
-): Promise<{ contacts: Recipient[]; notFound: number }> {
+): Promise<{ contacts: Recipient[]; notFound: number; optedOut: number }> {
   const found = new Map<string, Recipient>();
+  const optedOutIds = new Set<string>();
   if ('tagId' in audience) {
     const { data: links } = await db.from('contact_tags').select('contact_id').eq('tag_id', audience.tagId);
     const ids = [...new Set(((links ?? []) as { contact_id: string }[]).map((l) => l.contact_id))];
     for (let i = 0; i < ids.length; i += CHUNK) {
+      // `*` so opted_out_at (066) is read once it exists.
       const { data } = await db
         .from('contacts')
-        .select('id, name, company, phone')
+        .select('*')
         .eq('account_id', accountId)
         .in('id', ids.slice(i, i + CHUNK));
-      for (const c of (data ?? []) as (Recipient & { phone: string | null })[]) {
-        if (c.phone) found.set(c.id, { id: c.id, name: c.name, company: c.company });
+      for (const c of (data ?? []) as (Recipient & { phone: string | null; opted_out_at?: unknown })[]) {
+        if (!c.phone) continue;
+        if (isOptedOut(c)) optedOutIds.add(c.id);
+        else found.set(c.id, { id: c.id, name: c.name, company: c.company });
       }
     }
-    return { contacts: [...found.values()], notFound: 0 };
+    return { contacts: [...found.values()], notFound: 0, optedOut: optedOutIds.size };
   }
 
   let notFound = 0;
@@ -140,22 +148,25 @@ export async function resolveAudience(
   for (let i = 0; i < keys.length; i += CHUNK) {
     const { data } = await db
       .from('contacts')
-      .select('id, name, company, phone_normalized')
+      .select('*')
       .eq('account_id', accountId)
       .in('phone_normalized', keys.slice(i, i + CHUNK));
-    for (const c of (data ?? []) as (Recipient & { phone_normalized: string })[]) {
-      found.set(c.id, { id: c.id, name: c.name, company: c.company });
+    for (const c of (data ?? []) as (Recipient & { phone_normalized: string; opted_out_at?: unknown })[]) {
       const phone = keyToPhone.get(c.phone_normalized);
       if (phone) matched.add(phone);
+      if (isOptedOut(c)) optedOutIds.add(c.id);
+      else found.set(c.id, { id: c.id, name: c.name, company: c.company });
     }
   }
   notFound = audience.phones.filter((p) => !matched.has(p)).length;
-  return { contacts: [...found.values()], notFound };
+  return { contacts: [...found.values()], notFound, optedOut: optedOutIds.size };
 }
 
 export interface BulkPlanSummary {
   total: number;
   not_found: number;
+  /** Left out because they asked not to receive (066). */
+  opted_out: number;
   first_at: string | null;
   last_at: string | null;
   used_today: number;
@@ -245,11 +256,13 @@ export async function createBulkSend(
     if (!text && !media) throw new BulkError('bad_request', 'Essa resposta rápida não tem texto.', 400);
   }
 
-  const { contacts, notFound } = await resolveAudience(db, accountId, input.audience);
+  const { contacts, notFound, optedOut } = await resolveAudience(db, accountId, input.audience);
   if (contacts.length === 0) {
     throw new BulkError(
       'empty',
-      'Nenhum contato do CRM para disparar. Números fora do CRM ficam de fora.',
+      optedOut
+        ? 'Nenhum contato para disparar: os desta lista pediram para não receber, e números fora do CRM ficam de fora.'
+        : 'Nenhum contato do CRM para disparar. Números fora do CRM ficam de fora.',
       400,
     );
   }
@@ -269,6 +282,7 @@ export async function createBulkSend(
   const summary: BulkPlanSummary = {
     total: contacts.length,
     not_found: notFound,
+    opted_out: optedOut,
     first_at: new Date(times[0]).toISOString(),
     last_at: new Date(times[times.length - 1]).toISOString(),
     used_today: counts[dayKey(now)] ?? 0,
