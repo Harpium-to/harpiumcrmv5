@@ -216,6 +216,15 @@ buscar o contato no CRM por nome ou telefone; a escolha fica **lembrada
 neste navegador**, por conversa, e pode ser desfeita no próprio painel.
 O painel também lembra se foi recolhido.
 
+## Adicionar à agenda
+
+Cada tarefa com data (na aba Tarefas do contato e em Minhas tarefas) tem
+**Adicionar à agenda**: abre o Google Agenda da própria pessoa com o
+evento preenchido — o título, 30 minutos no horário da tarefa, o
+contato e o link dele no CRM. Ela só salva. Nada de acesso à conta
+Google: é a página pública de "novo evento" do Google, preenchida pelo
+link.
+
 ## Atalhos no topo da conversa
 
 Uma fileira de botões no cabeçalho da conversa do WhatsApp, no espaço

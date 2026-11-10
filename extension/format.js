@@ -334,3 +334,31 @@ export function describeScheduled(item, now = new Date()) {
       return when;
   }
 }
+
+/**
+ * "Adicionar à agenda": a Google Agenda link that opens the person's
+ * own calendar with the event filled in — a 30-minute slot at the task's
+ * time. Null without a title or a date. A copy of googleCalendarUrl in
+ * src/lib/tasks/calendar.ts; format.test.js keeps the two equal.
+ */
+export function googleCalendarUrl({ title, start, details, minutes = 30 }) {
+  const text = String(title ?? "").trim();
+  const begin = start ? new Date(start) : null;
+  if (!text || !begin || !Number.isFinite(begin.getTime())) return null;
+  const end = new Date(begin.getTime() + minutes * 60_000);
+  const stamp = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: text.slice(0, 200),
+    dates: `${stamp(begin)}/${stamp(end)}`,
+  });
+  const about = String(details ?? "").trim();
+  if (about) params.set("details", about.slice(0, 1000));
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+/** The event's description for a task about a contact. */
+export function taskEventDetails({ name, phone, url } = {}) {
+  const who = [name, phone].filter(Boolean).join(" · ");
+  return [who ? `Contato: ${who}` : "", url ? `No CRM: ${url}` : ""].filter(Boolean).join("\n");
+}
