@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizePhone, phonesMatch } from "@/lib/whatsapp/phone-utils";
+import {
+  equivalentPhoneKeys,
+  normalizePhone,
+  phonesMatch,
+} from "@/lib/whatsapp/phone-utils";
 
 /**
  * Contact de-duplication helpers, shared by the WhatsApp webhook, the
@@ -29,8 +33,19 @@ export interface ExistingContact {
 /**
  * Find an existing contact in `accountId` whose phone matches `phone`,
  * or null. Pre-filters in SQL by the last-8-digit suffix (so we don't
- * pull every contact), then applies the strict `phonesMatch` in JS on
- * the small candidate set — the exact approach the webhook has used.
+ * pull every contact), then applies `phonesMatch` in JS on the small
+ * candidate set — the exact approach the webhook has used.
+ *
+ * The suffix is matched on `phone_normalized` (digits only, migration
+ * 022), not on `phone` as typed: a contact saved as
+ * "+55 (31) 99999-8888" does not end in "99998888", so it was missed
+ * here and then rejected by the unique index on insert.
+ *
+ * When several candidates match, the closest wins: the same digits,
+ * then the same number in its other Brazilian form (ninth digit), and
+ * only then a looser last-8-digit match. Two people in different area
+ * codes can share the last 8 digits; taking whichever row came first
+ * could attach one person's message to the other.
  */
 export async function findExistingContact(
   db: SupabaseClient,
@@ -46,12 +61,19 @@ export async function findExistingContact(
     .from("contacts")
     .select("*")
     .eq("account_id", accountId)
-    .like("phone", `%${suffix}`);
+    .like("phone_normalized", `%${suffix}`);
 
   if (error || !data) return null;
 
+  const candidates = (data as ExistingContact[]).filter((c) =>
+    phonesMatch(c.phone, phone),
+  );
+  const keys = equivalentPhoneKeys(normalized);
   return (
-    (data as ExistingContact[]).find((c) => phonesMatch(c.phone, phone)) ?? null
+    candidates.find((c) => normalizePhone(c.phone) === normalized) ??
+    candidates.find((c) => keys.includes(normalizePhone(c.phone))) ??
+    candidates[0] ??
+    null
   );
 }
 

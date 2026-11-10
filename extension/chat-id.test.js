@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { chatPhoneFromDataIds, usableChatName } from './chat-id.js'
+import {
+  chatIdentityFromDataIds,
+  chatPhoneFromDataIds,
+  phoneFromHeaderTitles,
+  usableChatName,
+} from './chat-id.js'
 
 // ---------------------------------------------------------------------
 // The panel identifies the open chat from WhatsApp's own message ids.
@@ -81,6 +86,82 @@ describe('chatPhoneFromDataIds', () => {
     expect(chatPhoneFromDataIds([])).toBeNull()
     expect(chatPhoneFromDataIds(undefined)).toBeNull()
     expect(chatPhoneFromDataIds([null, 42, {}])).toBeNull()
+  })
+})
+
+describe('chatIdentityFromDataIds', () => {
+  it('returns the phone of a normal chat', () => {
+    expect(
+      chatIdentityFromDataIds(['false_5511999998888@c.us_3EB0C767D82B0D09A4C1']),
+    ).toEqual({ phone: '5511999998888' })
+  })
+
+  it('returns a lid chat as a lid, never as a phone', () => {
+    expect(chatIdentityFromDataIds(['false_123456789012345@lid_X'])).toEqual({
+      lid: '123456789012345',
+    })
+  })
+
+  it('prefers a phone id when the chat carries both', () => {
+    expect(
+      chatIdentityFromDataIds([
+        'false_123456789012345@lid_A',
+        'true_5511999998888@c.us_B',
+      ]),
+    ).toEqual({ phone: '5511999998888' })
+  })
+
+  it('refuses a group even when a participant is a lid', () => {
+    expect(
+      chatIdentityFromDataIds([
+        'false_120363000000000000@g.us_3EB0_123456789012345@lid',
+      ]),
+    ).toBeNull()
+  })
+
+  it('ignores a lid that is not all digits', () => {
+    expect(chatIdentityFromDataIds(['false_12a45@lid_X'])).toBeNull()
+  })
+
+  it('returns null for nothing at all', () => {
+    expect(chatIdentityFromDataIds([])).toBeNull()
+    expect(chatIdentityFromDataIds(undefined)).toBeNull()
+  })
+})
+
+describe('phoneFromHeaderTitles', () => {
+  it('reads the number WhatsApp shows for someone not in the address book', () => {
+    expect(phoneFromHeaderTitles(['+55 31 99999-8888'])).toBe('5531999998888')
+    expect(phoneFromHeaderTitles(['+1 (415) 555-1212'])).toBe('14155551212')
+  })
+
+  it('ignores names, statuses and anything without the +', () => {
+    expect(phoneFromHeaderTitles(['Maria Souza'])).toBeNull()
+    expect(phoneFromHeaderTitles(['online'])).toBeNull()
+    expect(phoneFromHeaderTitles(['(31) 99999-8888'])).toBeNull()
+    expect(phoneFromHeaderTitles(['~ Maria'])).toBeNull()
+  })
+
+  it('picks the one number among other titles', () => {
+    expect(
+      phoneFromHeaderTitles(['Dados do contato', '+55 31 99999-8888', 'online']),
+    ).toBe('5531999998888')
+  })
+
+  it('refuses when two different numbers are on screen', () => {
+    expect(
+      phoneFromHeaderTitles(['+55 31 99999-8888', '+55 11 98888-7777']),
+    ).toBeNull()
+  })
+
+  it('refuses something too short or too long to be a number', () => {
+    expect(phoneFromHeaderTitles(['+55 31'])).toBeNull()
+    expect(phoneFromHeaderTitles(['+1234567890123456'])).toBeNull()
+  })
+
+  it('returns null for nothing', () => {
+    expect(phoneFromHeaderTitles([])).toBeNull()
+    expect(phoneFromHeaderTitles(undefined)).toBeNull()
   })
 })
 
