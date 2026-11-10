@@ -19,6 +19,7 @@ import { GatedButton } from '@/components/ui/gated-button';
 import { getBroadcastStatus } from '@/lib/broadcast-status';
 import { useTranslations } from 'next-intl';
 import { HelpTip } from '@/components/help/help-tip';
+import { QrBulkSends } from '@/components/broadcasts/qr-bulk-sends';
 
 /**
  * Poll cadence while any broadcast is sending. Kept modest so we don't
@@ -199,6 +200,9 @@ export default function BroadcastsPage() {
           {t('newBroadcast')}
         </GatedButton>
       </div>
+
+      {/* Fase 8: free text through the QR-code number, paced and capped. */}
+      <QrBulkSends />
 
       {broadcasts.length === 0 ? (
         <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-border bg-card">

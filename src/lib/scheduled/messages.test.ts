@@ -214,6 +214,7 @@ describe('processScheduledMessages', () => {
   });
   const deps = (): ProcessDeps => ({
     send: vi.fn(async () => ({ messageId: 'msg-1', whatsappMessageId: 'wamid' })),
+    openConversation: vi.fn(async () => 'conv-new'),
   });
 
   it('sends what is due through the send core and records it', async () => {
@@ -278,13 +279,26 @@ describe('processScheduledMessages', () => {
         .fn()
         .mockRejectedValueOnce(new Error('Fora da janela de 24 horas'))
         .mockResolvedValueOnce({ messageId: 'msg-2', whatsappMessageId: 'w' }),
+      openConversation: vi.fn(),
     };
     expect(await processScheduledMessages(fakeDb(t), d)).toEqual({ sent: 1, skipped: 0, failed: 1 });
     expect(t.scheduled_messages[0]).toMatchObject({ status: 'failed', outcome: 'Fora da janela de 24 horas' });
   });
 
-  it('fails when the contact has no conversation', async () => {
-    const t = { ...world([row()]), conversations: [] };
+  it('opens a conversation for a contact who never had one, by their number', async () => {
+    const t = {
+      ...world([row()]),
+      conversations: [],
+      contacts: [{ id: CONTACT, account_id: ACC, phone: '+5511999998888' }],
+    };
+    const d = deps();
+    expect(await processScheduledMessages(fakeDb(t), d)).toEqual({ sent: 1, skipped: 0, failed: 0 });
+    expect(d.openConversation).toHaveBeenCalledWith(expect.anything(), ACC, '+5511999998888');
+    expect((d.send as ReturnType<typeof vi.fn>).mock.calls[0][2].conversationId).toBe('conv-new');
+  });
+
+  it('fails when the contact has no conversation and no phone', async () => {
+    const t = { ...world([row()]), conversations: [], contacts: [{ id: CONTACT, account_id: ACC, phone: null }] };
     expect(await processScheduledMessages(fakeDb(t), deps())).toEqual({ sent: 0, skipped: 0, failed: 1 });
   });
 

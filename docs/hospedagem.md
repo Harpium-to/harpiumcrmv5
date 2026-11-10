@@ -171,6 +171,12 @@ no sino quando uma tarefa vence, migration 060). Não há job separado
 para isso: com ele parado, as tarefas continuam aparecendo, mas ninguém
 é avisado na hora.
 
+O mesmo `automations/cron` envia as **mensagens agendadas** e os
+**disparos pelo QR code** (migrations 064 e 065), um a cada 30–90 s e até
+200 por dia por CRM. Quanto mais frequente o agendador, mais perto da
+hora marcada elas saem: com ele a cada 10 minutos, uma mensagem pode
+sair até 10 minutos depois.
+
 **Com o cron-job.org** (gratuito): crie um job para cada endpoint. Em
 **Advanced › Headers**, adicione `x-cron-secret` com o seu segredo.
 Para conferir: a resposta deve ser `200`. `401` é segredo errado e
