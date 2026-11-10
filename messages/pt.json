@@ -890,6 +890,10 @@
         "time_based": {
           "label": "Baseado em tempo",
           "hint": "Em uma agenda recorrente"
+        },
+        "manual": {
+          "label": "Sequência (disparo manual)",
+          "hint": "Começa quando alguém dispara para um contato, pela extensão do Chrome. Só mensagens, esperas e ações; entre duas mensagens, espere pelo menos 1 minuto."
         }
       },
       "trigger": "Gatilho",

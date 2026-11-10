@@ -505,6 +505,34 @@ const handlers = {
     return callApi("/messages", { method: "POST", body: JSON.stringify(body) });
   },
 
+  /**
+   * The CRM's sequences (automations started by hand), and which are
+   * running for this contact. Not cached: "running" changes as the
+   * sequence goes.
+   */
+  async sequences({ contactId }) {
+    if (!contactId) return { ok: false, error: "no_id" };
+    return callApi(`/sequences?contact_id=${encodeURIComponent(contactId)}`);
+  },
+
+  /** Start a sequence on a contact; the CRM checks its limits. */
+  async startSequence({ id, contactId }) {
+    if (!id || !contactId) return { ok: false, error: "no_id" };
+    return callApi(`/sequences/${encodeURIComponent(id)}/start`, {
+      method: "POST",
+      body: JSON.stringify({ contact_id: contactId }),
+    });
+  },
+
+  /** Stop what is left of a sequence for a contact. */
+  async stopSequence({ id, contactId }) {
+    if (!id || !contactId) return { ok: false, error: "no_id" };
+    return callApi(`/sequences/${encodeURIComponent(id)}/stop`, {
+      method: "POST",
+      body: JSON.stringify({ contact_id: contactId }),
+    });
+  },
+
   async settings() {
     const { baseUrl, apiKey } = await readSettings();
     // The key itself never crosses this boundary — only whether one

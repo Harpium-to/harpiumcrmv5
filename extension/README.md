@@ -123,6 +123,16 @@ para o campo de mensagem quando o campo está vazio — se já tem texto,
 ele já foi assinado, ou a pessoa preferiu não assinar. Sem nome, nada é
 assinado.
 
+**Sequências.** Abaixo das respostas, as sequências do CRM: mensagens
+com esperas entre elas, montadas nas Automações com o gatilho
+**Sequência (disparo manual)**. Cada uma mostra quantas mensagens tem e
+quanto tempo leva. **Iniciar** → **Confirmar** dispara para o contato
+da conversa: a primeira mensagem sai na hora e as outras seguem pelo
+agendador do CRM, mesmo com o WhatsApp Web fechado. Enquanto está em
+andamento, aparece **Parar**. Iniciar segue as mesmas condições do
+Enviar; o CRM ainda recusa iniciar a mesma sequência duas vezes para o
+mesmo contato e passa de 100 inícios por dia.
+
 **Respostas com arquivo.** Uma resposta rápida pode ter uma foto, um
 vídeo, um documento ou um áudio (migration 063, criada em
 Configurações › Respostas rápidas › Mídia). No painel ela mostra o tipo

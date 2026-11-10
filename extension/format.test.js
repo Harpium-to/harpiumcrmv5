@@ -12,6 +12,7 @@ import {
   filterDeals,
   filterReplies,
   cleanSignatureName,
+  describeDuration,
   signText,
   formatWhen,
   localInputToIso,
@@ -336,5 +337,16 @@ describe('cleanSignatureName', () => {
   it('is empty for nothing', () => {
     expect(cleanSignatureName(null)).toBe('')
     expect(cleanSignatureName('**')).toBe('')
+  })
+})
+
+describe('describeDuration', () => {
+  it('says how long, briefly', () => {
+    expect(describeDuration(0)).toBe('agora')
+    expect(describeDuration(30)).toBe('30 min')
+    expect(describeDuration(120)).toBe('2 h')
+    expect(describeDuration(1440)).toBe('1 dia')
+    expect(describeDuration(4320)).toBe('3 dias')
+    expect(describeDuration(undefined)).toBe('agora')
   })
 })

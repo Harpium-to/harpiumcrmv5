@@ -62,6 +62,10 @@ export interface DispatchInput {
  * recorded into automation_logs with status='failed'.
  */
 export async function runAutomationsForTrigger(input: DispatchInput): Promise<void> {
+  // A sequence starts one at a time, on one contact, with its limits
+  // checked (startSequence in src/lib/api/v1/sequences.ts) — never as
+  // "every manual automation of the account" from a generic dispatch.
+  if (input.triggerType === 'manual') return
   try {
     const db = supabaseAdmin()
 
@@ -113,6 +117,20 @@ export async function runAutomationsForTrigger(input: DispatchInput): Promise<vo
   } catch (err) {
     console.error('[automations] dispatch failed:', err)
   }
+}
+
+/**
+ * Run one automation for one contact, now — a sequence a person
+ * started. The caller has already checked that the automation and the
+ * contact belong to `input.accountId`. Runs until the end or the first
+ * wait, which the scheduler resumes. Returns the log id, null when the
+ * log could not be written (and then nothing ran).
+ */
+export async function startAutomationRun(
+  automation: Automation,
+  input: DispatchInput,
+): Promise<string | null> {
+  return executeAutomation(automation, input)
 }
 
 /**
@@ -170,7 +188,10 @@ export async function resumePendingExecution(pending: {
 // Internal execution
 // ------------------------------------------------------------
 
-async function executeAutomation(automation: Automation, input: DispatchInput) {
+async function executeAutomation(
+  automation: Automation,
+  input: DispatchInput,
+): Promise<string | null> {
   const db = supabaseAdmin()
 
   const { data: log, error: logErr } = await db
@@ -193,7 +214,7 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
 
   if (logErr || !log) {
     console.error('[automations] cannot create log:', logErr)
-    return
+    return null
   }
 
   await executeStepsFrom({
@@ -217,6 +238,7 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
   if (rpcErr) {
     console.error('[automations] increment counter failed:', rpcErr)
   }
+  return log.id as string
 }
 
 interface ExecuteArgs {

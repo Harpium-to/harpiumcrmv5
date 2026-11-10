@@ -953,6 +953,31 @@
   white-space: pre-line;
 }
 
+/* Sequences, under the replies. Not buttons themselves: the action
+   is the one beside them. */
+#crm-connector-panel .crmc-seqs:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+#crm-connector-panel .crmc-seqs-title {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-seqs > .crmc-muted {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-seq-main {
+  cursor: default;
+}
+
+#crm-connector-panel .crmc-seq-main:hover {
+  background: var(--crmc-surface);
+}
+
 /* "Assinar como [nome]", under the search. */
 #crm-connector-panel .crmc-sign {
   display: flex;
