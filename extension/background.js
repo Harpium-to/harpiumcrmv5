@@ -153,7 +153,14 @@ const handlers = {
   async account() {
     const result = await callApi("/me");
     if (!result.ok) return result;
-    return { ok: true, data: { name: result.data?.account?.name || null } };
+    return {
+      ok: true,
+      data: {
+        name: result.data?.account?.name || null,
+        // The person the key belongs to, to sign messages with.
+        person: result.data?.person?.name || null,
+      },
+    };
   },
 
   /**
@@ -260,13 +267,30 @@ const handlers = {
   },
 
   /** The panel's own preferences (today: whether it is collapsed). */
+  /**
+   * This person's panel choices: collapsed or not, and the signature
+   * (on or off, and the name to sign with; "" means the CRM's name).
+   */
   async getPrefs() {
-    const stored = await chrome.storage.local.get(PREFS_KEY);
-    return { ok: true, data: { collapsed: Boolean(stored[PREFS_KEY]?.collapsed) } };
+    const stored = (await chrome.storage.local.get(PREFS_KEY))[PREFS_KEY] || {};
+    return {
+      ok: true,
+      data: {
+        collapsed: Boolean(stored.collapsed),
+        sign: Boolean(stored.sign),
+        signName: typeof stored.signName === "string" ? stored.signName.slice(0, 60) : "",
+      },
+    };
   },
 
-  async setPrefs({ collapsed }) {
-    await chrome.storage.local.set({ [PREFS_KEY]: { collapsed: Boolean(collapsed) } });
+  /** Change only the choices given; the others stay as they were. */
+  async setPrefs(changes) {
+    const current = (await chrome.storage.local.get(PREFS_KEY))[PREFS_KEY] || {};
+    const next = { ...current };
+    if ("collapsed" in changes) next.collapsed = Boolean(changes.collapsed);
+    if ("sign" in changes) next.sign = Boolean(changes.sign);
+    if ("signName" in changes) next.signName = String(changes.signName ?? "").slice(0, 60);
+    await chrome.storage.local.set({ [PREFS_KEY]: next });
     return { ok: true };
   },
 

@@ -11,6 +11,8 @@ import {
   fillTemplate,
   filterDeals,
   filterReplies,
+  cleanSignatureName,
+  signText,
   formatWhen,
   localInputToIso,
   parseMoney,
@@ -304,5 +306,35 @@ describe('localInputToIso', () => {
     expect(localInputToIso('   ')).toBeNull()
     expect(localInputToIso(undefined)).toBeNull()
     expect(localInputToIso('amanhã')).toBeNull()
+  })
+})
+
+describe('signText', () => {
+  it('puts the name in bold on top', () => {
+    expect(signText('Olá, tudo bem?', 'Ana Lima')).toBe('*Ana Lima:*\nOlá, tudo bem?')
+  })
+
+  it('leaves the text alone without a name, or without text', () => {
+    expect(signText('Olá', '')).toBe('Olá')
+    expect(signText('Olá', '   ')).toBe('Olá')
+    expect(signText('', 'Ana')).toBe('')
+    expect(signText('  ', 'Ana')).toBe('  ')
+  })
+})
+
+describe('cleanSignatureName', () => {
+  it('keeps one plain line', () => {
+    expect(cleanSignatureName('  Ana \n Lima ')).toBe('Ana Lima')
+    // Marks that would close the bold early.
+    expect(cleanSignatureName('*Ana* _Lima_')).toBe('Ana Lima')
+  })
+
+  it('cuts long names', () => {
+    expect(cleanSignatureName('a'.repeat(60))).toHaveLength(40)
+  })
+
+  it('is empty for nothing', () => {
+    expect(cleanSignatureName(null)).toBe('')
+    expect(cleanSignatureName('**')).toBe('')
   })
 })

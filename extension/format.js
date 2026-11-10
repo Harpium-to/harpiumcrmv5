@@ -252,3 +252,34 @@ export function localInputToIso(value) {
   const date = new Date(text);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
+
+/**
+ * A name fit to sign with: one line, no WhatsApp formatting marks
+ * (which would break the bold), at most 40 characters. "" when nothing
+ * is left.
+ */
+export function cleanSignatureName(name) {
+  return String(name ?? "")
+    .replace(/[*_~`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40)
+    .trim();
+}
+
+/**
+ * The attendant's signature on top of a message, the way WhatsApp
+ * shows a name in bold:
+ *
+ *   *Ana Lima:*
+ *   Olá, tudo bem?
+ *
+ * Unchanged when there is no name or no text — a signature alone is
+ * not a message.
+ */
+export function signText(text, name) {
+  const body = String(text ?? "");
+  const who = cleanSignatureName(name);
+  if (!who || !body.trim()) return body;
+  return `*${who}:*\n${body}`;
+}
