@@ -79,7 +79,30 @@ let account = { baseUrl: null, name: null, askedAt: 0 };
 // so re-drawing the card (after a temperature change) doesn't refetch
 // them, and keyed by contact so a late reply for the previous chat is
 // recognisable as late.
-let dealsState = { contactId: null, status: "idle", deals: [], pipelines: [], notice: null };
+// `closed` is the deal just closed as won or lost from here, kept so
+// the list can offer to take it back.
+let dealsState = {
+  contactId: null,
+  status: "idle",
+  deals: [],
+  pipelines: [],
+  notice: null,
+  closed: null,
+};
+
+// Which tab of the record is showing. Kept across chats: someone
+// writing notes all morning wants the next chat to open on notes too.
+let activeTab = "deals";
+let dealFormOpen = false;
+
+// The contact's notes, loaded when the notes tab is first shown.
+let notesState = { contactId: null, status: "idle", notes: [], notice: null };
+
+// Editing the contact's own data. `editTags` is the tag names as they
+// will be saved; the CRM's tags (for suggestions) are asked once.
+let editingContact = false;
+let editTags = [];
+let tagsCache = { baseUrl: null, names: null };
 
 // The API's `temperature` values, in the order the control shows them.
 const TEMPERATURES = [
@@ -101,6 +124,10 @@ let usableChatName = () => null;
 let modulesLoaded = false;
 // Until theme.js loads, the system preference is all there is.
 let pickMode = (_colors, prefersDark) => (prefersDark ? "dark" : "light");
+// From format.js. The fallbacks keep the panel usable without it.
+let parseMoney = (text) => (String(text ?? "").trim() === "" ? 0 : null);
+let formatWhen = () => "";
+let addTagName = (names) => names;
 
 // page-bridge.js answers inside the dispatch below (see there), so the
 // reply is already in `pageAnswer` when `dispatchEvent` returns.
@@ -317,21 +344,55 @@ function ensurePanel() {
     if (action === "temperature") {
       void setTemperature(target.getAttribute("data-value"));
     }
+    if (action === "tab") openTab(target.getAttribute("data-tab"));
+    if (action === "deal-new" || action === "deal-cancel") {
+      dealFormOpen = action === "deal-new";
+      paintDealForm();
+    }
+    if (action === "deal-status") {
+      void closeDeal(target.getAttribute("data-deal"), target.getAttribute("data-status"));
+    }
+    if (action === "deal-undo") void reopenDeal();
+    if (action === "edit") startEditingContact();
+    if (action === "edit-cancel") {
+      editingContact = false;
+      paintPane();
+    }
+    if (action === "tag-add") addTagFromInput();
+    if (action === "tag-remove") removeEditTag(target.getAttribute("data-name"));
   });
 
   panel.addEventListener("change", (event) => {
     const select = event.target;
-    if (!select?.classList?.contains("crmc-stage")) return;
-    void moveDeal(select.getAttribute("data-deal"), select.value);
+    if (select?.classList?.contains("crmc-stage")) {
+      void moveDeal(select.getAttribute("data-deal"), select.value);
+    } else if (select?.name === "pipeline" && select.form?.dataset.form === "deal") {
+      syncDealStages(select.form);
+    }
   });
 
   panel.addEventListener("submit", (event) => {
     event.preventDefault();
-    const input = event.target?.querySelector?.("input");
-    if (input) void runSearch(input.value);
+    const form = event.target;
+    const kind = form?.dataset?.form;
+    if (kind === "note") void submitNote(form);
+    else if (kind === "deal") void submitDeal(form);
+    else if (kind === "contact") void submitContact(form);
+    else {
+      const input = form?.querySelector?.("input");
+      if (input) void runSearch(input.value);
+    }
   });
 
-  // Typing in the search box must not reach WhatsApp's own keyboard
+  panel.addEventListener("keydown", (event) => {
+    // Enter in the tag field adds the tag; it must not save the form.
+    if (event.key === "Enter" && event.target?.classList?.contains("crmc-taginput")) {
+      event.preventDefault();
+      addTagFromInput();
+    }
+  });
+
+  // Typing in the panel must not reach WhatsApp's own keyboard
   // handling (shortcuts, focusing its message box).
   for (const type of ["keydown", "keyup", "keypress"]) {
     panel.addEventListener(type, (event) => event.stopPropagation());
@@ -404,16 +465,44 @@ function renderChoice(contact) {
     </button>`;
 }
 
-function renderTemperature(contact) {
-  // `null` means the CRM hasn't applied migration 045 yet: there is no
-  // column to write to, so there is no control to offer.
-  if (!contact.temperature) return "";
-  const buttons = TEMPERATURES.map(
-    ([value, label]) => `
-      <button class="crmc-seg" data-act="temperature" data-value="${value}"
-              aria-pressed="${contact.temperature === value}">${label}</button>`,
-  ).join("");
-  return `<div class="crmc-temp" role="group" aria-label="Temperatura">${buttons}</div>`;
+// ------------------------------------------------------------
+// The contact's record
+//
+// Drawn in slots — who, temperature, tabs, pane — and each slot is
+// repainted on its own. That is what lets a temperature click or a
+// stage change land without wiping a half-written note or an open
+// form in another slot.
+// ------------------------------------------------------------
+
+function slot(selector) {
+  return body().querySelector(selector);
+}
+
+/** A reply that is no longer for the contact on screen is dropped. */
+function stillShowing(contactId, gen) {
+  return gen === generation && currentContact?.id === contactId;
+}
+
+/** Why a write failed, in the operator's terms. */
+function failureText(result, what) {
+  if (result.error === "unauthorized") return `A chave não tem permissão para ${what}.`;
+  if (result.error === "network") return "Não consegui falar com o CRM.";
+  // An older CRM without this endpoint yet.
+  if (result.status === 404) return "Este CRM ainda não aceita isso pela extensão. Atualize o CRM.";
+  return result.detail || "Algo deu errado. Tente de novo.";
+}
+
+function showFormError(form, message) {
+  const line = form?.querySelector(".crmc-err");
+  if (!line) return;
+  line.textContent = message || "";
+  line.hidden = !message;
+}
+
+function setFormBusy(form, busy) {
+  for (const control of form?.querySelectorAll("button, input, select, textarea") ?? []) {
+    control.disabled = busy;
+  }
 }
 
 function formatMoney(value, currency) {
@@ -428,33 +517,196 @@ function formatMoney(value, currency) {
   }
 }
 
+function renderContact(contact) {
+  currentContact = contact;
+  render(`
+    <div class="crmc-who"></div>
+    <div class="crmc-tempslot"></div>
+    <nav class="crmc-tabs" role="tablist" aria-label="Seções do contato"></nav>
+    <div class="crmc-pane" role="tabpanel"></div>
+    <a class="crmc-btn crmc-btn-quiet" target="_blank" rel="noreferrer noopener"
+       href="${escapeHtml(contactUrl(contact.id))}">
+      Abrir no CRM
+    </a>
+  `);
+  paintWho();
+  paintTemperature();
+  paintTabs();
+  paintPane();
+}
+
+/** Show a contact for the open chat and load its deals. */
+function showContact(contact, { linked = false } = {}) {
+  currentLinked = linked;
+  dealFormOpen = false;
+  editingContact = false;
+  renderContact(contact);
+  void loadDeals(contact.id);
+}
+
+function paintWho() {
+  const el = slot(".crmc-who");
+  const contact = currentContact;
+  if (!el || !contact) return;
+  el.innerHTML = `
+    <p class="crmc-name">${escapeHtml(contact.name || contact.phone)}</p>
+    <p class="crmc-sub">${escapeHtml(contact.phone)}</p>
+    ${
+      currentLinked
+        ? `<p class="crmc-linked">Vínculo lembrado neste navegador ·
+             <button class="crmc-link" data-act="unlink">Desfazer</button></p>`
+        : ""
+    }`;
+}
+
+// ---- Temperature --------------------------------------------
+
+function paintTemperature(notice) {
+  const el = slot(".crmc-tempslot");
+  const contact = currentContact;
+  if (!el || !contact) return;
+  // `null` means the CRM hasn't applied migration 045 yet: there is no
+  // column to write to, so there is no control to offer.
+  if (!contact.temperature) {
+    el.innerHTML = "";
+    return;
+  }
+  const buttons = TEMPERATURES.map(
+    ([value, label]) => `
+      <button class="crmc-seg" data-act="temperature" data-value="${value}"
+              aria-pressed="${contact.temperature === value}">${label}</button>`,
+  ).join("");
+  el.innerHTML = `
+    <div class="crmc-temp" role="group" aria-label="Temperatura">${buttons}</div>
+    ${notice ? `<p class="crmc-err">${escapeHtml(notice)}</p>` : ""}`;
+}
+
+async function setTemperature(value) {
+  const contact = currentContact;
+  const gen = generation;
+  if (!contact || contact.temperature === value) return;
+
+  for (const button of body().querySelectorAll(".crmc-seg")) button.disabled = true;
+  const result = await send("update", { id: contact.id, fields: { temperature: value } });
+
+  // The operator may have switched chats while this was in flight. The
+  // reply belongs to the contact that was open then; drawing it now
+  // would put one customer's card beside another customer's chat.
+  if (!stillShowing(contact.id, gen)) return;
+
+  if (!result.ok) {
+    paintTemperature(failureText(result, "editar contatos"));
+    return;
+  }
+  currentContact = result.data;
+  paintTemperature();
+}
+
+// ---- Tabs ---------------------------------------------------
+
+const TABS = [
+  ["deals", "Negócios"],
+  ["notes", "Notas"],
+  ["info", "Dados"],
+];
+
+function paintTabs() {
+  const el = slot(".crmc-tabs");
+  if (!el || !currentContact) return;
+  const dealsKnown =
+    dealsState.contactId === currentContact.id && dealsState.status === "ready";
+  el.innerHTML = TABS.map(([id, label]) => {
+    const count =
+      id === "deals" && dealsKnown && dealsState.deals.length
+        ? ` <span class="crmc-count">${dealsState.deals.length}</span>`
+        : "";
+    return `<button class="crmc-tabbtn" role="tab" data-act="tab" data-tab="${id}"
+                    aria-selected="${activeTab === id}">${label}${count}</button>`;
+  }).join("");
+}
+
+function openTab(tab) {
+  if (!TABS.some(([id]) => id === tab) || tab === activeTab) return;
+  activeTab = tab;
+  dealFormOpen = false;
+  editingContact = false;
+  paintTabs();
+  paintPane();
+}
+
+function paintPane() {
+  const el = slot(".crmc-pane");
+  const contact = currentContact;
+  if (!el || !contact) return;
+
+  if (activeTab === "notes") {
+    el.innerHTML = `
+      <form class="crmc-form" data-form="note">
+        <textarea class="crmc-input crmc-textarea" name="text" rows="3" maxlength="4000"
+                  placeholder="Escreva uma anotação sobre este contato"
+                  aria-label="Nova anotação"></textarea>
+        <p class="crmc-err" hidden></p>
+        <button class="crmc-btn" type="submit">Salvar anotação</button>
+      </form>
+      <div class="crmc-notes"></div>`;
+    paintNotes();
+    if (notesState.contactId !== contact.id) void loadNotes(contact.id);
+    return;
+  }
+
+  if (activeTab === "info") {
+    el.innerHTML = editingContact ? renderContactForm(contact) : renderContactInfo(contact);
+    if (editingContact) {
+      paintTagEdit();
+      void loadTags();
+    }
+    return;
+  }
+
+  el.innerHTML = `<div class="crmc-deals"></div><div class="crmc-dealform"></div>`;
+  paintDeals();
+  paintDealForm();
+}
+
+// ---- Deals --------------------------------------------------
+
+function stageOptions(stages, selectedId) {
+  return stages
+    .map(
+      (stage) =>
+        `<option value="${escapeHtml(stage.id)}"${
+          stage.id === selectedId ? " selected" : ""
+        }>${escapeHtml(stage.name)}</option>`,
+    )
+    .join("");
+}
+
 function renderDeal(deal) {
   const pipeline = dealsState.pipelines.find((p) => p.id === deal.pipeline?.id);
   // A stage list that doesn't include the current stage would show the
   // wrong one selected, so fall back to just the stage it is in.
   const stages = pipeline?.stages?.length ? pipeline.stages : deal.stage ? [deal.stage] : [];
-  const options = stages
-    .map(
-      (stage) =>
-        `<option value="${escapeHtml(stage.id)}"${
-          stage.id === deal.stage?.id ? " selected" : ""
-        }>${escapeHtml(stage.name)}</option>`,
-    )
-    .join("");
+  const id = escapeHtml(deal.id);
   return `
     <div class="crmc-deal">
       <p class="crmc-deal-head">
         <span class="crmc-deal-title">${escapeHtml(deal.title)}</span>
         <span class="crmc-deal-value">${escapeHtml(formatMoney(deal.value, deal.currency))}</span>
       </p>
-      <select class="crmc-stage" data-deal="${escapeHtml(deal.id)}"
-              aria-label="Etapa de ${escapeHtml(deal.title)}">${options}</select>
+      <select class="crmc-select crmc-stage" data-deal="${id}"
+              aria-label="Etapa de ${escapeHtml(deal.title)}">${stageOptions(stages, deal.stage?.id)}</select>
+      <p class="crmc-deal-actions">
+        Fechar como
+        <button class="crmc-link" data-act="deal-status" data-deal="${id}" data-status="won">ganho</button>
+        ou
+        <button class="crmc-link" data-act="deal-status" data-deal="${id}" data-status="lost">perdido</button>
+      </p>
     </div>`;
 }
 
 function renderDeals(contactId) {
   if (dealsState.contactId !== contactId) return "";
-  const { status, deals, notice } = dealsState;
+  const { status, deals, notice, closed } = dealsState;
   if (status === "loading") return `<p class="crmc-muted">Carregando…</p>`;
   if (status === "forbidden") {
     return `<p class="crmc-muted">A chave de API não tem acesso a negócios.</p>`;
@@ -463,19 +715,35 @@ function renderDeals(contactId) {
   const list = deals.length
     ? deals.map(renderDeal).join("")
     : `<p class="crmc-muted">Nenhum negócio em aberto.</p>`;
+  // A deal just closed leaves the list (it shows open deals); this
+  // line is what says where it went, and takes it back.
+  const undo = closed
+    ? `<p class="crmc-muted crmc-undo">“${escapeHtml(closed.title)}” fechado como ${
+        closed.status === "won" ? "ganho" : "perdido"
+      }. <button class="crmc-link" data-act="deal-undo">Desfazer</button></p>`
+    : "";
   return `
     ${list}
+    ${undo}
     ${notice ? `<p class="crmc-err">${escapeHtml(notice)}</p>` : ""}`;
 }
 
 function paintDeals() {
-  const slot = body().querySelector(".crmc-deals");
-  if (slot && currentContact) slot.innerHTML = renderDeals(currentContact.id);
+  const el = slot(".crmc-deals");
+  if (el && currentContact) el.innerHTML = renderDeals(currentContact.id);
 }
 
 async function loadDeals(contactId) {
-  dealsState = { contactId, status: "loading", deals: [], pipelines: [], notice: null };
+  dealsState = {
+    contactId,
+    status: "loading",
+    deals: [],
+    pipelines: [],
+    notice: null,
+    closed: null,
+  };
   paintDeals();
+  paintDealForm();
 
   const [deals, pipelines] = await Promise.all([
     send("deals", { contactId }),
@@ -495,7 +763,9 @@ async function loadDeals(contactId) {
       pipelines: Array.isArray(pipelines.data) ? pipelines.data : [],
     };
   }
+  paintTabs();
   paintDeals();
+  paintDealForm();
 }
 
 async function moveDeal(dealId, stageId) {
@@ -509,16 +779,10 @@ async function moveDeal(dealId, stageId) {
 
   // Same rule as the temperature: a reply for a chat that is no longer
   // open must not be drawn into the one that is.
-  if (gen !== generation || currentContact?.id !== contactId) return;
+  if (!stillShowing(contactId, gen)) return;
 
   if (!result.ok) {
-    dealsState = {
-      ...dealsState,
-      notice:
-        result.error === "unauthorized"
-          ? "A chave de API não tem permissão para mover negócios."
-          : "Não consegui mudar a etapa.",
-    };
+    dealsState = { ...dealsState, notice: failureText(result, "mover negócios") };
   } else {
     dealsState = {
       ...dealsState,
@@ -531,57 +795,371 @@ async function moveDeal(dealId, stageId) {
   paintDeals();
 }
 
-function renderContact(contact, notice) {
-  currentContact = contact;
-  const tags = (contact.tags || [])
-    .map((t) => `<span class="crmc-tag">${escapeHtml(t.name)}</span>`)
-    .join("");
+/** Close a deal as won or lost. It can be taken back from the list. */
+async function closeDeal(dealId, status) {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  const deal = dealsState.deals.find((d) => d.id === dealId);
+  if (!contactId || !deal || !["won", "lost"].includes(status)) return;
+
+  for (const control of slot(".crmc-deals")?.querySelectorAll("button, select") ?? []) {
+    control.disabled = true;
+  }
+  const result = await send("setDealStatus", { id: dealId, status });
+  if (!stillShowing(contactId, gen)) return;
+
+  if (!result.ok) {
+    dealsState = { ...dealsState, notice: failureText(result, "fechar negócios") };
+  } else {
+    dealsState = {
+      ...dealsState,
+      notice: null,
+      deals: dealsState.deals.filter((d) => d.id !== dealId),
+      closed: { id: dealId, title: deal.title, status },
+    };
+  }
+  paintTabs();
+  paintDeals();
+}
+
+async function reopenDeal() {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  const closed = dealsState.closed;
+  if (!contactId || !closed) return;
+
+  for (const control of slot(".crmc-deals")?.querySelectorAll("button, select") ?? []) {
+    control.disabled = true;
+  }
+  const result = await send("setDealStatus", { id: closed.id, status: "open" });
+  if (!stillShowing(contactId, gen)) return;
+
+  if (!result.ok) {
+    dealsState = { ...dealsState, notice: failureText(result, "reabrir negócios") };
+  } else {
+    dealsState = {
+      ...dealsState,
+      notice: null,
+      closed: null,
+      deals: [result.data, ...dealsState.deals],
+    };
+  }
+  paintTabs();
+  paintDeals();
+}
+
+/** Pipelines a deal can be opened on: the ones that have a stage. */
+function usablePipelines() {
+  return dealsState.pipelines.filter((p) => p.stages?.length);
+}
+
+function paintDealForm() {
+  const el = slot(".crmc-dealform");
+  const contact = currentContact;
+  if (!el || !contact) return;
+  if (dealsState.contactId !== contact.id || dealsState.status !== "ready") {
+    el.innerHTML = "";
+    return;
+  }
+  const pipelines = usablePipelines();
+  if (!pipelines.length) {
+    el.innerHTML = `<p class="crmc-muted">Crie um funil no CRM para abrir negócios por aqui.</p>`;
+    return;
+  }
+  if (!dealFormOpen) {
+    el.innerHTML = `<button class="crmc-btn crmc-btn-quiet" data-act="deal-new">+ Novo negócio</button>`;
+    return;
+  }
+  const pipelineChoice =
+    pipelines.length > 1
+      ? `<label class="crmc-field"><span>Funil</span>
+           <select class="crmc-select" name="pipeline">${pipelines
+             .map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`)
+             .join("")}</select></label>`
+      : "";
+  el.innerHTML = `
+    <form class="crmc-form crmc-card" data-form="deal">
+      <p class="crmc-section">Novo negócio</p>
+      <label class="crmc-field"><span>Título</span>
+        <input class="crmc-input" name="title" maxlength="120" autocomplete="off"
+               placeholder="Ex.: Plano anual" /></label>
+      <label class="crmc-field"><span>Valor</span>
+        <input class="crmc-input" name="value" inputmode="decimal" autocomplete="off"
+               placeholder="0,00" /></label>
+      ${pipelineChoice}
+      <label class="crmc-field"><span>Etapa</span>
+        <select class="crmc-select" name="stage">${stageOptions(pipelines[0].stages)}</select></label>
+      <p class="crmc-err" hidden></p>
+      <div class="crmc-form-actions">
+        <button class="crmc-btn" type="submit">Criar negócio</button>
+        <button class="crmc-link" type="button" data-act="deal-cancel">Cancelar</button>
+      </div>
+    </form>`;
+  el.querySelector('[name="title"]')?.focus();
+}
+
+/** The pipeline changed in the new-deal form: offer that one's stages. */
+function syncDealStages(form) {
+  const pipeline = usablePipelines().find((p) => p.id === form.elements.pipeline?.value);
+  if (pipeline) form.elements.stage.innerHTML = stageOptions(pipeline.stages);
+}
+
+async function submitDeal(form) {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  if (!contactId) return;
+
+  const title = form.elements.title.value.trim();
+  if (!title) {
+    showFormError(form, "Dê um título ao negócio.");
+    return;
+  }
+  const value = parseMoney(form.elements.value.value);
+  if (value === null) {
+    showFormError(form, "O valor precisa ser um número, como 1.200,00.");
+    return;
+  }
+  const pipelines = usablePipelines();
+  const pipelineId = form.elements.pipeline?.value || pipelines[0]?.id;
+  const stageId = form.elements.stage.value;
+
+  showFormError(form, "");
+  setFormBusy(form, true);
+  const result = await send("createDeal", { contactId, title, value, pipelineId, stageId });
+  if (!stillShowing(contactId, gen)) return;
+
+  if (!result.ok) {
+    setFormBusy(form, false);
+    showFormError(form, failureText(result, "criar negócios"));
+    return;
+  }
+  dealFormOpen = false;
+  dealsState = { ...dealsState, notice: null, deals: [result.data, ...dealsState.deals] };
+  paintTabs();
+  paintDeals();
+  paintDealForm();
+}
+
+// ---- Notes --------------------------------------------------
+
+function paintNotes() {
+  const el = slot(".crmc-notes");
+  const contact = currentContact;
+  if (!el || !contact) return;
+  if (notesState.contactId !== contact.id || notesState.status === "loading") {
+    el.innerHTML = `<p class="crmc-muted">Carregando…</p>`;
+    return;
+  }
+  if (notesState.status !== "ready") {
+    el.innerHTML = `<p class="crmc-muted">${escapeHtml(notesState.notice)}</p>`;
+    return;
+  }
+  el.innerHTML = notesState.notes.length
+    ? notesState.notes
+        .map((note) => {
+          const meta = [note.author?.name, formatWhen(note.created_at)].filter(Boolean).join(" · ");
+          return `
+            <div class="crmc-note">
+              <p class="crmc-note-text">${escapeHtml(note.text)}</p>
+              ${meta ? `<p class="crmc-note-meta">${escapeHtml(meta)}</p>` : ""}
+            </div>`;
+        })
+        .join("")
+    : `<p class="crmc-muted">Nenhuma anotação ainda. As anotações ficam só para a equipe.</p>`;
+}
+
+async function loadNotes(contactId) {
+  const gen = generation;
+  notesState = { contactId, status: "loading", notes: [], notice: null };
+  paintNotes();
+
+  const result = await send("notes", { contactId });
+  if (!stillShowing(contactId, gen)) return;
+
+  notesState = result.ok
+    ? { contactId, status: "ready", notes: Array.isArray(result.data) ? result.data : [], notice: null }
+    : { contactId, status: "error", notes: [], notice: failureText(result, "ver anotações") };
+  paintNotes();
+}
+
+async function submitNote(form) {
+  const contactId = currentContact?.id;
+  const gen = generation;
+  const text = form.elements.text.value.trim();
+  if (!contactId || !text) return;
+
+  showFormError(form, "");
+  setFormBusy(form, true);
+  const result = await send("addNote", { contactId, text });
+  if (!stillShowing(contactId, gen)) return;
+  setFormBusy(form, false);
+
+  if (!result.ok) {
+    showFormError(form, failureText(result, "escrever anotações"));
+    return;
+  }
+  form.elements.text.value = "";
+  if (notesState.contactId === contactId && notesState.status === "ready") {
+    notesState = { ...notesState, notes: [result.data, ...notesState.notes] };
+    paintNotes();
+  } else {
+    void loadNotes(contactId);
+  }
+}
+
+// ---- The contact's own data ----------------------------------
+
+function renderContactInfo(contact) {
   const rows = [
     contact.company ? `<p class="crmc-row"><span>Empresa</span>${escapeHtml(contact.company)}</p>` : "",
-    contact.email ? `<p class="crmc-row"><span>Email</span>${escapeHtml(contact.email)}</p>` : "",
+    contact.email ? `<p class="crmc-row"><span>E-mail</span>${escapeHtml(contact.email)}</p>` : "",
     contact.potential != null
       ? `<p class="crmc-row"><span>Potencial</span>${escapeHtml(contact.potential)}/100</p>`
       : "",
   ].join("");
-  const details = [
-    rows,
-    renderTemperature(contact),
-    notice ? `<p class="crmc-err">${escapeHtml(notice)}</p>` : "",
-    tags ? `<div class="crmc-tags">${tags}</div>` : "",
-  ].join("");
-
-  render(`
-    <div class="crmc-who">
-      <p class="crmc-name">${escapeHtml(contact.name || contact.phone)}</p>
-      <p class="crmc-sub">${escapeHtml(contact.phone)}</p>
-      ${
-        currentLinked
-          ? `<p class="crmc-linked">Vínculo lembrado neste navegador ·
-               <button class="crmc-link" data-act="unlink">Desfazer</button></p>`
-          : ""
-      }
-    </div>
-    ${
-      details.trim()
-        ? `<section class="crmc-card"><p class="crmc-section">Contato</p>${details}</section>`
-        : ""
-    }
-    <section class="crmc-card">
-      <p class="crmc-section">Negócios</p>
-      <div class="crmc-deals">${renderDeals(contact.id)}</div>
-    </section>
-    <a class="crmc-btn" target="_blank" rel="noreferrer noopener"
-       href="${escapeHtml(contactUrl(contact.id))}">
-      Abrir no CRM
-    </a>
-  `);
+  const tags = (contact.tags || [])
+    .map((t) => `<span class="crmc-tag">${escapeHtml(t.name)}</span>`)
+    .join("");
+  return `
+    ${rows || tags ? "" : `<p class="crmc-muted">Sem empresa, e-mail ou etiquetas no cadastro.</p>`}
+    ${rows}
+    ${tags ? `<div class="crmc-tags">${tags}</div>` : ""}
+    <button class="crmc-btn crmc-btn-quiet" data-act="edit">Editar contato</button>`;
 }
 
-/** Show a contact for the open chat and load its deals. */
-function showContact(contact, { linked = false } = {}) {
-  currentLinked = linked;
-  renderContact(contact);
-  void loadDeals(contact.id);
+function renderContactForm(contact) {
+  return `
+    <form class="crmc-form" data-form="contact" novalidate>
+      <label class="crmc-field"><span>Nome</span>
+        <input class="crmc-input" name="name" maxlength="120" autocomplete="off"
+               value="${escapeHtml(contact.name || "")}" /></label>
+      <label class="crmc-field"><span>E-mail</span>
+        <input class="crmc-input" name="email" type="email" maxlength="200" autocomplete="off"
+               value="${escapeHtml(contact.email || "")}" /></label>
+      <label class="crmc-field"><span>Empresa</span>
+        <input class="crmc-input" name="company" maxlength="120" autocomplete="off"
+               value="${escapeHtml(contact.company || "")}" /></label>
+      <div class="crmc-field"><span>Etiquetas</span>
+        <div class="crmc-tagedit"></div>
+        <div class="crmc-tagadd">
+          <input class="crmc-input crmc-taginput" list="crmc-taglist" maxlength="40"
+                 autocomplete="off" placeholder="Adicionar etiqueta" aria-label="Adicionar etiqueta" />
+          <button class="crmc-btn crmc-btn-small crmc-btn-quiet" type="button" data-act="tag-add">Adicionar</button>
+        </div>
+        <datalist id="crmc-taglist"></datalist>
+      </div>
+      <p class="crmc-err" hidden></p>
+      <div class="crmc-form-actions">
+        <button class="crmc-btn" type="submit">Salvar</button>
+        <button class="crmc-link" type="button" data-act="edit-cancel">Cancelar</button>
+      </div>
+    </form>`;
+}
+
+function startEditingContact() {
+  if (!currentContact) return;
+  editingContact = true;
+  editTags = (currentContact.tags || []).map((t) => t.name);
+  paintPane();
+}
+
+function paintTagEdit() {
+  const el = slot(".crmc-tagedit");
+  if (!el) return;
+  el.innerHTML = editTags.length
+    ? editTags
+        .map(
+          (name) => `
+            <span class="crmc-tag crmc-tag-edit">${escapeHtml(name)}
+              <button class="crmc-tag-x" type="button" data-act="tag-remove"
+                      data-name="${escapeHtml(name)}"
+                      aria-label="Tirar a etiqueta ${escapeHtml(name)}">×</button></span>`,
+        )
+        .join("")
+    : `<span class="crmc-muted">Sem etiquetas.</span>`;
+}
+
+function paintTagChoices() {
+  const list = slot("#crmc-taglist");
+  if (!list || tagsCache.baseUrl !== currentBaseUrl) return;
+  list.innerHTML = (tagsCache.names || [])
+    .map((name) => `<option value="${escapeHtml(name)}"></option>`)
+    .join("");
+}
+
+/** The CRM's tags, to suggest while typing. Asked once per CRM. */
+async function loadTags() {
+  const baseUrl = currentBaseUrl;
+  if (tagsCache.baseUrl === baseUrl && tagsCache.names) {
+    paintTagChoices();
+    return;
+  }
+  const result = await send("tags");
+  // Without the list the field still works: a typed name is created.
+  if (!result.ok || currentBaseUrl !== baseUrl) return;
+  tagsCache = {
+    baseUrl,
+    names: (Array.isArray(result.data) ? result.data : []).map((t) => t.name).filter(Boolean),
+  };
+  paintTagChoices();
+}
+
+function addTagFromInput() {
+  const input = slot(".crmc-taginput");
+  if (!input) return;
+  editTags = addTagName(editTags, input.value);
+  input.value = "";
+  paintTagEdit();
+  input.focus();
+}
+
+function removeEditTag(name) {
+  editTags = editTags.filter((existing) => existing !== name);
+  paintTagEdit();
+}
+
+async function submitContact(form) {
+  const contact = currentContact;
+  const gen = generation;
+  if (!contact) return;
+  if (!form.checkValidity()) {
+    showFormError(form, "Esse e-mail não parece válido.");
+    return;
+  }
+
+  // A tag typed but not yet added is still meant to be saved.
+  const pending = form.querySelector(".crmc-taginput")?.value;
+  const tags = addTagName(editTags, pending);
+  const name = form.elements.name.value.trim();
+  const fields = {
+    // The CRM requires a name; an emptied field leaves the one it has.
+    ...(name ? { name } : {}),
+    email: form.elements.email.value.trim() || null,
+    company: form.elements.company.value.trim() || null,
+    tags,
+  };
+
+  showFormError(form, "");
+  setFormBusy(form, true);
+  const result = await send("update", { id: contact.id, fields });
+  if (!stillShowing(contact.id, gen)) return;
+
+  if (!result.ok) {
+    setFormBusy(form, false);
+    showFormError(form, failureText(result, "editar contatos"));
+    return;
+  }
+  currentContact = result.data;
+  editingContact = false;
+  // A tag created just now belongs in the suggestions from here on.
+  if (tagsCache.names) {
+    tagsCache = {
+      ...tagsCache,
+      names: tags.reduce((names, tag) => addTagName(names, tag), tagsCache.names),
+    };
+  }
+  paintWho();
+  paintPane();
 }
 
 /** No record for this number: offer to create, or to link another. */
@@ -768,30 +1346,6 @@ function createTyped(digits) {
   return create(digits, { link: true });
 }
 
-async function setTemperature(value) {
-  const contact = currentContact;
-  const gen = generation;
-  if (!contact || contact.temperature === value) return;
-
-  for (const button of body().querySelectorAll(".crmc-seg")) button.disabled = true;
-  const result = await send("update", { id: contact.id, fields: { temperature: value } });
-
-  // The operator may have switched chats while this was in flight. The
-  // reply belongs to the contact that was open then; drawing it now
-  // would put one customer's card beside another customer's chat.
-  if (gen !== generation) return;
-
-  if (!result.ok) {
-    const notice =
-      result.error === "unauthorized"
-        ? "A chave de API não tem permissão para editar contatos."
-        : "Não consegui salvar a temperatura.";
-    renderContact(contact, notice);
-    return;
-  }
-  renderContact(result.data);
-}
-
 // ------------------------------------------------------------
 // The loop
 // ------------------------------------------------------------
@@ -933,6 +1487,14 @@ void (async () => {
     pickMode = (await import(chrome.runtime.getURL("theme.js"))).pickMode;
   } catch {
     // The panel still works; it just follows the system theme.
+  }
+  try {
+    const format = await import(chrome.runtime.getURL("format.js"));
+    parseMoney = format.parseMoney;
+    formatWhen = format.formatWhen;
+    addTagName = format.addTagName;
+  } catch {
+    // The fallbacks above stand in.
   }
   applyMode();
   await refresh(true);

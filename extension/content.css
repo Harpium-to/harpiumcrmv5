@@ -508,10 +508,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-#crm-connector-panel .crmc-stage {
+#crm-connector-panel .crmc-select {
   display: block;
   width: 100%;
-  margin: 5px 0 0;
+  margin: 0;
   padding: 6px 8px;
   border: 1px solid var(--crmc-border);
   border-radius: 8px;
@@ -522,19 +522,249 @@
   cursor: pointer;
 }
 
-#crm-connector-panel .crmc-stage:focus-visible {
+#crm-connector-panel .crmc-select:focus-visible {
   outline: 2px solid var(--crmc-ring);
   outline-offset: 1px;
 }
 
-#crm-connector-panel .crmc-stage:disabled {
+#crm-connector-panel .crmc-select:disabled {
   cursor: progress;
   opacity: 0.5;
 }
 
-#crm-connector-panel .crmc-stage option {
+#crm-connector-panel .crmc-select option {
   background: var(--crmc-bg);
   color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-stage {
+  margin: 5px 0 0;
+}
+
+#crm-connector-panel .crmc-deal-actions {
+  margin: 5px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+#crm-connector-panel .crmc-deals:not(:empty) + .crmc-dealform:not(:empty) {
+  margin-top: 12px;
+}
+
+#crm-connector-panel .crmc-dealform > .crmc-btn {
+  margin-top: 0;
+}
+
+/* ---- Tabs ------------------------------------------------- */
+
+#crm-connector-panel .crmc-tempslot:not(:empty) {
+  margin: 0 0 12px;
+}
+
+#crm-connector-panel .crmc-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 14px;
+  border-bottom: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-tabbtn {
+  flex: 1;
+  margin: 0 0 -1px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--crmc-fg-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-tabbtn:hover {
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-tabbtn[aria-selected="true"] {
+  border-bottom-color: var(--crmc-primary);
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-tabbtn:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: -2px;
+}
+
+#crm-connector-panel .crmc-count {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 2px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--crmc-muted);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ---- Forms ------------------------------------------------ */
+
+#crm-connector-panel .crmc-form {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-field {
+  display: block;
+  margin: 0 0 10px;
+}
+
+#crm-connector-panel .crmc-field > span {
+  display: block;
+  margin: 0 0 4px;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+#crm-connector-panel .crmc-field .crmc-input,
+#crm-connector-panel .crmc-textarea {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+}
+
+#crm-connector-panel .crmc-textarea {
+  min-height: 68px;
+  padding: 8px 12px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+#crm-connector-panel .crmc-form > .crmc-btn {
+  margin-top: 8px;
+}
+
+#crm-connector-panel .crmc-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 0;
+}
+
+#crm-connector-panel .crmc-form-actions .crmc-btn {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-form .crmc-err {
+  margin: 0 0 8px;
+}
+
+#crm-connector-panel .crmc-btn:disabled,
+#crm-connector-panel .crmc-link:disabled,
+#crm-connector-panel .crmc-input:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+
+/* A second action on a screen that already has a main one. */
+#crm-connector-panel .crmc-btn.crmc-btn-quiet {
+  border: 1px solid var(--crmc-border);
+  background: transparent;
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-btn.crmc-btn-quiet:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-pane + .crmc-btn {
+  margin-top: 16px;
+}
+
+/* ---- Notes ------------------------------------------------ */
+
+#crm-connector-panel .crmc-notes {
+  margin: 14px 0 0;
+}
+
+#crm-connector-panel .crmc-notes > .crmc-muted:first-child {
+  margin-top: 0;
+}
+
+#crm-connector-panel .crmc-note {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+}
+
+#crm-connector-panel .crmc-note-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+#crm-connector-panel .crmc-note-meta {
+  margin: 5px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+/* ---- Editing tags ----------------------------------------- */
+
+#crm-connector-panel .crmc-tagedit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 6px;
+}
+
+#crm-connector-panel .crmc-tagedit .crmc-muted {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-tag.crmc-tag-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+#crm-connector-panel .crmc-tag-x {
+  margin: 0;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-tag-x:hover {
+  background: var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-tag-x:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 0;
+}
+
+#crm-connector-panel .crmc-tagadd {
+  display: flex;
+  gap: 6px;
+}
+
+#crm-connector-panel .crmc-tagadd .crmc-input {
+  flex: 1;
+  width: auto;
 }
 
 /* ---- Linking a chat to a contact by hand ------------------ */

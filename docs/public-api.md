@@ -45,11 +45,11 @@ it. Grant the minimum.
 | -------------------- | ---------------------------------------- |
 | `messages:send`      | Send WhatsApp messages                   |
 | `messages:read`      | Read messages and delivery status        |
-| `contacts:read`      | List and read contacts                   |
-| `contacts:write`     | Create and update contacts               |
+| `contacts:read`      | List and read contacts, their notes, and the account's tags |
+| `contacts:write`     | Create and update contacts; add notes    |
 | `conversations:read` | List and read conversations              |
 | `deals:read`         | List and read deals and pipelines        |
-| `deals:write`        | Update deals (move stage, mark won/lost) |
+| `deals:write`        | Create and update deals (move stage, mark won/lost) |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
 
@@ -223,6 +223,46 @@ curl -X PATCH https://your-app/api/v1/contacts/<id> \
   -d '{ "temperature": "hot", "potential": 80, "source": "instagram" }'
 ```
 
+### `GET` / `POST /api/v1/contacts/{id}/notes`
+
+The team's own annotations about a contact — never sent to the
+customer. Scopes: `contacts:read` / `contacts:write`. A contact in
+another account returns `404`.
+
+`GET` returns the most recent notes, newest first. Not paginated:
+`?limit=` (default `20`, at most `50`).
+
+```json
+{
+  "data": [
+    {
+      "id": "…",
+      "text": "Prefere contato à tarde.",
+      "author": { "id": "…", "name": "Ana Lima" },
+      "created_at": "…"
+    }
+  ]
+}
+```
+
+`POST` takes `{ "text": "…" }` (required, up to 4000 characters) and
+returns the new note with `201`. `author` is the person the key belongs
+to — whoever created it — and `null` only if that profile is gone.
+
+```bash
+curl -X POST https://your-app/api/v1/contacts/<id>/notes \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Prefere contato à tarde." }'
+```
+
+### `GET /api/v1/tags`
+
+The account's tags, sorted by name: `{ "id", "name", "color" }`. Scope:
+`contacts:read`. Not paginated. To put tags on a contact, send their
+**names** as `tags` in `PATCH /api/v1/contacts/{id}`; a name that
+doesn't exist yet is created.
+
 ### `GET /api/v1/conversations`
 
 List conversations, newest first. Scope: `conversations:read`.
@@ -267,6 +307,33 @@ filters: `?contact_id=`, `?pipeline_id=` and `?status=` (`open` /
 `value` is a number. `closed_at` is when the deal reached `won` or
 `lost`; it is set by the database and is `null` while the deal is open
 (or on a deployment without migration `046`).
+
+### `POST /api/v1/deals`
+
+Open a deal for a contact. Scope: `deals:write`. Returns the deal with
+`201`. It is always created `open`, in the account's default currency.
+
+| Field | Accepts |
+|---|---|
+| `contact_id` | **required** — a contact of this account |
+| `title` | **required** — non-empty string |
+| `value` | number, `0` or more (default `0`) |
+| `notes` | string |
+| `expected_close_date` | `"YYYY-MM-DD"` |
+| `pipeline_id` | a pipeline of this account |
+| `stage_id` | a stage of a pipeline of this account |
+
+Where it lands on the board: on `stage_id` when given (and it must be a
+stage of `pipeline_id`, if you send both); otherwise on the first stage
+of `pipeline_id`; with neither, on the first stage of the account's
+first pipeline. An account with no pipeline gets a `400`.
+
+```bash
+curl -X POST https://your-app/api/v1/deals \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "contact_id": "<contact id>", "title": "Plano anual", "value": 4800 }'
+```
 
 ### `GET` / `PATCH /api/v1/deals/{id}`
 

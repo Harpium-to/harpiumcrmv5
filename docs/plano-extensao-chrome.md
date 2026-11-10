@@ -266,11 +266,32 @@ as conversas, e que fotos e vídeos em tela cheia não ficam com botões
 embaixo do painel.
 
 **Fase 3 — Ficha completa do contato.** O que não envia mensagem.
-- Notas, etiquetas, editar nome/e-mail/empresa.
-- Criar negócio, mover de etapa, ganhar e perder.
-- Tarefas e lembretes.
+Dividida em duas, porque só a segunda precisa de migration.
+
+*3A ✅ (código pronto, extensão 0.6.0, falta testar no WhatsApp real).*
+Branch `feat/extensao-fase3a-ficha`. **Sem migration.**
+- Ficha em abas: **Negócios**, **Notas** e **Dados**. A aba aberta
+  continua aberta na próxima conversa.
+- Negócios: criar (título, valor, funil, etapa), mover de etapa, fechar
+  como ganho ou perdido, com "Desfazer".
+- Notas: ver as anotações da equipe e escrever outra. O autor é a
+  pessoa dona da chave da extensão.
+- Dados: editar nome, e-mail, empresa e etiquetas, com as etiquetas do
+  CRM como sugestão.
+- API pública nova: `GET/POST /api/v1/contacts/{id}/notes`,
+  `GET /api/v1/tags` e `POST /api/v1/deals`.
+- **Mudança de alcance dos escopos, sem migration:** `contacts:read`
+  passa a ler anotações e etiquetas, `contacts:write` a escrever
+  anotações, e `deals:write` a criar negócio. Vale para qualquer chave
+  que já tenha esses escopos, não só as da extensão.
+- Os funis ficam guardados por 1 minuto na extensão, para não pedir de
+  novo a cada troca de conversa.
+
+*3B (a fazer). Precisa da migration 059, aplicada no Supabase.*
+- Tarefas e lembretes de pessoas (tabela nova).
 - Estado da conversa no CRM (IA respondendo, aguardando atendente) e
-  **Assumir**.
+  **Assumir**. Depende do PR #10 (migration 058) no `main` e de escopos
+  de conversa na chave da extensão.
 
 **Fase 4 — Mensagens com 1 clique.** Primeira fase que envia.
 - Respostas rápidas com texto, áudio, imagem, vídeo e arquivo.

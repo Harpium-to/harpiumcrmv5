@@ -22,21 +22,38 @@ painel funciona e só avisa que não tem acesso a negócios.
 ## O que ela faz
 
 Com uma conversa individual aberta no WhatsApp Web, o painel procura o
-contato pelo telefone e mostra nome, empresa, email e etiquetas, com um
-link para abrir o registro completo. A busca compara só os dígitos (a
-formatação com que o número foi salvo não importa) e aceita o celular
-brasileiro com ou sem o nono dígito, porque o WhatsApp ainda identifica
-muitos números pela forma antiga. Se o CRM tiver o mesmo número duas
-vezes, o painel mostra os dois e pede para escolher. Abaixo dos dados fica a
-**temperatura** do lead (Frio / Morno / Quente): um clique grava no
-CRM. O controle só aparece quando o CRM já tem a migration 045 — antes
-dela não existe onde gravar. Embaixo, os **negócios em aberto** do
-contato, cada um com a etapa do funil num seletor: trocar a etapa ali
-é o mesmo que arrastar o card no quadro. Se não houver cadastro, oferece
-criar — usando o nome que o WhatsApp exibe, quando ele não é só o
-próprio número — ou vincular a um contato que está no CRM com outro
+contato pelo telefone e mostra a ficha dele, com um link para abrir o
+registro completo no CRM.
+
+**Como acha o contato.** A busca compara só os dígitos (a formatação
+com que o número foi salvo não importa) e aceita o celular brasileiro
+com ou sem o nono dígito, porque o WhatsApp ainda identifica muitos
+números pela forma antiga. Se o CRM tiver o mesmo número duas vezes, o
+painel mostra os dois e pede para escolher. Se não houver cadastro,
+oferece criar — usando o nome que o WhatsApp exibe, quando ele não é só
+o próprio número — ou vincular a um contato que está no CRM com outro
 número. Se o CRM responder com um contato de número só parecido (mesmos
 últimos dígitos, outro DDD), o painel pergunta em vez de mostrá-lo.
+
+**A ficha.** No topo, o nome, o número e a **temperatura** do lead
+(Frio / Morno / Quente): um clique grava no CRM. O controle só aparece
+quando o CRM já tem a migration 045. Abaixo, três abas; a que estiver
+aberta continua aberta na próxima conversa.
+
+- **Negócios** — os negócios em aberto do contato. Cada um tem a etapa
+  do funil num seletor (trocar ali é o mesmo que arrastar o card no
+  quadro) e pode ser fechado como **ganho** ou **perdido**; o negócio
+  sai da lista e fica uma linha para **desfazer**. "Novo negócio" abre
+  um formulário com título, valor, funil e etapa.
+- **Notas** — as anotações da equipe sobre o contato, da mais recente
+  para a mais antiga, com quem escreveu e quando, e um campo para
+  escrever outra. Não são enviadas ao cliente.
+- **Dados** — empresa, e-mail, potencial e etiquetas. "Editar contato"
+  troca nome, e-mail, empresa e etiquetas; as etiquetas do CRM aparecem
+  como sugestão e um nome novo é criado ao salvar.
+
+Cada parte da ficha é redesenhada sozinha: mudar a temperatura ou a
+etapa de um negócio não apaga uma anotação pela metade.
 
 ### Conversas com `@lid`
 
