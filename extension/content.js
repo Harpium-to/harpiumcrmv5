@@ -89,6 +89,10 @@ let account = { baseUrl: null, name: null, person: null, askedAt: 0 };
 // kept in the extension. `name` is what they typed; empty means the
 // name the CRM has for them (`account.person`).
 let signature = { on: false, name: "" };
+// The shortcut bar in WhatsApp's chat header: shown unless the person
+// turned it off in the extension's options.
+let shortcutsOn = true;
+let shortcutsShown = 0;
 
 // The open deals of the contact on screen. Kept apart from the contact
 // so re-drawing the card (after a temperature change) doesn't refetch
@@ -233,6 +237,9 @@ let signText = (text) => String(text ?? "");
 let cleanSignatureName = (name) => String(name ?? "").trim();
 let describeDuration = () => "";
 let defaultScheduleValue = () => "";
+// From shortcuts.js. Without it there is simply no bar.
+let placeShortcuts = () => null;
+let measureHeader = () => ({ nameRight: 0, actionsLeft: 0 });
 let describeScheduled = (item) => String(item?.status ?? "");
 // From send-check.js. Without it the panel never offers to send.
 let sendCheck = () => ({ ok: false, why: null });
@@ -465,6 +472,7 @@ function ensurePanel() {
       <button class="crmc-btn crmc-btn-quiet" data-act="mytasks-open" title="Minhas tarefas">Tarefas<span class="crmc-count crmc-badge" hidden></span></button>
     </footer>
     <section class="crmc-board" aria-label="Funil"></section>
+    <nav class="crmc-shortcuts" aria-label="Atalhos do Harpium CRM" hidden></nav>
   `;
   document.body.appendChild(panel);
   // A panel rebuilt after WhatsApp replaced the page starts closed.
@@ -540,6 +548,7 @@ function ensurePanel() {
     if (action === "conv-flow-pause") void conversationAction("pauseFlow", "pausar fluxos");
     if (action === "flow-start") void startFlow(target.getAttribute("data-id"));
     if (action === "board-open") setBoardOpen(true);
+    if (action?.startsWith("sc-")) runShortcut(action.slice(3));
     if (action === "board-close") setBoardOpen(false);
     if (action === "board-refresh") void loadBoard();
     if (action === "board-chat") openChatWith(target.getAttribute("data-phone"));
@@ -624,11 +633,7 @@ function ensurePanel() {
   applyLayout();
   paintAccount();
 
-  void send("getPrefs").then((prefs) => {
-    if (!prefs.ok) return;
-    if (prefs.data?.collapsed) setCollapsed(true);
-    signature = { on: Boolean(prefs.data?.sign), name: prefs.data?.signName || "" };
-  });
+  void readPrefs();
 
   return panel;
 }
@@ -1994,6 +1999,8 @@ function setRepliesOpen(open) {
   if (!open) return;
 
   repliesQuery = "";
+  // Opens on "Enviar agora"; the Agendar shortcut switches it after.
+  sendMode = "now";
   sheet().innerHTML = `
     <div class="crmc-sheet-head">
       <p class="crmc-name">Respostas rápidas</p>
@@ -3176,6 +3183,168 @@ function wireBoardDragging(root) {
 }
 
 // ------------------------------------------------------------
+// Shortcuts in WhatsApp's chat header
+//
+// A row of buttons over the empty stretch of the chat header, right of
+// the contact's name: each opens a part of the panel, already in place
+// (shortcuts.js says where it fits). Nothing goes inside WhatsApp's
+// page, so nothing breaks when it re-renders; when there is no room,
+// the row gives up its last buttons, then hides.
+// ------------------------------------------------------------
+
+const SC_ICONS = {
+  replies: `<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>`,
+  schedule: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`,
+  task: `<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>`,
+  note: `<path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h4"/>`,
+  deals: `<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`,
+  sequences: `<path d="M4 6h10M4 12h10M4 18h7"/><path d="m17 14 4 3-4 3z"/>`,
+  board: `<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/>`,
+  crm: `<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>`,
+};
+
+// Most useful first: when room is short, the last ones go.
+const SHORTCUTS = [
+  { id: "replies", label: "Respostas rápidas", contact: false },
+  { id: "schedule", label: "Agendar mensagem", contact: true },
+  { id: "task", label: "Nova tarefa", contact: true },
+  { id: "note", label: "Nova anotação", contact: true },
+  { id: "deals", label: "Negócios", contact: true },
+  { id: "sequences", label: "Sequências e fluxos", contact: true },
+  { id: "board", label: "Funil", contact: false },
+  { id: "crm", label: "Abrir no CRM", contact: true },
+];
+
+async function readPrefs() {
+  const prefs = await send("getPrefs");
+  if (!prefs.ok) return;
+  if (prefs.data?.collapsed && !ensurePanel().classList.contains("crmc-collapsed")) setCollapsed(true);
+  signature = { on: Boolean(prefs.data?.sign), name: prefs.data?.signName || "" };
+  shortcutsOn = prefs.data?.shortcuts !== false;
+  placeShortcutBar();
+}
+
+/** The boxes the placement needs, read from WhatsApp's chat header. */
+function readHeader(header) {
+  const box = (r) => ({ left: r.left, right: r.right, width: r.width });
+  const buttons = [...header.querySelectorAll("button, [role='button']")].map((b) =>
+    box(b.getBoundingClientRect()),
+  );
+  // Text boxes, glyph by glyph: an element can be wider than its words.
+  const texts = [];
+  const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent.trim()) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const r of range.getClientRects()) {
+      if (r.width > 0) texts.push({ left: r.left, right: r.right });
+    }
+  }
+  return { buttons, texts };
+}
+
+function placeShortcutBar() {
+  const node = ensurePanel();
+  const bar = node.querySelector(".crmc-shortcuts");
+  if (!bar) return;
+  const header = document.querySelector("#main header");
+  const hide = () => {
+    bar.hidden = true;
+    shortcutsShown = 0;
+  };
+  if (
+    !shortcutsOn ||
+    !header ||
+    !currentChat ||
+    !node.classList.contains("crmc-connected") ||
+    node.classList.contains("crmc-board-open")
+  ) {
+    return hide();
+  }
+  const rect = header.getBoundingClientRect();
+  const { buttons, texts } = readHeader(header);
+  const { nameRight, actionsLeft } = measureHeader(
+    { left: rect.left, right: rect.right },
+    buttons,
+    texts,
+  );
+  const place = placeShortcuts({
+    header: { left: rect.left, right: rect.right, top: rect.top, height: rect.height },
+    nameRight,
+    actionsLeft,
+    want: SHORTCUTS.length,
+  });
+  if (!place) return hide();
+
+  if (place.count !== shortcutsShown || bar.dataset.contact !== String(Boolean(currentContact))) {
+    bar.dataset.contact = String(Boolean(currentContact));
+    bar.innerHTML = SHORTCUTS.slice(0, place.count)
+      .map((sc) => {
+        const off = sc.contact && !currentContact;
+        const label = off ? `${sc.label} (só para contatos do CRM)` : sc.label;
+        return `<button class="crmc-sc" data-act="sc-${sc.id}" title="${escapeHtml(label)}"
+                        aria-label="${escapeHtml(label)}" ${off ? "disabled" : ""}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">${SC_ICONS[sc.id]}</svg>
+                </button>`;
+      })
+      .join("");
+    shortcutsShown = place.count;
+  }
+  bar.style.left = `${place.left}px`;
+  bar.style.top = `${place.top}px`;
+  bar.hidden = false;
+}
+
+function focusSoon(selector) {
+  setTimeout(() => ensurePanel().querySelector(selector)?.focus(), 60);
+}
+
+/** Do what a shortcut stands for, opening the panel first. */
+function runShortcut(id) {
+  const node = ensurePanel();
+  if (node.classList.contains("crmc-collapsed")) {
+    setCollapsed(false);
+    void send("setPrefs", { collapsed: false });
+  }
+  if (id !== "board") setBoardOpen(false);
+  const needsContact = SHORTCUTS.find((sc) => sc.id === id)?.contact;
+  if (needsContact && !currentContact) return;
+
+  if (id === "replies" || id === "schedule" || id === "sequences") {
+    setMyTasksOpen(false);
+    setRepliesOpen(true);
+    setSendMode(id === "schedule" ? "later" : "now");
+    if (id === "schedule") focusSoon(".crmc-when-text");
+    // The sequences load after the sheet opens.
+    if (id === "sequences") {
+      setTimeout(() => node.querySelector(".crmc-seqs")?.scrollIntoView({ block: "start" }), 700);
+    }
+    return;
+  }
+  if (id === "board") {
+    setBoardOpen(true);
+    return;
+  }
+  if (id === "crm") {
+    window.open(contactUrl(currentContact.id), "_blank", "noopener");
+    return;
+  }
+  // The record's tabs: close what covers them, then open the tab.
+  setRepliesOpen(false);
+  setMyTasksOpen(false);
+  if (id === "task") {
+    openTab("tasks");
+    focusSoon(".crmc-task-title-input");
+  } else if (id === "note") {
+    openTab("notes");
+    focusSoon('form[data-form="note"] textarea');
+  } else if (id === "deals") {
+    openTab("deals");
+  }
+}
+
+// ------------------------------------------------------------
 // The loop
 // ------------------------------------------------------------
 
@@ -3297,6 +3466,9 @@ async function refresh(force) {
 // takes to read a chat.
 ensurePanel();
 
+// The options page may have turned the shortcuts on or off.
+window.addEventListener("focus", () => void readPrefs());
+
 let resizeQueued = false;
 window.addEventListener("resize", () => {
   if (resizeQueued) return;
@@ -3305,6 +3477,7 @@ window.addEventListener("resize", () => {
     resizeQueued = false;
     dockFailed = false;
     applyLayout();
+    placeShortcutBar();
   });
 });
 
@@ -3322,6 +3495,13 @@ void (async () => {
   } catch {
     renderMessage("Não consegui carregar a extensão. Recarregue a página.");
     return;
+  }
+  try {
+    const sc = await import(chrome.runtime.getURL("shortcuts.js"));
+    placeShortcuts = sc.placeShortcuts;
+    measureHeader = sc.measureHeader;
+  } catch {
+    // No bar; the panel does everything it offers.
   }
   try {
     sendCheck = (await import(chrome.runtime.getURL("send-check.js"))).sendCheck;
@@ -3359,6 +3539,7 @@ void (async () => {
   setInterval(() => {
     applyMode();
     keepDock();
+    placeShortcutBar();
     refreshMyTasksIfStale();
     void refresh(false);
   }, POLL_MS);

@@ -216,6 +216,25 @@ buscar o contato no CRM por nome ou telefone; a escolha fica **lembrada
 neste navegador**, por conversa, e pode ser desfeita no próprio painel.
 O painel também lembra se foi recolhido.
 
+## Atalhos no topo da conversa
+
+Uma fileira de botões no cabeçalho da conversa do WhatsApp, no espaço
+vazio entre o nome do contato e os botões do próprio WhatsApp:
+**respostas rápidas, agendar, nova tarefa, nova anotação, negócios,
+sequências e fluxos, funil e abrir no CRM**. Cada um abre o painel já
+na parte certa (e abre o painel, se estiver recolhido). Os que dependem
+de um contato do CRM ficam apagados quando o número não é contato.
+
+Ela não entra na página do WhatsApp — que refaz o cabeçalho a toda
+hora: flutua por cima do espaço vazio, medido a cada instante
+(`shortcuts.js`). Quando falta espaço, perde os últimos botões; abaixo
+de três, some. Com o painel aberto o cabeçalho costuma ficar estreito
+demais, e então ela some — o painel está na tela com tudo. Não aparece
+em grupos nem com o quadro do funil aberto.
+
+Dá para desligar nas opções da extensão ("Mostrar os atalhos no topo da
+conversa").
+
 ## Onde o painel fica
 
 Numa coluna à direita, que **estreita o WhatsApp** em vez de cobrir a

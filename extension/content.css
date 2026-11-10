@@ -1331,6 +1331,79 @@
   margin: 0;
 }
 
+/* ---- Shortcuts in WhatsApp's chat header -------------------- */
+
+/* A child of the panel placed against the viewport, like the board:
+   content.js puts it over the empty stretch of the chat header. Shown
+   with the panel collapsed too — a shortcut opens it. */
+#crm-connector-panel .crmc-shortcuts {
+  position: fixed;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 36px;
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 999px;
+  background: var(--crmc-bg);
+  box-shadow: 0 2px 8px rgba(20, 16, 12, 0.12);
+}
+
+#crm-connector-panel .crmc-shortcuts[hidden] {
+  display: none;
+}
+
+#crm-connector-panel .crmc-sc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--crmc-fg);
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-sc:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-sc:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: -2px;
+}
+
+#crm-connector-panel .crmc-sc:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+#crm-connector-panel .crmc-sc:disabled:hover {
+  background: transparent;
+}
+
+#crm-connector-panel .crmc-sc svg,
+#crm-connector-panel .crmc-sc svg * {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#crm-connector-panel .crmc-sc svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+}
+
 /* ---- The board -------------------------------------------- */
 
 /* A child of the panel, placed against the viewport: it covers

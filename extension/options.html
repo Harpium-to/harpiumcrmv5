@@ -122,6 +122,22 @@
         min-height: 21px;
         margin: 14px 0 0;
       }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .check input {
+        width: auto;
+        margin: 0;
+        accent-color: var(--primary);
+      }
+      .card + .card {
+        margin-top: 16px;
+      }
       .ok { color: var(--ok); }
       .bad { color: var(--bad); }
     </style>
@@ -152,6 +168,18 @@
 
         <button id="save">Salvar e testar</button>
         <p id="status"></p>
+      </div>
+
+      <div class="card">
+        <label class="check">
+          <input id="shortcuts" type="checkbox" />
+          Mostrar os atalhos no topo da conversa
+        </label>
+        <small>
+          Uma fileira de botões no cabeçalho da conversa do WhatsApp, ao lado
+          do nome do contato: respostas, agendar, tarefa, anotação, negócios,
+          sequências, funil e abrir no CRM. Muda na hora.
+        </small>
       </div>
     </main>
 

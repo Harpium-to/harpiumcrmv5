@@ -91,3 +91,17 @@ async function save() {
 
 el("save").addEventListener("click", () => void save());
 void load();
+
+// The shortcuts in the chat header: part of this person's panel
+// choices, next to "collapsed" and the signature. The panel reads them
+// again when WhatsApp's window gets the focus back.
+async function loadShortcuts() {
+  const prefs = (await chrome.storage.local.get("prefs")).prefs || {};
+  el("shortcuts").checked = prefs.shortcuts !== false;
+}
+
+el("shortcuts").addEventListener("change", async () => {
+  const prefs = (await chrome.storage.local.get("prefs")).prefs || {};
+  await chrome.storage.local.set({ prefs: { ...prefs, shortcuts: el("shortcuts").checked } });
+});
+void loadShortcuts();
