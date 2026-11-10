@@ -978,6 +978,84 @@
   background: var(--crmc-surface);
 }
 
+/* "Enviar agora | Agendar", and the time fields under it. */
+#crm-connector-panel .crmc-mode:not([hidden]) {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+#crm-connector-panel .crmc-mode-btn {
+  flex: 1;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--crmc-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-mode-btn.crmc-mode-on {
+  border-color: var(--crmc-primary);
+  background: var(--crmc-primary);
+  color: var(--crmc-primary-fg);
+}
+
+#crm-connector-panel .crmc-when:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 10px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-when-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-when-at {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-when-text {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+#crm-connector-panel .crmc-when .crmc-when-send {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-sched:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+#crm-connector-panel .crmc-sched-done {
+  opacity: 0.6;
+}
+
 /* "Assinar como [nome]", under the search. */
 #crm-connector-panel .crmc-sign {
   display: flex;
@@ -997,7 +1075,8 @@
   cursor: pointer;
 }
 
-#crm-connector-panel .crmc-sign-on {
+#crm-connector-panel .crmc-sign-on,
+#crm-connector-panel .crmc-when-noreply {
   margin: 0;
   accent-color: var(--crmc-primary);
 }

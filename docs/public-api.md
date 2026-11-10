@@ -214,7 +214,9 @@ All three endpoints need `messages:send`.
 
 - `GET /api/v1/sequences?contact_id=<uuid>` — the active sequences:
   `{ "id", "name", "description", "messages", "duration_minutes",
-  "running" }`. `running` is for the contact given (false without one).
+  "stop_on_reply", "running" }`. `running` is for the contact given
+  (false without one). `stop_on_reply`: after each wait, the sequence
+  ends there if the customer wrote since it started.
 - `POST /api/v1/sequences/{id}/start` with `{ "contact_id" }` — sends
   the first messages now; the scheduler (`/api/automations/cron`)
   carries on after each wait. `201 { "data": { "log_id" } }`. Refused
@@ -225,6 +227,28 @@ All three endpoints need `messages:send`.
 - `POST /api/v1/sequences/{id}/stop` with `{ "contact_id" }` — drops
   what was still waiting to be sent. `{ "data": { "stopped": n } }`,
   `0` when it wasn't running.
+
+### Scheduled messages
+
+One message to one contact at a set time — a text, or a quick reply's
+file with its caption — sent by the CRM's scheduler
+(`/api/automations/cron`) through the same send core as the inbox.
+Needs migration `064`; before it these answer `503 unavailable`. All
+need `messages:send`.
+
+- `GET /api/v1/contacts/{id}/scheduled-messages` — what is waiting,
+  soonest first, then the last 5 done: `{ "id", "text", "media",
+  "send_at", "only_if_no_reply", "status", "outcome", "created_at" }`.
+  `status` is `scheduled`, `sending`, `sent`, `skipped`, `cancelled` or
+  `failed`; `outcome` says why it was skipped or failed.
+- `POST /api/v1/contacts/{id}/scheduled-messages` with `{ "text",
+  "quick_reply_id"?, "send_at", "only_if_no_reply"? }` — `send_at` from
+  1 minute to 90 days ahead; `quick_reply_id` takes that reply's file
+  (`text` is then the caption). With `only_if_no_reply` it is a
+  follow-up: skipped if the customer writes before `send_at`. At most
+  20 waiting per contact (`409 too_many`). `201` with the message.
+- `DELETE /api/v1/scheduled-messages/{id}` — cancel one that has not
+  gone yet (`409 not_scheduled` otherwise).
 
 ### `GET /api/v1/contacts`
 

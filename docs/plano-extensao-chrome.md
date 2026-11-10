@@ -420,9 +420,23 @@ Riscos próprios desta etapa:
   bloqueio de número. O funil de mensagens precisa de limite por dia e
   de intervalo mínimo.
 
-**Fase 5 — Agendamento e follow-up.**
-- Mensagem agendada por conversa.
-- Follow-up automático quando o cliente não responde.
+**Fase 5 — Agendamento e follow-up ✅ (feita em 10/11/2026, extensão
+0.14.0, migration 064; feita junto com a 7, a pedido).**
+- **Mensagem agendada:** na lista de respostas, "Enviar agora | Agendar".
+  Dia e hora, um texto escrito ou uma resposta rápida (com o arquivo,
+  se tiver). Sai pelo agendador do CRM (`/api/automations/cron`), pelo
+  mesmo núcleo de envio do inbox, mesmo com o WhatsApp Web fechado.
+  Agendar segue as condições do Enviar. De 1 minuto a 90 dias à frente,
+  até 20 esperando por contato.
+- **Follow-up:** "Só se o cliente não responder até lá" — na hora, a
+  mensagem é pulada se o cliente escreveu depois de agendada.
+- **Sequências:** "Parar se o cliente responder" (nas Automações): depois
+  de cada espera, a sequência confere se o cliente escreveu desde que
+  começou.
+- A ficha do contato no CRM mostra as agendadas (aba Tarefas), com
+  Cancelar. O campo de mensagem do inbox não agenda.
+- API: `/api/v1/contacts/{id}/scheduled-messages` e
+  `/api/v1/scheduled-messages/{id}`, com `messages:send`.
 
 **Fase 6 — Kanban dentro do WhatsApp Web ✅ (em produção desde
 10/11/2026, extensão 0.8.0, PR #18; conferida no WhatsApp real em 10/11,

@@ -160,6 +160,11 @@ const SEND_CONFIRM_MS = 5000;
 // is the one whose "Iniciar" was clicked once and waits for
 // "Confirmar".
 let seqState = { contactId: null, status: "idle", items: [] };
+// Scheduling (Fase 5): "Enviar agora" or "Agendar" in the replies
+// sheet, and what is scheduled for the contact on the panel.
+let sendMode = "now";
+let schedState = { contactId: null, status: "idle", items: [] };
+let scheduling = false;
 let pendingSeq = null;
 let seqBusy = false;
 // What a person calls the file of a quick reply (migration 063).
@@ -223,6 +228,8 @@ let localInputToIso = () => null;
 let signText = (text) => String(text ?? "");
 let cleanSignatureName = (name) => String(name ?? "").trim();
 let describeDuration = () => "";
+let defaultScheduleValue = () => "";
+let describeScheduled = (item) => String(item?.status ?? "");
 // From send-check.js. Without it the panel never offers to send.
 let sendCheck = () => ({ ok: false, why: null });
 
@@ -515,6 +522,10 @@ function ensurePanel() {
     if (action === "reply-use") void useReply(target.getAttribute("data-id"));
     if (action === "reply-send") void sendReply(target.getAttribute("data-id"));
     if (action === "seq-start") void startSequence(target.getAttribute("data-id"));
+    if (action === "mode-now" || action === "mode-later") setSendMode(action === "mode-later" ? "later" : "now");
+    if (action === "reply-schedule") void scheduleReply(target.getAttribute("data-id"));
+    if (action === "schedule-text") void scheduleTyped();
+    if (action === "sched-cancel") void cancelScheduled(target.getAttribute("data-id"));
     if (action === "seq-stop") void stopSequence(target.getAttribute("data-id"));
     if (action === "mytasks-open") setMyTasksOpen(true);
     if (action === "mytasks-close") setMyTasksOpen(false);
@@ -1947,14 +1958,38 @@ function setRepliesOpen(open) {
     <input class="crmc-input crmc-replies-search" type="search" autocomplete="off"
            placeholder="Buscar pelo título ou pelo texto" aria-label="Buscar resposta rápida" />
     <div class="crmc-sign"></div>
+    <div class="crmc-mode" role="group" aria-label="Quando enviar" hidden>
+      <button class="crmc-mode-btn" data-act="mode-now">Enviar agora</button>
+      <button class="crmc-mode-btn" data-act="mode-later">Agendar</button>
+    </div>
+    <div class="crmc-when" hidden>
+      <label class="crmc-when-row">
+        <span>Quando</span>
+        <input class="crmc-input crmc-when-at" type="datetime-local" aria-label="Dia e hora do envio" />
+      </label>
+      <label class="crmc-sign-row">
+        <input type="checkbox" class="crmc-when-noreply" />
+        <span>Só se o cliente não responder até lá</span>
+      </label>
+      <textarea class="crmc-input crmc-when-text" rows="2" maxlength="4096"
+                placeholder="Escreva uma mensagem, ou escolha uma resposta abaixo"
+                aria-label="Mensagem para agendar"></textarea>
+      <button class="crmc-btn crmc-btn-quiet crmc-when-send" data-act="schedule-text">
+        Agendar esta mensagem
+      </button>
+    </div>
     <p class="crmc-replies-status" role="status" aria-live="polite"></p>
     <div class="crmc-replies"></div>
+    <div class="crmc-sched"></div>
     <div class="crmc-seqs"></div>`;
+  const at = sheet().querySelector(".crmc-when-at");
+  if (at) at.value = defaultScheduleValue();
   paintSignature();
   paintReplies();
   sheet().querySelector(".crmc-replies-search")?.focus();
   void loadReplies();
   void loadSequences(true);
+  void loadScheduled(true);
   void loadSender();
 }
 
@@ -1968,6 +2003,10 @@ function setRepliesStatus(message, tone) {
 function paintReplies() {
   const el = sheet()?.querySelector(".crmc-replies");
   if (!el || !repliesOpen) return;
+  // The parts around the list don't wait for it.
+  syncSendMode(currentSendCheck());
+  paintScheduled();
+  paintSequences();
   const mine = repliesState.baseUrl === currentBaseUrl;
   if (!mine || repliesState.status === "loading") {
     el.innerHTML = `<p class="crmc-muted">Carregando…</p>`;
@@ -1995,8 +2034,11 @@ function paintReplies() {
   // A confirmation waiting for another chat is not this chat's.
   if (pendingSend && (!check.ok || pendingSend.chatKey !== currentChat?.key)) clearPendingSend();
   const note = check.ok
-    ? `<p class="crmc-muted crmc-replies-note">Clique numa resposta para colocá-la no campo de
-         mensagem, ou em Enviar para mandar direto pelo CRM.</p>`
+    ? sendMode === "later"
+      ? `<p class="crmc-muted crmc-replies-note">Escolha quando e clique em Agendar numa resposta,
+           ou escreva a mensagem acima.</p>`
+      : `<p class="crmc-muted crmc-replies-note">Clique numa resposta para colocá-la no campo de
+           mensagem, ou em Enviar para mandar direto pelo CRM.</p>`
     : check.why
       ? `<p class="crmc-muted crmc-replies-note">${escapeHtml(check.why)}</p>`
       : "";
@@ -2014,7 +2056,11 @@ function paintReplies() {
             )}</span>`
           : "";
         const confirming = pendingSend?.id === reply.id;
-        const sendButton = check.ok
+        const sendButton = check.ok && sendMode === "later"
+          ? `<button class="crmc-reply-send" data-act="reply-schedule" data-id="${id}"
+                     ${scheduling ? "disabled" : ""}
+                     aria-label="Agendar ${escapeHtml(reply.title)}">Agendar</button>`
+          : check.ok
           ? `<button class="crmc-reply-send${confirming ? " crmc-reply-confirm" : ""}"
                      data-act="reply-send" data-id="${id}"
                      ${sendingReply ? "disabled" : ""}
@@ -2031,7 +2077,188 @@ function paintReplies() {
           </div>`;
       })
       .join("") + manage;
-  paintSequences();
+}
+
+// ------------------------------------------------------------
+// Scheduling (Fase 5)
+//
+// "Agendar" turns the replies into things to send later, from the
+// CRM's number, at a chosen time; "Só se o cliente não responder até
+// lá" makes it a follow-up. What is scheduled for the contact is
+// listed under the replies, with Cancelar. A schedule can be undone,
+// so it takes one click, not two.
+// ------------------------------------------------------------
+
+/** Show the now/later switch and the time fields when sending is on. */
+function syncSendMode(check) {
+  const root = sheet();
+  if (!root) return;
+  const mode = root.querySelector(".crmc-mode");
+  const when = root.querySelector(".crmc-when");
+  if (!check.ok && sendMode === "later") sendMode = "now";
+  if (mode) mode.hidden = !check.ok;
+  if (when) when.hidden = !check.ok || sendMode !== "later";
+  for (const button of root.querySelectorAll(".crmc-mode-btn")) {
+    const on = button.getAttribute("data-act") === (sendMode === "later" ? "mode-later" : "mode-now");
+    button.classList.toggle("crmc-mode-on", on);
+    button.setAttribute("aria-pressed", String(on));
+  }
+}
+
+function setSendMode(mode) {
+  sendMode = mode === "later" ? "later" : "now";
+  clearPendingSend();
+  clearPendingSeq();
+  setRepliesStatus("");
+  paintReplies();
+}
+
+/** The time and follow-up choice in the fields, or an error to say. */
+function readScheduleFields() {
+  const root = sheet();
+  const iso = localInputToIso(root?.querySelector(".crmc-when-at")?.value);
+  if (!iso) return { error: "Escolha o dia e a hora do envio." };
+  if (Date.parse(iso) < Date.now() + 60_000) {
+    return { error: "Escolha um horário daqui a pelo menos 1 minuto." };
+  }
+  return { sendAt: iso, onlyIfNoReply: Boolean(root?.querySelector(".crmc-when-noreply")?.checked) };
+}
+
+async function submitSchedule({ title, text, quickReplyId }) {
+  const contactId = currentContact?.id;
+  if (scheduling || !contactId || !currentSendCheck().ok) return false;
+  const fields = readScheduleFields();
+  if (fields.error) {
+    setRepliesStatus(fields.error, "error");
+    return false;
+  }
+  scheduling = true;
+  paintReplies();
+  const result = await send("schedule", {
+    contactId,
+    text,
+    quickReplyId,
+    sendAt: fields.sendAt,
+    onlyIfNoReply: fields.onlyIfNoReply,
+  });
+  scheduling = false;
+  paintReplies();
+  if (result.ok) {
+    const when = describeScheduled(result.data);
+    setRepliesStatus(`${title} agendada: ${when}.`);
+  } else {
+    setRepliesStatus(`Não agendei: ${failureText(result, "agendar mensagens")}`, "error");
+  }
+  await loadScheduled(true);
+  return result.ok;
+}
+
+/** Schedule a quick reply: its text, or its file with the caption. */
+async function scheduleReply(replyId) {
+  const reply = repliesState.items.find((r) => r.id === replyId);
+  if (!reply) return;
+  const { text, missing } = fillTemplate(reply.text, replyContact());
+  if (missing.length) {
+    setRepliesStatus(
+      "Faltou preencher " +
+        missing.map((v) => `{{${v}}}`).join(", ") +
+        ". Escreva a mensagem no campo acima para agendar.",
+      "error",
+    );
+    return;
+  }
+  // An empty caption stays empty: a signature alone is not a message.
+  const signed = signText(text, signatureName());
+  await submitSchedule({
+    title: `“${reply.title}”`,
+    text: signed,
+    quickReplyId: reply.media ? reply.id : null,
+  });
+}
+
+/** Schedule what was typed in the field. */
+async function scheduleTyped() {
+  const field = sheet()?.querySelector(".crmc-when-text");
+  const typed = field?.value?.trim() ?? "";
+  if (!typed) {
+    setRepliesStatus("Escreva a mensagem, ou clique em Agendar numa resposta.", "error");
+    return;
+  }
+  const ok = await submitSchedule({
+    title: "Mensagem",
+    text: signText(typed, signatureName()),
+    quickReplyId: null,
+  });
+  if (ok && field) field.value = "";
+}
+
+/** Ask the CRM what is scheduled for the contact on the panel. */
+async function loadScheduled(force = false) {
+  const contactId = currentContact?.id ?? null;
+  if (!repliesOpen) return;
+  if (!force && schedState.contactId === contactId && schedState.status !== "idle") return;
+  if (!contactId) {
+    schedState = { contactId: null, status: "idle", items: [] };
+    paintScheduled();
+    return;
+  }
+  if (schedState.contactId !== contactId) {
+    schedState = { contactId, status: "loading", items: [] };
+    paintScheduled();
+  }
+  const result = await send("scheduled", { contactId });
+  if (currentContact?.id !== contactId) return;
+  schedState = result.ok
+    ? { contactId, status: "ready", items: Array.isArray(result.data) ? result.data : [] }
+    : // 503 before migration 064, 403 before 062: nothing to show.
+      { contactId, status: "error", items: [] };
+  paintScheduled();
+}
+
+function paintScheduled() {
+  const el = sheet()?.querySelector(".crmc-sched");
+  if (!el || !repliesOpen) return;
+  if ((currentContact?.id ?? null) !== schedState.contactId) {
+    el.innerHTML = "";
+    void loadScheduled();
+    return;
+  }
+  if (schedState.status !== "ready" || !schedState.items.length) {
+    el.innerHTML = "";
+    return;
+  }
+  const waiting = schedState.items.filter((m) => m.status === "scheduled" || m.status === "sending");
+  const done = schedState.items.filter((m) => m.status !== "scheduled" && m.status !== "sending").slice(0, 3);
+  el.innerHTML = `
+    <p class="crmc-name crmc-seqs-title">Agendadas</p>
+    ${[...waiting, ...done]
+      .map((m) => {
+        const label = m.media && MEDIA_LABELS[m.media.kind] ? MEDIA_LABELS[m.media.kind] : "";
+        const preview = [label, m.text].filter(Boolean).join(" · ") || "Mensagem";
+        const cancel =
+          m.status === "scheduled"
+            ? `<button class="crmc-reply-send" data-act="sched-cancel" data-id="${escapeHtml(m.id)}"
+                       aria-label="Cancelar mensagem agendada">Cancelar</button>`
+            : "";
+        const quiet = m.status === "scheduled" || m.status === "sending" ? "" : " crmc-sched-done";
+        return `
+          <div class="crmc-reply-row crmc-seq${quiet}">
+            <div class="crmc-result crmc-seq-main">
+              <span class="crmc-reply-file">${escapeHtml(describeScheduled(m))}</span>
+              <span class="crmc-reply-text">${escapeHtml(preview)}</span>
+            </div>${cancel}
+          </div>`;
+      })
+      .join("")}`;
+}
+
+async function cancelScheduled(id) {
+  const result = await send("cancelScheduled", { id });
+  setRepliesStatus(
+    result.ok ? "Mensagem agendada cancelada." : `Não cancelei: ${failureText(result, "cancelar")}`,
+    result.ok ? undefined : "error",
+  );
+  await loadScheduled(true);
 }
 
 // ------------------------------------------------------------
@@ -2090,7 +2317,9 @@ function paintSequences() {
       .map((seq) => {
         const id = escapeHtml(seq.id);
         const plural = seq.messages === 1 ? "mensagem" : "mensagens";
-        const summary = `${seq.messages} ${plural} · ${describeDuration(seq.duration_minutes)}`;
+        const summary =
+          `${seq.messages} ${plural} · ${describeDuration(seq.duration_minutes)}` +
+          (seq.stop_on_reply ? " · para se responder" : "");
         const confirming = pendingSeq?.id === seq.id;
         const action = seq.running
           ? `<button class="crmc-reply-send" data-act="seq-stop" data-id="${id}" ${seqBusy ? "disabled" : ""}
@@ -2963,6 +3192,8 @@ void (async () => {
     signText = format.signText;
     cleanSignatureName = format.cleanSignatureName;
     describeDuration = format.describeDuration;
+    defaultScheduleValue = format.defaultScheduleValue;
+    describeScheduled = format.describeScheduled;
   } catch {
     // The fallbacks above stand in.
   }

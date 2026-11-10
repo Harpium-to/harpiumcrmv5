@@ -864,6 +864,23 @@ function TriggerCard({
                 />
               </div>
             )}
+            {type === "manual" && (
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={config.stop_on_reply === true}
+                  onChange={(e) => onConfigChange({ ...config, stop_on_reply: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span>
+                  Parar se o cliente responder
+                  <span className="block text-[11px] text-muted-foreground">
+                    Depois de cada espera, a sequência confere se o cliente escreveu desde que ela
+                    começou. Se escreveu, ela para ali.
+                  </span>
+                </span>
+              </label>
+            )}
             {type === "time_based" && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
