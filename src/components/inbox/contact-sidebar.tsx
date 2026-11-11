@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useTranslations } from "next-intl";
+import { ContactAppointments } from "@/components/agenda/contact-appointments";
 
 interface ContactSidebarProps {
   contact: Contact | null;
@@ -181,6 +182,14 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
 
           {/* Divider */}
           <div className="my-4 border-t border-border" />
+
+          {/* Agenda (067): their appointments, and booking from the
+              conversation. Renders nothing — rule included — in a CRM
+              that has no agenda. */}
+          <ContactAppointments
+            contact={{ id: contact.id, name: contact.name ?? null, phone: contact.phone ?? null }}
+            divider
+          />
 
           {/* Tags */}
           <div>

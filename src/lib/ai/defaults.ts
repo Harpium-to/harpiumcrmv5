@@ -54,8 +54,15 @@ export function buildSystemPrompt(args: {
   mode: 'draft' | 'auto_reply'
   /** Knowledge-base excerpts retrieved for the current question. */
   knowledge?: string[]
+  /**
+   * Capabilities this agent was granted, each a ready-made section —
+   * today the agenda (lib/agenda/ai.ts). They are the scaffold's own
+   * words, not the customer's or the operator's, so they rank as
+   * instructions.
+   */
+  capabilities?: string[]
 }): string {
-  const { userPrompt, mode, knowledge } = args
+  const { userPrompt, mode, knowledge, capabilities } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -74,6 +81,10 @@ export function buildSystemPrompt(args: {
 
   if (userPrompt && userPrompt.trim()) {
     parts.push(`Business context and instructions:\n${userPrompt.trim()}`)
+  }
+
+  for (const capability of capabilities ?? []) {
+    if (capability.trim()) parts.push(capability.trim())
   }
 
   if (knowledge && knowledge.length > 0) {

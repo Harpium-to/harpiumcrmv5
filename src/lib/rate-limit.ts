@@ -167,6 +167,14 @@ export const RATE_LIMITS = {
    *  capping a stampede; excess inbounds simply don't get an auto-reply
    *  (they still land in the inbox for a human). */
   aiAutoReplyAccount: { limit: 30, windowMs: 60_000 },
+  /** The public booking page reading an agenda's free slots (per IP).
+   *  A person picking a day reloads a few times; 60/min is far above
+   *  that and still makes guessing tokens pointless. */
+  publicAgendaRead: { limit: 60, windowMs: 60_000 },
+  /** A booking made from the public link (per IP). Nobody books more
+   *  than a handful of appointments in a minute; this is what stops a
+   *  script from filling someone's week. */
+  publicAgendaBook: { limit: 6, windowMs: 60_000 },
 } as const;
 
 /** Test-only helper. Clears the in-memory state so unit tests don't

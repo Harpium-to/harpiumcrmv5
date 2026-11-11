@@ -42,6 +42,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { ContactTasks } from '@/components/contacts/contact-tasks';
 import { ContactScheduled } from '@/components/contacts/contact-scheduled';
+import { ContactAppointments } from '@/components/agenda/contact-appointments';
 import { ContactOptOut } from '@/components/contacts/contact-opt-out';
 
 interface ContactDetailViewProps {
@@ -598,6 +599,16 @@ export function ContactDetailView({
 
               {/* Tasks Tab */}
               <TabsContent value="tasks" className="flex-1 overflow-y-auto px-4 py-3">
+                {/* The contact's appointments (067). Renders nothing in a
+                    CRM that has no agenda. */}
+                <ContactAppointments
+                  contact={
+                    contactId
+                      ? { id: contactId, name: contact.name ?? null, phone: contact.phone ?? null }
+                      : null
+                  }
+                  className="mb-6"
+                />
                 <ContactTasks
                   key={contactId}
                   contactId={contactId}

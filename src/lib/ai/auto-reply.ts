@@ -26,6 +26,17 @@ import {
 import type { Agent } from '@/lib/agents/types'
 import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { decide, toAutonomy, type ApprovalReason } from '@/lib/agents/autonomy'
+import { requestApproval } from '@/lib/agents/approvals'
+import {
+  agendaPrompt,
+  bookForAi,
+  BOOKING_FALLBACK,
+  describeSlot,
+  loadAgendaForAi,
+  parseBookingMarker,
+  type AgendaForAi,
+} from '@/lib/agenda/ai'
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -380,10 +391,47 @@ export async function dispatchInboundToAiReply(
       // Ground the reply in the account's knowledge base (best-effort).
       const knowledge = await retrieveKnowledge(db, accountId, config, inbound)
 
+      // The agenda, for an agent that was handed the "Agenda" tool
+      // (lib/agenda/ai.ts). The single assistant has no tools, so it
+      // is never told about scheduling. Best-effort: a problem reading
+      // the agenda must cost the customer nothing but that topic.
+      let scheduling: {
+        agenda: AgendaForAi
+        needsApproval: boolean
+        reason: ApprovalReason | null
+      } | null = null
+      if (agent) {
+        const verdict = decide(
+          {
+            autonomy: toAutonomy(agent.autonomy),
+            tools: agent.tools,
+            requireApprovalFor: agent.requireApprovalFor,
+          },
+          'schedule_meeting',
+        )
+        if (verdict.allowed) {
+          try {
+            const agenda = await loadAgendaForAi(db, accountId, contactId, new Date())
+            if (agenda) {
+              scheduling = {
+                agenda,
+                needsApproval: verdict.needsApproval,
+                reason: verdict.needsApproval ? verdict.reason : null,
+              }
+            }
+          } catch (err) {
+            console.error('[ai auto-reply] could not load the agenda:', err)
+          }
+        }
+      }
+
       const systemPrompt = buildSystemPrompt({
         userPrompt: composePrompt(config, agent),
         mode: 'auto_reply',
         knowledge,
+        capabilities: scheduling
+          ? [agendaPrompt(scheduling.agenda, { needsApproval: scheduling.needsApproval })]
+          : undefined,
       })
 
       // An agent may run on its own model (a cheap one for the FAQ, a
@@ -393,11 +441,68 @@ export async function dispatchInboundToAiReply(
           ? { ...config, model: agent.model }
           : config
 
-      const { text, handoff, usage } = await generateReply({
+      const generated = await generateReply({
         config: callConfig,
         systemPrompt,
         messages,
       })
+      const { handoff, usage } = generated
+      // A booking marker never reaches the customer, whether or not
+      // this agent may book.
+      const { text, booking } = parseBookingMarker(generated.text)
+
+      /**
+       * Act on the agent's request to book, and return what the
+       * customer should read: the agent's own words when the booking
+       * (or the reservation a person will approve) went through, a
+       * plain sentence when it did not — its words would then be a
+       * promise nobody kept.
+       */
+      const settleBooking = async (reply: string): Promise<string> => {
+        if (!booking || !scheduling || !agent) return reply
+        const outcome = await bookForAi(db, {
+          accountId,
+          contactId,
+          agenda: scheduling.agenda,
+          request: booking,
+          needsApproval: scheduling.needsApproval,
+          agentName: agent.name,
+        })
+        if (outcome.status === 'booked') return reply
+        if (outcome.status !== 'pending') return BOOKING_FALLBACK[outcome.status]
+
+        // Held as pending: ask a person. The request points at the
+        // appointment, and the database keeps the two in step (067).
+        const { data: who } = await db
+          .from('contacts')
+          .select('name, phone')
+          .eq('id', contactId)
+          .maybeSingle()
+        const customer =
+          (who as { name?: string | null; phone?: string | null } | null)?.name?.trim() ||
+          (who as { phone?: string | null } | null)?.phone ||
+          'o cliente'
+        await requestApproval(db, {
+          accountId,
+          agentId: agent.id,
+          agentName: agent.name,
+          taskId: null,
+          contactId,
+          kind: 'schedule_meeting',
+          summary:
+            outcome.calendar && outcome.slot
+              ? `Marcar ${customer} com ${outcome.calendar.name}: ${describeSlot(outcome.calendar, outcome.slot)}. O horário já está reservado.`
+              : `Marcar ${customer}. O horário já está reservado.`,
+          payload: {
+            event_id: outcome.eventId,
+            calendar_name: outcome.calendar?.name ?? null,
+            starts_at: outcome.slot?.start.toISOString() ?? null,
+            conversation_id: conversationId,
+            reason: scheduling.reason,
+          },
+        })
+        return reply
+      }
 
       // Record token spend on the account's BYO key. Fire-and-forget so
       // it never adds latency to the customer-facing send: `logAiUsage`
@@ -476,12 +581,16 @@ export async function dispatchInboundToAiReply(
         return
       }
 
+      // After the reply slot is claimed, so a reply that will not be
+      // sent never leaves a booking behind.
+      const reply = await settleBooking(text)
+
       await sendChannelText({
         accountId,
         userId: configOwnerUserId,
         conversationId,
         contactId,
-        text,
+        text: reply,
         aiGenerated: true,
       })
 
@@ -498,7 +607,7 @@ export async function dispatchInboundToAiReply(
       if (run) {
         await finishAgentRun(db, run, {
           status: 'replied',
-          output: text,
+          output: reply,
           usage,
         })
       }
