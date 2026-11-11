@@ -177,6 +177,19 @@ O mesmo `automations/cron` envia as **mensagens agendadas** e os
 hora marcada elas saem: com ele a cada 10 minutos, uma mensagem pode
 sair até 10 minutos depois.
 
+É ele também que envia os **avisos da agenda** (migration 067): o
+lembrete antes do horário e, como garantia, a confirmação de quem
+marcou. A confirmação sai na hora pela própria tela; o lembrete só sai
+pelo agendador, então com ele parado ninguém é lembrado.
+
+A agenda tem dois endereços que funcionam **sem login**, cada um atrás
+de um código secreto e desligado até um administrador ligar na agenda:
+`/marcar/<código>` (o cliente marca um horário) e
+`/api/agenda/feed/<código>.ics` (a agenda para acompanhar no Google
+Agenda, Apple ou Outlook). Se houver um firewall ou uma regra de acesso
+na frente do site, esses dois caminhos e `/api/public/agenda/` precisam
+ficar abertos.
+
 **Com o cron-job.org** (gratuito): crie um job para cada endpoint. Em
 **Advanced › Headers**, adicione `x-cron-secret` com o seu segredo.
 Para conferir: a resposta deve ser `200`. `401` é segredo errado e

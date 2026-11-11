@@ -734,6 +734,24 @@ html[data-theme="rose"] {
     color: var(--primary-foreground);
     box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.12);
   }
+
+  /* The agenda grid. Outside opening hours is a flat dim — it is
+   * still bookable (um encaixe), so it must not read as disabled.
+   * A block is hatched: it is the one thing on the grid that is
+   * deliberately not an appointment, and should look like it. */
+  .agenda-closed {
+    background-color: color-mix(in oklab, var(--foreground) 5%, transparent);
+  }
+
+  .agenda-block {
+    background-color: color-mix(in oklab, var(--foreground) 7%, transparent);
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in oklab, var(--foreground) 9%, transparent) 6px 7px
+    );
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
 }
 
 /* Motion sensitivity is a real accessibility need, and a reveal that

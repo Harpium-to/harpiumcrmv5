@@ -4,6 +4,7 @@ import { resumePendingExecution } from '@/lib/automations/engine'
 import type { AutomationContext } from '@/lib/automations/engine'
 import { emitTaskReminders } from '@/lib/tasks/reminders'
 import { processScheduledMessages } from '@/lib/scheduled/messages'
+import { processCalendarNotifications } from '@/lib/agenda/messages'
 
 /**
  * Drain due `automation_pending_executions` rows. Meant to be hit
@@ -19,8 +20,10 @@ import { processScheduledMessages } from '@/lib/scheduled/messages'
  * The same tick also sends the reminders of tasks that came due
  * (migration 060, src/lib/tasks/reminders.ts) and the messages
  * scheduled for contacts (migration 064, src/lib/scheduled/messages.ts),
- * so they need no scheduler job of their own. Both run first and never
- * throw: nothing about them can hold the automations back.
+ * and the agenda's confirmations and reminders (migration 067,
+ * src/lib/agenda/messages.ts), so they need no scheduler job of their
+ * own. They run first and never throw: nothing about them can hold the
+ * automations back.
  */
 export async function GET(request: Request) {
   const expected = process.env.AUTOMATION_CRON_SECRET
@@ -35,6 +38,7 @@ export async function GET(request: Request) {
   const admin = supabaseAdmin()
   const task_reminders = await emitTaskReminders(admin)
   const scheduled_messages = await processScheduledMessages(admin)
+  const agenda_messages = await processCalendarNotifications(admin)
 
   const { data: due, error } = await admin
     .from('automation_pending_executions')
@@ -46,7 +50,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0) {
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages })
   }
 
   let processed = 0
@@ -77,5 +81,5 @@ export async function GET(request: Request) {
     processed++
   }
 
-  return NextResponse.json({ processed, task_reminders, scheduled_messages })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages })
 }

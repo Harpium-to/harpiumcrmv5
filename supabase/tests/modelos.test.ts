@@ -86,6 +86,8 @@ describe('053 — applying a template', () => {
       custom_fields: 4,
       quick_replies: 5,
       automations: 2,
+      // The clinic's agenda (067).
+      calendars: 1,
       skipped: 0,
     })
     const stages = await sql<{ name: string }>(
@@ -143,7 +145,8 @@ describe('053 — applying a template', () => {
       custom_fields: 0,
       quick_replies: 0,
       automations: 0,
-      skipped: 17,
+      calendars: 0,
+      skipped: 18,
     })
   })
 
