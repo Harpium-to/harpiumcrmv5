@@ -44,12 +44,33 @@ export interface TemplateAutomation {
   trigger_config?: Record<string, unknown>
   steps: TemplateStep[]
 }
+/** One stretch of an agenda's opening hours (migration 067). */
+export interface TemplateCalendarHours {
+  /** ISO weekday, 1 = Monday … 7 = Sunday. */
+  weekday: number
+  /** "HH:MM" */
+  starts: string
+  ends: string
+}
+/**
+ * An agenda the template creates. Only what travels between CRMs: no
+ * messages, public link or feed — those stay off until the client's
+ * own admin turns them on.
+ */
+export interface TemplateCalendar {
+  name: string
+  color?: string
+  slot_minutes?: number
+  hours: TemplateCalendarHours[]
+}
 export interface TemplateContent {
   pipelines: TemplatePipeline[]
   tags: TemplateTag[]
   custom_fields: TemplateField[]
   quick_replies: TemplateQuickReply[]
   automations: TemplateAutomation[]
+  /** Present only when the template has agendas. */
+  calendars?: TemplateCalendar[]
 }
 
 export const TEMPLATE_TRIGGERS = [
@@ -228,8 +249,71 @@ export function parseTemplateContent(value: unknown): Result {
   })
   dupes(automations.map((a) => a.name).filter(Boolean), 'Automação')
 
+  const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/
+  const calendars: TemplateCalendar[] = list('calendars').map((c, i) => {
+    if (!isObj(c) || !str(c.name)) {
+      errors.push(`Agenda ${i + 1}: precisa de nome.`)
+      return { name: '', hours: [] }
+    }
+    const name = str(c.name)
+    const where = `Agenda "${name}"`
+    let slot: number | undefined
+    if (c.slot_minutes !== undefined) {
+      if (!Number.isInteger(c.slot_minutes) || (c.slot_minutes as number) < 5 || (c.slot_minutes as number) > 480) {
+        errors.push(`${where}: "slot_minutes" precisa ser um inteiro entre 5 e 480.`)
+      } else {
+        slot = c.slot_minutes as number
+      }
+    }
+    const hoursRaw = c.hours === undefined ? [] : c.hours
+    if (!Array.isArray(hoursRaw)) errors.push(`${where}: "hours" precisa ser uma lista.`)
+    const hours = (Array.isArray(hoursRaw) ? hoursRaw : []).flatMap((h, j): TemplateCalendarHours[] => {
+      const at = `${where}, horário ${j + 1}`
+      if (!isObj(h)) {
+        errors.push(`${at}: precisa de "weekday", "starts" e "ends".`)
+        return []
+      }
+      const weekday = h.weekday
+      if (!Number.isInteger(weekday) || (weekday as number) < 1 || (weekday as number) > 7) {
+        errors.push(`${at}: "weekday" vai de 1 (segunda) a 7 (domingo).`)
+        return []
+      }
+      const starts = str(h.starts)
+      const ends = str(h.ends)
+      if (!CLOCK.test(starts) || !CLOCK.test(ends)) {
+        errors.push(`${at}: "starts" e "ends" no formato HH:MM.`)
+        return []
+      }
+      if (ends <= starts) {
+        errors.push(`${at}: o fim precisa ser depois do início.`)
+        return []
+      }
+      return [{ weekday: weekday as number, starts, ends }]
+    })
+    const tint = color(c.color, where)
+    return {
+      name,
+      ...(tint ? { color: tint } : {}),
+      ...(slot !== undefined ? { slot_minutes: slot } : {}),
+      hours,
+    }
+  })
+  dupes(calendars.map((c) => c.name).filter(Boolean), 'Agenda')
+
   if (errors.length > 0) return { ok: false, errors }
-  return { ok: true, content: { pipelines, tags, custom_fields, quick_replies, automations } }
+  return {
+    ok: true,
+    content: {
+      pipelines,
+      tags,
+      custom_fields,
+      quick_replies,
+      automations,
+      // Left out when empty, so a template with no agenda stores
+      // exactly what it did before agendas existed.
+      ...(calendars.length > 0 ? { calendars } : {}),
+    },
+  }
 }
 
 export interface TemplateCounts {
@@ -239,6 +323,8 @@ export interface TemplateCounts {
   customFields: number
   quickReplies: number
   automations: number
+  /** Agendas (migration 067). Absent on counts taken before them. */
+  calendars?: number
 }
 
 /** Counts for a stored template — tolerant of any JSON shape. */
@@ -255,6 +341,7 @@ export function templateCounts(content: unknown): TemplateCounts {
     customFields: arr('custom_fields').length,
     quickReplies: arr('quick_replies').length,
     automations: arr('automations').length,
+    calendars: arr('calendars').length,
   }
 }
 
@@ -267,6 +354,8 @@ export function describeCounts(c: TemplateCounts): string {
     p(c.customFields, 'campo', 'campos'),
     p(c.quickReplies, 'resposta rápida', 'respostas rápidas'),
     p(c.automations, 'automação', 'automações'),
+    // Most templates have no agenda: say so only when there is one.
+    ...(c.calendars ? [p(c.calendars, 'agenda', 'agendas')] : []),
   ].join(', ')
 }
 
@@ -280,6 +369,7 @@ export function describeApplySummary(s: Record<string, unknown>): string {
     customFields: n('custom_fields'),
     quickReplies: n('quick_replies'),
     automations: n('automations'),
+    calendars: n('calendars'),
   })
   const skipped = n('skipped')
   return skipped > 0

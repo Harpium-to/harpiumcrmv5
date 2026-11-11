@@ -472,7 +472,17 @@ async function resolveTarget(
     .select('user_id')
     .eq('account_id', accountId)
     .maybeSingle()
-  const ownerUserId = (owner as { user_id?: string } | null)?.user_id
+  // A CRM on the unofficial path (D1) has no Meta config: the CRM's
+  // owner stands in, as the UAZAPI webhook already does for inserts.
+  let ownerUserId = (owner as { user_id?: string } | null)?.user_id
+  if (!ownerUserId) {
+    const { data: account } = await db
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .maybeSingle()
+    ownerUserId = (account as { owner_user_id?: string } | null)?.owner_user_id
+  }
   if (!ownerUserId) return null
 
   if (task.conversationId && task.contactId) {

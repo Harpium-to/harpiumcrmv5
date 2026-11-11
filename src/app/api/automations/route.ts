@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       ...validateTriggerForActivation(effectiveTriggerType, effectiveTriggerConfig ?? {}),
       ...validateStepsForActivation(
         (effectiveSteps ?? []) as unknown as { step_type: string; step_config: Record<string, unknown> }[],
+        effectiveTriggerType,
       ),
     ]
     if (issues.length > 0) {

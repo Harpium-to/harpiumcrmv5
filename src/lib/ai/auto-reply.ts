@@ -4,7 +4,11 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
-import { buildHandoffSummary, type HandoffReason } from './handoff'
+import {
+  DEFAULT_HANDOFF_NOTICE,
+  buildHandoffSummary,
+  type HandoffReason,
+} from './handoff'
 import { describeReplyFailure } from './reply-failure'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
@@ -22,6 +26,17 @@ import {
 import type { Agent } from '@/lib/agents/types'
 import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { decide, toAutonomy, type ApprovalReason } from '@/lib/agents/autonomy'
+import { requestApproval } from '@/lib/agents/approvals'
+import {
+  agendaPrompt,
+  bookForAi,
+  BOOKING_FALLBACK,
+  describeSlot,
+  loadAgendaForAi,
+  parseBookingMarker,
+  type AgendaForAi,
+} from '@/lib/agenda/ai'
 
 interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
@@ -215,6 +230,36 @@ export async function dispatchInboundToAiReply(
     }
 
     /**
+     * Tell the customer the team takes it from here — a silent handoff
+     * left them writing to nobody. Call it only after `handOff` landed,
+     * so a human who took over meanwhile is never talked over. It does
+     * not claim a reply slot: it is the bot's last word on this thread,
+     * not another turn. Returns what the monitor should record.
+     */
+    const sendHandoffNotice = async (
+      notice: string,
+    ): Promise<
+      { status: 'handoff'; output: string } | { status: 'failed'; reason: string }
+    > => {
+      try {
+        await sendChannelText({
+          accountId,
+          userId: configOwnerUserId,
+          conversationId,
+          contactId,
+          text: notice,
+          aiGenerated: true,
+        })
+        return { status: 'handoff', output: notice }
+      } catch (err) {
+        // The thread is paused either way. Record why the customer got
+        // nothing, so the inbox banner can say it and what to fix.
+        console.error('[ai auto-reply] handoff notice failed:', err)
+        return { status: 'failed', reason: describeReplyFailure(err) }
+      }
+    }
+
+    /**
      * The reply budget is spent: hand off instead of going quiet.
      *
      * The settings screen promises exactly this ("ao atingir o limite,
@@ -226,6 +271,8 @@ export async function dispatchInboundToAiReply(
      *
      * `run` is the open run when the cap was discovered at the atomic
      * claim (after generating); null when the cheap pre-check caught it.
+     * A reply generated before losing the claim is dropped: the customer
+     * gets the neutral notice instead.
      */
     const handOffAtCap = async (
       replyCount: number,
@@ -234,10 +281,20 @@ export async function dispatchInboundToAiReply(
     ) => {
       const flipped = await handOff('reply_cap', replyCount)
       // Lost the race to another path that already paused the bot (or
-      // the write failed): this message is simply over the cap.
-      const outcome = flipped
-        ? ({ status: 'handoff', reason: 'reply_cap_reached' } as const)
-        : ({ status: 'skipped', reason: 'reply_cap_reached' } as const)
+      // the write failed): this message is simply over the cap, and
+      // whoever paused it speaks now.
+      let outcome:
+        | { status: 'handoff' | 'skipped'; reason: string; output?: string }
+        | { status: 'failed'; reason: string }
+      if (!flipped) {
+        outcome = { status: 'skipped', reason: 'reply_cap_reached' }
+      } else {
+        const sent = await sendHandoffNotice(DEFAULT_HANDOFF_NOTICE)
+        // Keep the cap reason on a handoff: the banner titles it
+        // "limit reached" from it.
+        outcome =
+          sent.status === 'handoff' ? { ...sent, reason: 'reply_cap_reached' } : sent
+      }
       if (run) {
         await finishAgentRun(db, run, { ...outcome, usage })
       } else if (agent) {
@@ -334,10 +391,47 @@ export async function dispatchInboundToAiReply(
       // Ground the reply in the account's knowledge base (best-effort).
       const knowledge = await retrieveKnowledge(db, accountId, config, inbound)
 
+      // The agenda, for an agent that was handed the "Agenda" tool
+      // (lib/agenda/ai.ts). The single assistant has no tools, so it
+      // is never told about scheduling. Best-effort: a problem reading
+      // the agenda must cost the customer nothing but that topic.
+      let scheduling: {
+        agenda: AgendaForAi
+        needsApproval: boolean
+        reason: ApprovalReason | null
+      } | null = null
+      if (agent) {
+        const verdict = decide(
+          {
+            autonomy: toAutonomy(agent.autonomy),
+            tools: agent.tools,
+            requireApprovalFor: agent.requireApprovalFor,
+          },
+          'schedule_meeting',
+        )
+        if (verdict.allowed) {
+          try {
+            const agenda = await loadAgendaForAi(db, accountId, contactId, new Date())
+            if (agenda) {
+              scheduling = {
+                agenda,
+                needsApproval: verdict.needsApproval,
+                reason: verdict.needsApproval ? verdict.reason : null,
+              }
+            }
+          } catch (err) {
+            console.error('[ai auto-reply] could not load the agenda:', err)
+          }
+        }
+      }
+
       const systemPrompt = buildSystemPrompt({
         userPrompt: composePrompt(config, agent),
         mode: 'auto_reply',
         knowledge,
+        capabilities: scheduling
+          ? [agendaPrompt(scheduling.agenda, { needsApproval: scheduling.needsApproval })]
+          : undefined,
       })
 
       // An agent may run on its own model (a cheap one for the FAQ, a
@@ -347,11 +441,68 @@ export async function dispatchInboundToAiReply(
           ? { ...config, model: agent.model }
           : config
 
-      const { text, handoff, usage } = await generateReply({
+      const generated = await generateReply({
         config: callConfig,
         systemPrompt,
         messages,
       })
+      const { handoff, usage } = generated
+      // A booking marker never reaches the customer, whether or not
+      // this agent may book.
+      const { text, booking } = parseBookingMarker(generated.text)
+
+      /**
+       * Act on the agent's request to book, and return what the
+       * customer should read: the agent's own words when the booking
+       * (or the reservation a person will approve) went through, a
+       * plain sentence when it did not — its words would then be a
+       * promise nobody kept.
+       */
+      const settleBooking = async (reply: string): Promise<string> => {
+        if (!booking || !scheduling || !agent) return reply
+        const outcome = await bookForAi(db, {
+          accountId,
+          contactId,
+          agenda: scheduling.agenda,
+          request: booking,
+          needsApproval: scheduling.needsApproval,
+          agentName: agent.name,
+        })
+        if (outcome.status === 'booked') return reply
+        if (outcome.status !== 'pending') return BOOKING_FALLBACK[outcome.status]
+
+        // Held as pending: ask a person. The request points at the
+        // appointment, and the database keeps the two in step (067).
+        const { data: who } = await db
+          .from('contacts')
+          .select('name, phone')
+          .eq('id', contactId)
+          .maybeSingle()
+        const customer =
+          (who as { name?: string | null; phone?: string | null } | null)?.name?.trim() ||
+          (who as { phone?: string | null } | null)?.phone ||
+          'o cliente'
+        await requestApproval(db, {
+          accountId,
+          agentId: agent.id,
+          agentName: agent.name,
+          taskId: null,
+          contactId,
+          kind: 'schedule_meeting',
+          summary:
+            outcome.calendar && outcome.slot
+              ? `Marcar ${customer} com ${outcome.calendar.name}: ${describeSlot(outcome.calendar, outcome.slot)}. O horário já está reservado.`
+              : `Marcar ${customer}. O horário já está reservado.`,
+          payload: {
+            event_id: outcome.eventId,
+            calendar_name: outcome.calendar?.name ?? null,
+            starts_at: outcome.slot?.start.toISOString() ?? null,
+            conversation_id: conversationId,
+            reason: scheduling.reason,
+          },
+        })
+        return reply
+      }
 
       // Record token spend on the account's BYO key. Fire-and-forget so
       // it never adds latency to the customer-facing send: `logAiUsage`
@@ -371,16 +522,25 @@ export async function dispatchInboundToAiReply(
         // The model can't (or shouldn't) answer — stop auto-replying on
         // this thread and hand it to a human (see `handOff`).
         const flipped = await handOff('model', conv.ai_reply_count ?? 0)
+        if (!flipped) {
+          // Someone paused the bot while the model was thinking (a
+          // human hit "Take over") — it was already handed off, and the
+          // human now speaks for the business.
+          if (run) {
+            await finishAgentRun(db, run, {
+              status: 'skipped',
+              reason: 'handed_off',
+              usage,
+            })
+          }
+          return
+        }
+
+        // The model's own words when it wrote any ("o Marcelo monta sua
+        // proposta"), a neutral default otherwise.
+        const outcome = await sendHandoffNotice(text || DEFAULT_HANDOFF_NOTICE)
         if (run) {
-          await finishAgentRun(
-            db,
-            run,
-            flipped
-              ? { status: 'handoff', usage }
-              : // Someone paused the bot while the model was thinking
-                // (a human hit "Take over") — it was already handed off.
-                { status: 'skipped', reason: 'handed_off', usage },
-          )
+          await finishAgentRun(db, run, { ...outcome, usage })
         }
         return
       }
@@ -421,12 +581,16 @@ export async function dispatchInboundToAiReply(
         return
       }
 
+      // After the reply slot is claimed, so a reply that will not be
+      // sent never leaves a booking behind.
+      const reply = await settleBooking(text)
+
       await sendChannelText({
         accountId,
         userId: configOwnerUserId,
         conversationId,
         contactId,
-        text,
+        text: reply,
         aiGenerated: true,
       })
 
@@ -443,7 +607,7 @@ export async function dispatchInboundToAiReply(
       if (run) {
         await finishAgentRun(db, run, {
           status: 'replied',
-          output: text,
+          output: reply,
           usage,
         })
       }

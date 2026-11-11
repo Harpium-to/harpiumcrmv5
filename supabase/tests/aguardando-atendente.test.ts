@@ -10,9 +10,9 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   activeAccountOf,
   applyMigration,
-  applyMigrationsBefore,
   asUser,
   createDb,
+  migrationFiles,
   signUp,
   sql,
 } from './harness'
@@ -164,17 +164,24 @@ describe('058 — conversations waiting for a person', () => {
 })
 
 describe('058 — backfill of conversations handed off before it', () => {
-  it('marks only the open handoffs nobody answered, from the AI’s last message', async () => {
-    const db = await createDb()
-    await applyMigrationsBefore(db, M058)
+  // Production got 059 onwards first and 058 last, so build it that
+  // way. Done in beforeAll: running every migration takes longer than a
+  // test's own time limit when the whole suite runs in parallel.
+  let db: PGlite
+  let waiting: string, answered: string, closed: string, active: string
+  beforeAll(async () => {
+    db = await createDb()
+    for (const f of migrationFiles()) {
+      if (f !== M058) await applyMigration(db, f)
+    }
     const owner = '00000000-0000-4000-8000-0000000005a1'
     await signUp(db, owner, 'Bia')
     const acct = (await activeAccountOf(db, owner))!
 
-    const waiting = await newConversation(db, acct, owner)
-    const answered = await newConversation(db, acct, owner)
-    const closed = await newConversation(db, acct, owner)
-    const active = await newConversation(db, acct, owner)
+    waiting = await newConversation(db, acct, owner)
+    answered = await newConversation(db, acct, owner)
+    closed = await newConversation(db, acct, owner)
+    active = await newConversation(db, acct, owner)
     for (const conv of [waiting, answered, closed]) {
       await sql(
         db,
@@ -195,7 +202,9 @@ describe('058 — backfill of conversations handed off before it', () => {
       [answered],
     )
     await sql(db, `UPDATE conversations SET status = 'closed' WHERE id = $1`, [closed])
+  })
 
+  it('marks only the open handoffs nobody answered, from the AI’s last message', async () => {
     await applyMigration(db, M058)
 
     expect(new Date((await since(db, waiting))!).toISOString()).toBe('2026-11-09T12:00:00.000Z')

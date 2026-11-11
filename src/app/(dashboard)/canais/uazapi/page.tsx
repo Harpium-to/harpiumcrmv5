@@ -1,59 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  QrCode,
-  Save,
-  Smartphone,
-} from "lucide-react";
+import { AlertTriangle, Loader2, QrCode, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UazapiQrPanel } from "@/components/settings/uazapi-qr-panel";
 
-// UAZAPI channel setup.
+// UAZAPI — manual setup (D1).
 //
-// The point of this page, versus the Evolution one, is that pairing
-// happens here: /connect mints the instance and wires the webhook
-// server-side, then we poll /status for the QR until the phone is
-// linked. The operator never copies a token or a callback URL.
-
-interface StatusPayload {
-  configured: boolean;
-  status: string;
-  connected: boolean;
-  qrcode: string | null;
-  paircode: string | null;
-  phone: string | null;
-  profileName: string | null;
-}
-
-const POLL_MS = 2500;
-// UAZAPI rotates the QR every ~20s and gives up well before this; stop
-// polling so a forgotten tab doesn't hammer the gateway's rate limit.
-const POLL_TIMEOUT_MS = 2 * 60 * 1000;
+// A client chooses the unofficial path in Settings › WhatsApp and
+// pairs on the Harpium's server without seeing any of this. This page
+// is for the agency (or a CRM with a server of its own): the server
+// address and tokens are saved here, then pairing is the same QR panel.
 
 export default function UazapiSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [connecting, setConnecting] = useState(false);
 
   const [baseUrl, setBaseUrl] = useState("");
+  const [savedBaseUrl, setSavedBaseUrl] = useState("");
   const [instanceName, setInstanceName] = useState("");
   const [adminToken, setAdminToken] = useState("");
   const [instanceToken, setInstanceToken] = useState("");
   const [hasAdminToken, setHasAdminToken] = useState(false);
   const [hasInstanceToken, setHasInstanceToken] = useState(false);
   const [enabled, setEnabled] = useState(false);
-
-  const [status, setStatus] = useState<StatusPayload | null>(null);
-  const [polling, setPolling] = useState(false);
-  const pollStartedAt = useRef<number>(0);
+  const [panelKey, setPanelKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +37,7 @@ export default function UazapiSettingsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Falha ao carregar");
       setBaseUrl(json.baseUrl ?? "");
+      setSavedBaseUrl(json.baseUrl ?? "");
       setInstanceName(json.instanceName ?? "");
       setEnabled(Boolean(json.enabled));
       setHasAdminToken(Boolean(json.hasAdminToken));
@@ -72,43 +49,9 @@ export default function UazapiSettingsPage() {
     }
   }, []);
 
-  const refreshStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/uazapi/status");
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Falha ao consultar status");
-      setStatus(json as StatusPayload);
-      return json as StatusPayload;
-    } catch {
-      // A failed poll is not worth a toast on every tick — the banner
-      // keeps showing the last known state.
-      return null;
-    }
-  }, []);
-
   useEffect(() => {
-    void load().then(() => refreshStatus());
-  }, [load, refreshStatus]);
-
-  // Poll while pairing. Stops on success or after POLL_TIMEOUT_MS.
-  useEffect(() => {
-    if (!polling) return;
-    const id = setInterval(async () => {
-      const s = await refreshStatus();
-      if (s?.connected) {
-        setPolling(false);
-        toast.success(
-          s.phone ? `WhatsApp conectado: +${s.phone}` : "WhatsApp conectado",
-        );
-        return;
-      }
-      if (Date.now() - pollStartedAt.current > POLL_TIMEOUT_MS) {
-        setPolling(false);
-        toast.error("Tempo esgotado. Clique em conectar para gerar outro QR.");
-      }
-    }, POLL_MS);
-    return () => clearInterval(id);
-  }, [polling, refreshStatus]);
+    void load();
+  }, [load]);
 
   const save = async () => {
     setSaving(true);
@@ -137,8 +80,10 @@ export default function UazapiSettingsPage() {
         setHasInstanceToken(true);
         setInstanceToken("");
       }
+      setSavedBaseUrl(baseUrl);
       toast.success("Configuração salva");
-      void refreshStatus();
+      // The QR panel re-reads the status of the (possibly new) server.
+      setPanelKey((k) => k + 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao salvar");
     } finally {
@@ -146,39 +91,21 @@ export default function UazapiSettingsPage() {
     }
   };
 
-  const connect = async () => {
-    setConnecting(true);
-    try {
-      const res = await fetch("/api/uazapi/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Falha ao conectar");
-      toast.success("Leia o QR code com o WhatsApp do seu celular");
-      pollStartedAt.current = Date.now();
-      setPolling(true);
-      void refreshStatus();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao conectar");
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const connected = status?.connected === true;
-
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center gap-2">
         <QrCode className="h-6 w-6 text-primary" />
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            WhatsApp via UAZAPI
+            WhatsApp via UAZAPI · configuração manual
           </h1>
           <p className="text-sm text-muted-foreground">
-            Conecte o número lendo um QR code, sem sair do sistema.
+            Para um servidor UAZAPI próprio. O cliente escolhe o WhatsApp
+            não oficial em{" "}
+            <Link href="/settings?tab=whatsapp" className="underline">
+              Configurações › WhatsApp
+            </Link>{" "}
+            e conecta no servidor da Harpium, sem nada disto.
           </p>
         </div>
       </div>
@@ -190,8 +117,9 @@ export default function UazapiSettingsPage() {
           <strong>
             viola os termos da Meta — há risco de banimento do número
           </strong>
-          , principalmente em disparos em massa. Quando o canal está ativo, os
-          envios de texto do inbox saem por ele.
+          , principalmente em disparos em massa. Com o canal ativo, tudo o
+          que o CRM envia por WhatsApp sai por ele, a menos que o CRM tenha
+          escolhido o caminho oficial.
         </p>
       </div>
 
@@ -201,76 +129,11 @@ export default function UazapiSettingsPage() {
         </div>
       ) : (
         <>
-          {/* Connection state + pairing */}
-          <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {connected ? (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                ) : (
-                  <Smartphone className="h-5 w-5 text-muted-foreground" />
-                )}
-                <div>
-                  <p className="font-medium text-foreground">
-                    {connected ? "Conectado" : "Não conectado"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {connected
-                      ? [status?.profileName, status?.phone && `+${status.phone}`]
-                          .filter(Boolean)
-                          .join(" · ") || "Número pareado"
-                      : `Estado: ${status?.status ?? "desconhecido"}`}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                onClick={connect}
-                disabled={connecting || polling || !baseUrl}
-                variant={connected ? "outline" : "default"}
-                className={
-                  connected
-                    ? ""
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
-                }
-              >
-                {connecting || polling ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <QrCode className="h-4 w-4" />
-                )}
-                {connected ? "Reconectar" : "Conectar WhatsApp"}
-              </Button>
-            </div>
-
-            {polling && !connected && (
-              <div className="flex flex-col items-center gap-3 border-t border-border pt-4">
-                {status?.qrcode ? (
-                  <Image
-                    src={status.qrcode}
-                    alt="QR code para parear o WhatsApp"
-                    width={240}
-                    height={240}
-                    unoptimized
-                    className="rounded-lg bg-white p-2"
-                  />
-                ) : status?.paircode ? (
-                  <p className="font-mono text-2xl tracking-widest text-foreground">
-                    {status.paircode}
-                  </p>
-                ) : (
-                  <div className="flex h-[240px] w-[240px] items-center justify-center rounded-lg border border-dashed border-border">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-                <p className="text-center text-xs text-muted-foreground">
-                  No celular: WhatsApp → Aparelhos conectados → Conectar
-                  aparelho. O código se renova sozinho.
-                </p>
-              </div>
-            )}
-          </div>
+          <UazapiQrPanel
+            key={panelKey}
+            canManage
+            canConnect={Boolean(savedBaseUrl)}
+          />
 
           {/* Credentials */}
           <div className="space-y-5 rounded-xl border border-border bg-card p-5">
@@ -282,7 +145,7 @@ export default function UazapiSettingsPage() {
                 className="h-4 w-4 accent-[var(--primary)]"
               />
               <span className="font-medium text-foreground">
-                Ativar canal UAZAPI (roteia os textos por aqui)
+                Ativar canal UAZAPI (o CRM envia por aqui)
               </span>
             </label>
 

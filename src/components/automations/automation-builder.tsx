@@ -138,6 +138,7 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
   { value: "conversation_assigned" },
   { value: "tag_added" },
   { value: "time_based" },
+  { value: "manual" },
 ]
 
 function cid(): string {
@@ -710,7 +711,10 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background">
+    // Sits in the page under the rail and top bar, sized like the flow
+    // editor. It used to be a `fixed inset-0` overlay, which the new
+    // shell's page-enter animation turned into a box of zero height.
+    <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-border bg-background">
       {/* Top bar. At sub-sm widths the "Active" label is hidden and the
           switch moves to the right of the save button, so the name input
           gets maximum width. */}
@@ -859,6 +863,23 @@ function TriggerCard({
                   t={t}
                 />
               </div>
+            )}
+            {type === "manual" && (
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={config.stop_on_reply === true}
+                  onChange={(e) => onConfigChange({ ...config, stop_on_reply: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span>
+                  Parar se o cliente responder
+                  <span className="block text-[11px] text-muted-foreground">
+                    Depois de cada espera, a sequência confere se o cliente escreveu desde que ela
+                    começou. Se escreveu, ela para ali.
+                  </span>
+                </span>
+              </label>
             )}
             {type === "time_based" && (
               <div>

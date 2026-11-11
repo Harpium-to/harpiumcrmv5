@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { effectivePath, isWhatsAppPath, type WhatsAppPath } from '@/lib/channels/whatsapp-route'
+import { getUazapiStatus } from '@/lib/uazapi/api'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { verifyPhoneNumber } from '@/lib/whatsapp/meta-api'
 import { statusReasonMessage } from '@/lib/whatsapp/status-reason'
@@ -79,16 +81,159 @@ export function summarizeWhatsApp(row: WhatsAppConfigRow | null | undefined): Wh
 export async function loadWhatsAppStatuses(
   admin: SupabaseClient,
 ): Promise<Map<string, WhatsAppStatus> | null> {
-  const { data, error } = await admin.from('whatsapp_config').select(STATUS_COLUMNS)
-  if (error) {
-    console.error('[agencia/whatsapp] status list failed:', error)
+  const [meta, paths, uaz] = await Promise.all([
+    admin.from('whatsapp_config').select(STATUS_COLUMNS),
+    // D1. Both reads fail before 061 / 043: the CRMs then read as
+    // official, which is what they were.
+    admin.from('accounts').select('id, whatsapp_path'),
+    admin.from('uazapi_config').select(UAZAPI_COLUMNS),
+  ])
+  if (meta.error) {
+    console.error('[agencia/whatsapp] status list failed:', meta.error)
     return null
   }
   const map = new Map<string, WhatsAppStatus>()
-  for (const row of (data ?? []) as WhatsAppConfigRow[]) {
+  for (const row of (meta.data ?? []) as WhatsAppConfigRow[]) {
     map.set(row.account_id, summarizeWhatsApp(row))
   }
+
+  // CRMs on the unofficial path show the QR-code connection instead.
+  const stored = new Map<string, WhatsAppPath>()
+  for (const r of (paths.error ? [] : (paths.data ?? [])) as { id?: string; whatsapp_path?: unknown }[]) {
+    if (r.id && isWhatsAppPath(r.whatsapp_path)) stored.set(r.id, r.whatsapp_path)
+  }
+  const uazByAccount = new Map<string, UazapiStatusRow>()
+  for (const r of (uaz.error ? [] : (uaz.data ?? [])) as UazapiStatusRow[]) {
+    if (r.account_id) uazByAccount.set(r.account_id, r)
+  }
+  for (const id of new Set([...stored.keys(), ...uazByAccount.keys()])) {
+    const row = uazByAccount.get(id) ?? null
+    const path = effectivePath({
+      path: stored.get(id) ?? null,
+      uazapiReady: isUazapiRowReady(row),
+      evolutionReady: false,
+      metaConfigured: map.get(id)?.state !== undefined && map.get(id)?.state !== 'none',
+    })
+    if (path === 'nao_oficial') map.set(id, summarizeUnofficial(row))
+  }
   return map
+}
+
+// ------------------------------------------------------------
+// The unofficial path (D1): a QR-code connection through UAZAPI.
+// ------------------------------------------------------------
+
+/** The columns of `uazapi_config` the console needs (never the tokens' values). */
+export interface UazapiStatusRow {
+  account_id: string
+  base_url: string | null
+  instance_token: string | null
+  enabled: boolean | null
+  /** Cached gateway state: connected | connecting | disconnected | hibernated. */
+  status: string | null
+  paired_phone?: string | null
+}
+
+const UAZAPI_COLUMNS = 'account_id, base_url, instance_token, enabled, status, paired_phone'
+
+function isUazapiRowReady(row: UazapiStatusRow | null): boolean {
+  return Boolean(row?.enabled && row.base_url && row.instance_token)
+}
+
+/**
+ * The QR-code connection's state, in the order an operator would act:
+ * never paired, switched off, then whatever the phone last reported.
+ * The phone dropping is the common failure (offline for days, logged
+ * out on the phone, or a ban) and the fix is always the client reading
+ * the QR again.
+ */
+export function summarizeUnofficial(row: UazapiStatusRow | null | undefined): WhatsAppStatus {
+  if (!row?.base_url || !row.instance_token) {
+    return { state: 'none', reason: 'O WhatsApp por QR code ainda não foi conectado neste CRM.' }
+  }
+  if (!row.enabled) {
+    return { state: 'attention', reason: 'A conexão por QR code está desligada neste CRM.' }
+  }
+  switch (row.status) {
+    case 'connected':
+      return { state: 'connected', reason: null }
+    case 'connecting':
+      return { state: 'attention', reason: 'O QR code foi gerado, mas ainda não foi lido no celular.' }
+    case 'hibernated':
+      return {
+        state: 'attention',
+        reason: 'A conexão por QR code está pausada. O cliente precisa ler o QR code de novo.',
+      }
+    default:
+      return {
+        state: 'attention',
+        reason:
+          'O celular desconectou. O cliente precisa ler o QR code de novo em Configurações › WhatsApp.',
+      }
+  }
+}
+
+/** Which path one CRM is on, for the detail card. null = official or unknown. */
+async function loadDetailPath(
+  admin: SupabaseClient,
+  accountId: string,
+): Promise<{ path: WhatsAppPath | null; uazapi: UazapiStatusRow | null }> {
+  const [acc, uaz] = await Promise.all([
+    admin.from('accounts').select('whatsapp_path').eq('id', accountId).maybeSingle(),
+    admin.from('uazapi_config').select(UAZAPI_COLUMNS).eq('account_id', accountId).maybeSingle(),
+  ])
+  const raw = acc.error ? null : (acc.data as { whatsapp_path?: unknown } | null)?.whatsapp_path
+  const uazapi = uaz.error ? null : ((uaz.data as UazapiStatusRow | null) ?? null)
+  const path = effectivePath({
+    path: isWhatsAppPath(raw) ? raw : null,
+    uazapiReady: isUazapiRowReady(uazapi),
+    evolutionReady: false,
+    // Unknown here; only the unofficial answer changes what is loaded.
+    metaConfigured: true,
+  })
+  return { path, uazapi }
+}
+
+async function loadUnofficialDetail(
+  admin: SupabaseClient,
+  accountId: string,
+  row: UazapiStatusRow | null,
+  personal: boolean,
+): Promise<WhatsAppDetail> {
+  let status = summarizeUnofficial(row)
+  let phone: WhatsAppPhone | null = null
+  // Ask the gateway, like the official card asks Meta: the cached state
+  // can be hours old when no connection event reached us.
+  if (row?.base_url && row.instance_token && status.state !== 'none') {
+    try {
+      const live = await getUazapiStatus({
+        baseUrl: row.base_url,
+        token: decrypt(row.instance_token),
+      })
+      status = summarizeUnofficial({ ...row, status: live.connected ? 'connected' : live.status })
+      if (live.phone) {
+        phone = {
+          displayPhoneNumber: `+${live.phone}`,
+          verifiedName: live.profileName,
+          qualityRating: null,
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'erro desconhecido'
+      status = {
+        state: 'attention',
+        reason: `Não foi possível consultar a conexão por QR code: ${message}`,
+      }
+    }
+  }
+  return {
+    ...status,
+    phone: personal ? phone : null,
+    lastInboundAt: personal && status.state !== 'none' ? await loadLastInbound(admin, accountId) : null,
+    detailsAllowed: personal,
+    coexistence: false,
+    path: 'nao_oficial',
+  }
 }
 
 export interface WhatsAppPhone {
@@ -106,6 +251,8 @@ export interface WhatsAppDetail extends WhatsAppStatus {
   detailsAllowed: boolean
   /** The number is shared with the WhatsApp Business app on the phone. */
   coexistence: boolean
+  /** D1: the path the CRM is on. Absent/null reads as official. */
+  path?: WhatsAppPath | null
 }
 
 /**
@@ -119,6 +266,12 @@ export async function loadWhatsAppDetail(
   opts: { personal: boolean },
 ): Promise<WhatsAppDetail> {
   const { personal } = opts
+
+  const route = await loadDetailPath(admin, accountId)
+  if (route.path === 'nao_oficial') {
+    return loadUnofficialDetail(admin, accountId, route.uazapi, personal)
+  }
+
   const { data, error } = await admin
     .from('whatsapp_config')
     .select(`${STATUS_COLUMNS}, access_token`)

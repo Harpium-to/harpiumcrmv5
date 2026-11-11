@@ -11,40 +11,27 @@ import { useAuth } from "@/hooks/use-auth";
 import { createClient } from "@/lib/supabase/client";
 import { parseReplyFailure, type ParsedReplyFailure } from "@/lib/ai/reply-failure";
 import { autoReplyStatusFromConfig, type AiConfigSnapshot } from "@/lib/ai/autoreply-status";
+import { createAiConfigSnapshotCache } from "@/lib/ai/config-snapshot-cache";
 import type { AgentRunStatus } from "@/lib/agents/types";
 
 // ------------------------------------------------------------
-// The account's AI config is the same for every conversation, so cache
-// it per account and reuse it across thread switches instead of hitting
-// /api/ai/config every time the agent opens a chat. What it means for a
-// given thread depends on that thread's channel, so the status itself
-// is derived per thread from the cached snapshot.
-//
-// Keyed by accountId (a multi-account user switching workspaces must not
-// see the previous account's status), and only *successful* fetches are
-// cached — a transient failure returns null without poisoning the
-// cache, so it retries on the next thread open rather than hiding the
-// banner for the whole session.
+// The account's AI config is the same for every conversation, so the
+// threads share one short-lived copy per account (see
+// `config-snapshot-cache`: reused while fresh, read again after, so
+// turning the agent on or off reaches an inbox that is already open).
+// What it means for a given thread depends on that thread's channel,
+// so the status itself is derived per thread from the snapshot.
 // ------------------------------------------------------------
 // `agentMode` (an active agent speaks on this thread's channel) matters
 // twice: it turns the banner on even with the single-assistant switch
 // off — the dispatcher never reads that switch in agent mode — and it
 // is what makes `agent_runs` exist for the failure notice to read.
-const configCache = new Map<string, AiConfigSnapshot>();
-
-async function fetchAiConfigSnapshot(accountId: string): Promise<AiConfigSnapshot | null> {
-  const cached = configCache.get(accountId);
-  if (cached) return cached;
-  try {
+const aiConfigSnapshots = createAiConfigSnapshotCache({
+  load: async () => {
     const res = await fetch("/api/ai/config", { cache: "no-store" });
-    if (!res.ok) return null; // don't cache a transient failure
-    const snapshot = (await res.json()) as AiConfigSnapshot;
-    configCache.set(accountId, snapshot);
-    return snapshot;
-  } catch {
-    return null; // don't cache
-  }
-}
+    return res.ok ? ((await res.json()) as AiConfigSnapshot) : null;
+  },
+});
 
 // ------------------------------------------------------------
 // The last thing the bot did on this thread, from `agent_runs`.
@@ -202,14 +189,24 @@ export function AiThreadBanner({
   // is a new run and shows again.
   const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
 
+  // Asked on every thread opened and whenever the tab comes back into
+  // view; the shared copy answers from memory while it is fresh. The
+  // banner keeps showing the previous answer until a new one arrives.
   useEffect(() => {
     if (!accountId) return;
     let alive = true;
-    fetchAiConfigSnapshot(accountId).then((c) => alive && setConfig(c));
+    const load = () =>
+      aiConfigSnapshots.get(accountId).then((c) => alive && setConfig(c));
+    load();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [accountId]);
+  }, [accountId, conversationId]);
 
   // Same rule as the dispatcher, for this thread's channel. Still
   // loading (null) → off.

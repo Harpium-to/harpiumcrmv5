@@ -9,7 +9,9 @@ import {
   isValidE164,
   phoneVariants,
   isRecipientNotAllowedError,
+  equivalentPhoneKeys,
 } from '@/lib/whatsapp/phone-utils'
+import { isOptedOut } from '@/lib/contacts/opt-out'
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -175,12 +177,42 @@ export async function POST(request: Request) {
     }
     const templateRow = rawTemplateRow ?? null
 
+    // Contacts who asked not to receive automatic messages (066) are
+    // left out, by any form of their number. `*` so this reads nothing
+    // — and refuses nobody — before 066 is applied.
+    const optedOutKeys = new Set<string>()
+    const allKeys = [
+      ...new Set(
+        recipients.flatMap((r) => equivalentPhoneKeys(sanitizePhoneForMeta(r.phone))),
+      ),
+    ]
+    for (let i = 0; i < allKeys.length; i += 500) {
+      const { data: rows } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('account_id', accountId)
+        .in('phone_normalized', allKeys.slice(i, i + 500))
+      for (const c of (rows ?? []) as { phone_normalized?: string; opted_out_at?: unknown }[]) {
+        if (isOptedOut(c) && c.phone_normalized) optedOutKeys.add(c.phone_normalized)
+      }
+    }
+
     const results: BroadcastResult[] = []
     let sentCount = 0
     let failedCount = 0
 
     for (const recipient of recipients) {
       const sanitized = sanitizePhoneForMeta(recipient.phone)
+
+      if (equivalentPhoneKeys(sanitized).some((k) => optedOutKeys.has(k))) {
+        results.push({
+          phone: recipient.phone,
+          status: 'failed',
+          error: 'Não enviado: o contato pediu para não receber mensagens automáticas',
+        })
+        failedCount++
+        continue
+      }
 
       if (!isValidE164(sanitized)) {
         results.push({

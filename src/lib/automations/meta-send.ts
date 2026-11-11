@@ -12,6 +12,8 @@ import {
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
 import { supabaseAdmin } from './admin-client'
+import { sendEngineUnofficial } from '@/lib/channels/engine-send'
+import { resolveWhatsAppProvider } from '@/lib/channels/whatsapp-route'
 
 // ------------------------------------------------------------
 // Automation-side Meta sender.
@@ -106,6 +108,25 @@ type SendInput =
   | (SendTemplateArgs & { kind: 'template' })
 
 async function sendViaMeta(input: SendInput): Promise<{ whatsapp_message_id: string }> {
+  // Unofficial path (D1). Templates are Meta's own: there is nothing to
+  // approve them against on a QR-code connection, so the step fails
+  // with a reason the automation log can show.
+  if (input.kind === 'template') {
+    const provider = await resolveWhatsAppProvider(supabaseAdmin(), input.accountId)
+    if (provider !== 'meta') {
+      throw new Error(
+        'Modelos aprovados só existem no caminho oficial (API da Meta). No WhatsApp não oficial, use "Enviar mensagem".',
+      )
+    }
+  } else {
+    const unofficial = await sendEngineUnofficial({
+      accountId: input.accountId,
+      conversationId: input.conversationId,
+      content: { kind: 'text', text: input.text },
+    })
+    if (unofficial) return unofficial
+  }
+
   const db = supabaseAdmin()
 
   // Scope the contact + config lookups by account_id, not user_id.

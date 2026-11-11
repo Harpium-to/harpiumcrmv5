@@ -95,7 +95,12 @@ export function FlowEditorShell({ initialFlow, initialNodes }: Props) {
 
   return (
     <FlowEditorProvider initialFlow={initialFlow} initialNodes={initialNodes}>
-      <div className="flex h-full min-h-0 flex-col">
+      {/* An explicit height, not `h-full`: the dashboard shell scrolls
+          as one plane, so `main` has no height of its own and a
+          percentage resolves to auto — the stage's `flex-1` then
+          collapses to its borders and the canvas (or list) vanishes.
+          9rem is the chrome above and below: top bar + main's padding. */}
+      <div className="flex h-[calc(100dvh-9rem)] min-h-[32rem] flex-col">
         <EditorHeader />
 
         {/* ---- mode row: view toggle + node-type legend ----

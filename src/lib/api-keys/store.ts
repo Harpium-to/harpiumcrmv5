@@ -94,6 +94,46 @@ export async function getAccountName(
   return (data.name as string) ?? null;
 }
 
+/** The person a personal key belongs to. */
+export interface KeyPerson {
+  id: string;
+  /** Their name in the CRM; null when they never filled it in. */
+  name: string | null;
+}
+
+/** A profile's name as a person would sign with it, or null. */
+export function personName(fullName: unknown): string | null {
+  if (typeof fullName !== 'string') return null;
+  const name = fullName.replace(/\s+/g, ' ').trim();
+  return name || null;
+}
+
+/**
+ * Who a key belongs to, when it is someone's own: the Chrome
+ * extension's personal keys (054). An account-level key belongs to
+ * the CRM, not to whoever minted it, so it has no person — null.
+ */
+export async function getKeyPerson(keyId: string): Promise<KeyPerson | null> {
+  const db = supabaseAdmin();
+  const { data: key, error } = await db
+    .from('api_keys')
+    .select('kind, user_id')
+    .eq('id', keyId)
+    .maybeSingle();
+  const row = key as { kind?: string | null; user_id?: string | null } | null;
+  if (error || row?.kind !== 'extension' || !row.user_id) return null;
+
+  const { data: profile } = await db
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', row.user_id)
+    .maybeSingle();
+  return {
+    id: row.user_id,
+    name: personName((profile as { full_name?: unknown } | null)?.full_name),
+  };
+}
+
 /**
  * Best-effort `last_used_at` bump. Fire-and-forget from the auth
  * path — a failed update just means the "last used" column lags;

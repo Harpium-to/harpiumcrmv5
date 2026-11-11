@@ -11,12 +11,6 @@ import { NAV_GROUPS, NAV_ITEMS, type NavItem } from "@/lib/nav";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import { useWaitingConversations } from "@/hooks/use-waiting-conversations";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface RailProps {
   /** Mobile drawer state, owned by the shell and opened from the top bar. */
@@ -27,16 +21,29 @@ interface RailProps {
 /**
  * Primary navigation.
  *
- * Desktop: a floating icon rail pinned to the left gutter. Icons only,
- * with the label in a tooltip — twelve destinations in a 4.5rem column
- * instead of a 15rem panel, which is what buys the content area its
- * full-bleed, poster-like top edge. The rail floats clear of the page
- * edges (it is a `.surface` pill, not a bordered column) so the warm
- * backdrop reads as one continuous plane behind the whole workspace.
+ * Desktop: a floating icon rail pinned to the left gutter. At rest it
+ * is icons only — a 3.75rem column instead of a 15rem panel, which is
+ * what buys the content area its full-bleed, poster-like top edge.
+ * Pointing at it (or tabbing into it) widens it sideways to show every
+ * label at once, over the content rather than pushing it, so nothing
+ * on the page moves. The rail floats clear of the page edges (it is a
+ * `.surface` pill, not a bordered column) so the warm backdrop reads
+ * as one continuous plane behind the whole workspace.
  *
- * Mobile: the same list as a labelled drawer — tooltips don't exist on
+ * The expansion is CSS only (`group/rail` hover + keyboard focus), so
+ * it can't get stuck open. It keys on `:focus-visible`, not `:focus`:
+ * a mouse click leaves focus on the link, and the rail must still
+ * close when the pointer leaves.
+ *
+ * Mobile: the same list as a labelled drawer — hover doesn't exist on
  * touch, so an icon-only rail there would be a guessing game.
  */
+
+/** Applied to whatever should change while the desktop rail is open. */
+const RAIL_OPEN_SHOW =
+  "group-hover/rail:opacity-100 group-has-[:focus-visible]/rail:opacity-100";
+const RAIL_OPEN_HIDE =
+  "group-hover/rail:opacity-0 group-has-[:focus-visible]/rail:opacity-0";
 export function Rail({ open = false, onClose }: RailProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
@@ -47,6 +54,12 @@ export function Rail({ open = false, onClose }: RailProps) {
   const { items: waiting, lateCount } = useWaitingConversations();
   const waitingFor = (item: NavItem) =>
     item.href === "/inbox" ? waiting.length : 0;
+  const waitingPill = cn(
+      "rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+      lateCount > 0
+        ? "animate-pulse bg-red-600 text-white"
+        : "bg-amber-400 text-amber-950",
+    );
 
   // Opened to go somewhere — once they pick, get out of the way.
   useEffect(() => {
@@ -87,80 +100,121 @@ export function Rail({ open = false, onClose }: RailProps) {
   return (
     <>
       {/* ---- Desktop rail ---- */}
-      <TooltipProvider delay={120}>
-        <nav
-          aria-label="Primary"
-          className="fixed top-1/2 left-3 z-30 hidden -translate-y-1/2 lg:block"
+      <nav
+        aria-label="Primary"
+        className="group/rail fixed top-1/2 left-3 z-30 hidden -translate-y-1/2 lg:block"
+      >
+        {/* The radius is half the resting width, so at rest this is the
+            same pill `rounded-full` drew — and stays a rounded card,
+            not a giant capsule, once it widens. */}
+        <div
+          className={cn(
+            "surface surface-blur flex max-h-[calc(100vh-2rem)] w-[3.75rem] flex-col gap-1 overflow-x-hidden overflow-y-auto rounded-[1.875rem] px-2 py-3",
+            "transition-[width] duration-200 ease-out [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            "group-hover/rail:w-56 group-has-[:focus-visible]/rail:w-56",
+          )}
         >
-          <div className="surface surface-blur flex max-h-[calc(100vh-2rem)] flex-col items-center gap-1 overflow-y-auto rounded-full px-2 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {NAV_GROUPS.map((group, groupIndex) => {
-              const items = NAV_ITEMS.filter((i) => i.group === group);
-              if (items.length === 0) return null;
-              return (
-                <div key={group} className="flex flex-col items-center gap-1">
-                  {groupIndex > 0 ? (
-                    <span
-                      aria-hidden
-                      className="my-1 h-px w-5 bg-foreground/10"
-                    />
-                  ) : null}
-                  {items.map((item) => {
-                    const active = isActive(item);
-                    const badge = badgeFor(item);
-                    const waitingCount = waitingFor(item);
-                    return (
-                      <Tooltip key={item.href}>
-                        <TooltipTrigger
-                          render={
-                            <Link
-                              href={item.href}
-                              aria-label={t(item.labelKey)}
-                              aria-current={active ? "page" : undefined}
-                              className={cn(
-                                "relative flex size-11 items-center justify-center rounded-full transition-colors",
-                                active
-                                  ? "surface-on"
-                                  : "text-muted-foreground hover:bg-foreground/8 hover:text-foreground",
-                              )}
-                            />
-                          }
-                        >
-                          <item.icon className="size-[1.15rem]" />
-                          {waitingCount > 0 ? (
-                            <span
-                              aria-hidden
-                              className={cn(
-                                "absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ring-2 ring-background",
-                                lateCount > 0
-                                  ? "animate-pulse bg-red-600 text-white"
-                                  : "bg-amber-400 text-amber-950",
-                              )}
-                            >
-                              {waitingCount > 9 ? "9+" : waitingCount}
-                            </span>
-                          ) : badge > 0 && !active ? (
-                            <span
-                              aria-hidden
-                              className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-background"
-                            />
-                          ) : null}
-                        </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={10}>
+          {NAV_GROUPS.map((group, groupIndex) => {
+            const items = NAV_ITEMS.filter((i) => i.group === group);
+            if (items.length === 0) return null;
+            return (
+              <div key={group} className="flex flex-col gap-1">
+                {groupIndex > 0 ? (
+                  <span
+                    aria-hidden
+                    className="mx-3 my-1 h-px shrink-0 bg-foreground/10"
+                  />
+                ) : null}
+                {items.map((item) => {
+                  const active = isActive(item);
+                  const badge = badgeFor(item);
+                  const waitingCount = waitingFor(item);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-label={
+                        waitingCount > 0
+                          ? `${t(item.labelKey)} · ${t("waitingBadge", { count: waitingCount })}`
+                          : t(item.labelKey)
+                      }
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex h-11 shrink-0 items-center rounded-full transition-colors",
+                        active
+                          ? "surface-on"
+                          : "text-muted-foreground hover:bg-foreground/8 hover:text-foreground",
+                      )}
+                    >
+                      {/* Fixed square: the icon must not drift while
+                          the rail's width animates around it. */}
+                      <span className="relative flex size-11 shrink-0 items-center justify-center">
+                        <item.icon className="size-[1.15rem]" />
+                        {waitingCount > 0 ? (
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center ring-2 ring-background transition-opacity",
+                              waitingPill,
+                              "px-1 text-[10px]",
+                              RAIL_OPEN_HIDE,
+                            )}
+                          >
+                            {waitingCount > 9 ? "9+" : waitingCount}
+                          </span>
+                        ) : badge > 0 && !active ? (
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-background transition-opacity",
+                              RAIL_OPEN_HIDE,
+                            )}
+                          />
+                        ) : null}
+                      </span>
+                      <span
+                        className={cn(
+                          "flex min-w-0 flex-1 items-center gap-2 pr-3 text-sm whitespace-nowrap opacity-0 transition-opacity duration-150",
+                          RAIL_OPEN_SHOW,
+                        )}
+                      >
+                        <span className="flex-1 truncate">
                           {t(item.labelKey)}
-                          {badge > 0 ? ` · ${badge > 99 ? "99+" : badge}` : ""}
-                          {waitingCount > 0
-                            ? ` · ${t("waitingBadge", { count: waitingCount })}`
-                            : ""}
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </nav>
-      </TooltipProvider>
+                        </span>
+                        {item.beta ? (
+                          <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
+                            {t("beta")}
+                          </span>
+                        ) : null}
+                        {waitingCount > 0 ? (
+                          <span
+                            title={t("waitingBadge", { count: waitingCount })}
+                            className={waitingPill}
+                          >
+                            {waitingCount > 99 ? "99+" : waitingCount}
+                          </span>
+                        ) : null}
+                        {badge > 0 ? (
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 text-[11px] font-medium tabular-nums",
+                              active
+                                ? "bg-primary-foreground/15"
+                                : "bg-primary text-primary-foreground",
+                            )}
+                          >
+                            {badge > 99 ? "99+" : badge}
+                          </span>
+                        ) : null}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* ---- Mobile drawer ---- */}
       <button
@@ -197,7 +251,6 @@ export function Rail({ open = false, onClose }: RailProps) {
           {NAV_ITEMS.map((item) => {
             const active = isActive(item);
             const badge = badgeFor(item);
-            const waitingCount = waitingFor(item);
             return (
               <li key={item.href}>
                 <Link
@@ -217,17 +270,12 @@ export function Rail({ open = false, onClose }: RailProps) {
                       {t("beta")}
                     </span>
                   ) : null}
-                  {waitingCount > 0 ? (
+                  {waitingFor(item) > 0 ? (
                     <span
-                      title={t("waitingBadge", { count: waitingCount })}
-                      className={cn(
-                        "rounded-full px-1.5 text-[11px] font-bold tabular-nums",
-                        lateCount > 0
-                          ? "animate-pulse bg-red-600 text-white"
-                          : "bg-amber-400 text-amber-950",
-                      )}
+                      title={t("waitingBadge", { count: waitingFor(item) })}
+                      className={waitingPill}
                     >
-                      {waitingCount > 99 ? "99+" : waitingCount}
+                      {waitingFor(item) > 99 ? "99+" : waitingFor(item)}
                     </span>
                   ) : null}
                   {badge > 0 ? (

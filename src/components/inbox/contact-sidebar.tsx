@@ -23,6 +23,7 @@ import { ptBR } from "date-fns/locale";
 import { useTranslations } from "next-intl";
 import { useCan } from "@/hooks/use-can";
 import { NewDealButton } from "@/components/inbox/new-deal-button";
+import { ContactAppointments } from "@/components/agenda/contact-appointments";
 
 interface ContactSidebarProps {
   contact: Contact | null;
@@ -186,6 +187,14 @@ export function ContactSidebar({ contact, conversationId = null }: ContactSideba
 
           {/* Divider */}
           <div className="my-4 border-t border-border" />
+
+          {/* Agenda (067): their appointments, and booking from the
+              conversation. Renders nothing — rule included — in a CRM
+              that has no agenda. */}
+          <ContactAppointments
+            contact={{ id: contact.id, name: contact.name ?? null, phone: contact.phone ?? null }}
+            divider
+          />
 
           {/* Tags */}
           <div>

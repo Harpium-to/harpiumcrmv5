@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  equivalentPhoneKeys,
   isRecipientNotAllowedError,
   isValidE164,
   normalizePhone,
@@ -33,6 +34,39 @@ describe("normalizePhone", () => {
     for (const s of samples) {
       expect(normalizePhone(s)).toBe(sanitizePhoneForMeta(s));
     }
+  });
+});
+
+describe("equivalentPhoneKeys", () => {
+  it("adds the form without the ninth digit to a Brazilian mobile", () => {
+    expect(equivalentPhoneKeys("+55 31 99999-8888")).toEqual([
+      "5531999998888",
+      "553199998888",
+    ]);
+  });
+
+  it("adds the ninth digit to the old 8-digit form", () => {
+    expect(equivalentPhoneKeys("553188887777")).toEqual([
+      "553188887777",
+      "5531988887777",
+    ]);
+  });
+
+  it("never pairs a landline with a mobile", () => {
+    // 8-digit numbers starting 2-5 are landlines; 9 + 3xxx is not the
+    // ninth-digit form of one.
+    expect(equivalentPhoneKeys("553132221111")).toEqual(["553132221111"]);
+    expect(equivalentPhoneKeys("5531932221111")).toEqual(["5531932221111"]);
+  });
+
+  it("leaves other countries alone", () => {
+    expect(equivalentPhoneKeys("+1 415-555-1212")).toEqual(["14155551212"]);
+    expect(equivalentPhoneKeys("447700900123")).toEqual(["447700900123"]);
+  });
+
+  it("returns nothing for no digits", () => {
+    expect(equivalentPhoneKeys("")).toEqual([]);
+    expect(equivalentPhoneKeys(" - ")).toEqual([]);
   });
 });
 

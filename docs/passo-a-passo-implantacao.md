@@ -141,8 +141,7 @@ contatos, conversas da Harpium?
 - **Cadastro aberto.** No fim do Painel, "Cadastro novo cria um CRM
   pessoal". Recomendado **desligar**: quem se cadastrar fica em
   "Aguardando liberação" até vocês criarem ou vincularem o CRM.
-- **Nome da extensão.** Hoje "CRM Connector". Se quiser a marca, me diga
-  o nome.
+- **Nome da extensão.** Resolvido: "Harpium CRM" desde a versão 0.5.0.
 - **Chrome Web Store (opcional).** Com uma conta de desenvolvedor Google
   (taxa única de US$ 5), publique a extensão como "não listada". Depois,
   na Netlify › Site configuration › Environment variables, crie

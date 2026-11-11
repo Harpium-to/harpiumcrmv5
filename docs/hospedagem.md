@@ -128,6 +128,15 @@ Em **Site configuration › Environment variables**:
 | `META_APP_ID` | Meta for Developers › Configurações › Básico | só para Lead Ads e templates com imagem |
 | `META_LEADS_VERIFY_TOKEN` | invente uma frase secreta | só para Lead Ads |
 | `META_INSTAGRAM_VERIFY_TOKEN` | invente uma frase secreta | só para Instagram (etapa final) |
+| `UAZAPI_BASE_URL` | painel da UAZAPI › endereço do servidor da Harpium, sem `/` no final | só para o WhatsApp não oficial (QR code) |
+| `UAZAPI_ADMIN_TOKEN` | painel da UAZAPI › token de administrador do servidor (secreto) | só para o WhatsApp não oficial (QR code) |
+
+**Sobre a UAZAPI:** com essas duas variáveis, um cliente que escolhe o
+WhatsApp não oficial em Configurações › WhatsApp só lê o QR code: o CRM
+cria a instância no servidor da Harpium e configura o webhook sozinho.
+O token de administrador fica só no Netlify, nunca no banco. Sem elas,
+o caminho não oficial aparece, mas diz ao cliente para falar com a
+agência. Ver `docs/plano-whatsapp-dois-caminhos.md`.
 
 **Sobre a `ENCRYPTION_KEY`:** ela cifra os tokens de WhatsApp e as
 chaves de IA guardadas no banco. Como o seu computador e o Netlify usam
@@ -156,6 +165,30 @@ avançam. O app não se chama sozinho.
 
 Todos exigem o cabeçalho `x-cron-secret` com o valor de
 `AUTOMATION_CRON_SECRET`.
+
+O `automations/cron` também envia os **lembretes de tarefas** (o aviso
+no sino quando uma tarefa vence, migration 060). Não há job separado
+para isso: com ele parado, as tarefas continuam aparecendo, mas ninguém
+é avisado na hora.
+
+O mesmo `automations/cron` envia as **mensagens agendadas** e os
+**disparos pelo QR code** (migrations 064 e 065), um a cada 30–90 s e até
+200 por dia por CRM. Quanto mais frequente o agendador, mais perto da
+hora marcada elas saem: com ele a cada 10 minutos, uma mensagem pode
+sair até 10 minutos depois.
+
+É ele também que envia os **avisos da agenda** (migration 067): o
+lembrete antes do horário e, como garantia, a confirmação de quem
+marcou. A confirmação sai na hora pela própria tela; o lembrete só sai
+pelo agendador, então com ele parado ninguém é lembrado.
+
+A agenda tem dois endereços que funcionam **sem login**, cada um atrás
+de um código secreto e desligado até um administrador ligar na agenda:
+`/marcar/<código>` (o cliente marca um horário) e
+`/api/agenda/feed/<código>.ics` (a agenda para acompanhar no Google
+Agenda, Apple ou Outlook). Se houver um firewall ou uma regra de acesso
+na frente do site, esses dois caminhos e `/api/public/agenda/` precisam
+ficar abertos.
 
 **Com o cron-job.org** (gratuito): crie um job para cada endpoint. Em
 **Advanced › Headers**, adicione `x-cron-secret` com o seu segredo.

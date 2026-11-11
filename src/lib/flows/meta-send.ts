@@ -16,6 +16,7 @@ import {
   isRecipientNotAllowedError,
 } from '@/lib/whatsapp/phone-utils'
 import { supabaseAdmin } from './admin-client'
+import { sendEngineUnofficial } from '@/lib/channels/engine-send'
 
 // ------------------------------------------------------------
 // Flows-side Meta sender (interactive variants).
@@ -65,6 +66,15 @@ interface SendTextEngineArgs {
 export async function engineSendText(
   args: SendTextEngineArgs,
 ): Promise<{ whatsapp_message_id: string }> {
+  // Unofficial path (D1): sent through the QR-code connection instead.
+  const unofficial = await sendEngineUnofficial({
+    accountId: args.accountId,
+    conversationId: args.conversationId,
+    content: { kind: 'text', text: args.text },
+    aiGenerated: args.aiGenerated,
+  })
+  if (unofficial) return unofficial
+
   const db = supabaseAdmin()
 
   const { data: contact, error: contactErr } = await db
@@ -175,6 +185,19 @@ interface SendMediaEngineArgs {
 export async function engineSendMedia(
   args: SendMediaEngineArgs,
 ): Promise<{ whatsapp_message_id: string }> {
+  const unofficial = await sendEngineUnofficial({
+    accountId: args.accountId,
+    conversationId: args.conversationId,
+    content: {
+      kind: 'media',
+      mediaKind: args.kind,
+      url: args.link,
+      caption: args.caption ?? null,
+      filename: args.filename ?? null,
+    },
+  })
+  if (unofficial) return unofficial
+
   const db = supabaseAdmin()
 
   const { data: contact, error: contactErr } = await db
@@ -321,9 +344,36 @@ type SendInput =
   | (SendInteractiveButtonsEngineArgs & { kind: 'buttons' })
   | (SendInteractiveListEngineArgs & { kind: 'list' })
 
+/** The structured payload the inbox re-renders, from the engine args. */
+function interactivePayloadOf(input: SendInput): InteractiveMessagePayload {
+  return input.kind === 'buttons'
+    ? {
+        kind: 'buttons',
+        body: input.bodyText,
+        header: input.headerText,
+        footer: input.footerText,
+        buttons: input.buttons,
+      }
+    : {
+        kind: 'list',
+        body: input.bodyText,
+        header: input.headerText,
+        footer: input.footerText,
+        button_label: input.buttonLabel,
+        sections: input.sections,
+      }
+}
+
 async function sendInteractiveViaMeta(
   input: SendInput,
 ): Promise<{ whatsapp_message_id: string }> {
+  const unofficial = await sendEngineUnofficial({
+    accountId: input.accountId,
+    conversationId: input.conversationId,
+    content: { kind: 'interactive', payload: interactivePayloadOf(input) },
+  })
+  if (unofficial) return unofficial
+
   const db = supabaseAdmin()
 
   // Scope the contact + whatsapp_config lookups by account_id —
@@ -417,23 +467,7 @@ async function sendInteractiveViaMeta(
   // when their reply arrives. We DO persist the structured payload so
   // the inbox thread re-renders the buttons/rows the bot sent (round-
   // trip), matching the composer + automation send paths.
-  const interactivePayload: InteractiveMessagePayload =
-    input.kind === 'buttons'
-      ? {
-          kind: 'buttons',
-          body: input.bodyText,
-          header: input.headerText,
-          footer: input.footerText,
-          buttons: input.buttons,
-        }
-      : {
-          kind: 'list',
-          body: input.bodyText,
-          header: input.headerText,
-          footer: input.footerText,
-          button_label: input.buttonLabel,
-          sections: input.sections,
-        }
+  const interactivePayload = interactivePayloadOf(input)
 
   const { error: msgErr } = await db.from('messages').insert({
     conversation_id: input.conversationId,

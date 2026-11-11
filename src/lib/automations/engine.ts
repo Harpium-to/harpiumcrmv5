@@ -21,6 +21,7 @@ import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
+import { contactOptedOut } from '@/lib/contacts/opt-out'
 
 // ------------------------------------------------------------
 // Public API
@@ -62,6 +63,10 @@ export interface DispatchInput {
  * recorded into automation_logs with status='failed'.
  */
 export async function runAutomationsForTrigger(input: DispatchInput): Promise<void> {
+  // A sequence starts one at a time, on one contact, with its limits
+  // checked (startSequence in src/lib/api/v1/sequences.ts) — never as
+  // "every manual automation of the account" from a generic dispatch.
+  if (input.triggerType === 'manual') return
   try {
     const db = supabaseAdmin()
 
@@ -116,6 +121,20 @@ export async function runAutomationsForTrigger(input: DispatchInput): Promise<vo
 }
 
 /**
+ * Run one automation for one contact, now — a sequence a person
+ * started. The caller has already checked that the automation and the
+ * contact belong to `input.accountId`. Runs until the end or the first
+ * wait, which the scheduler resumes. Returns the log id, null when the
+ * log could not be written (and then nothing ran).
+ */
+export async function startAutomationRun(
+  automation: Automation,
+  input: DispatchInput,
+): Promise<string | null> {
+  return executeAutomation(automation, input)
+}
+
+/**
  * Resume a run that was parked at a wait step. Called from the cron
  * endpoint after it grabs a due `automation_pending_executions` row.
  */
@@ -148,6 +167,24 @@ export async function resumePendingExecution(pending: {
     return
   }
 
+  // A sequence set to stop when the customer replies (Fase 5): if they
+  // wrote since the run started, it ends here instead of going on.
+  if (await customerRepliedSinceStart(automation as Automation, pending)) {
+    await markPending(pending.id, 'done')
+    await finalizeLog(pending.log_id, 'partial', 'Parada: o cliente respondeu.')
+    return
+  }
+  // A sequence also stops when the contact opted out meanwhile (066).
+  if (
+    (automation as Automation).trigger_type === 'manual' &&
+    pending.contact_id &&
+    (await contactOptedOut(db, (automation as Automation).account_id, pending.contact_id))
+  ) {
+    await markPending(pending.id, 'done')
+    await finalizeLog(pending.log_id, 'partial', 'Parada: o contato pediu para não receber.')
+    return
+  }
+
   try {
     await executeStepsFrom({
       automation: automation as Automation,
@@ -166,11 +203,55 @@ export async function resumePendingExecution(pending: {
   }
 }
 
+/**
+ * For a sequence with `stop_on_reply`: did the customer write since the
+ * run started (its log's creation)? False for anything else, and when
+ * it can't tell — a failed lookup never stops a run.
+ */
+export async function customerRepliedSinceStart(
+  automation: Automation,
+  pending: { contact_id: string | null; log_id: string | null },
+): Promise<boolean> {
+  const cfg = (automation.trigger_config ?? {}) as { stop_on_reply?: unknown }
+  if (automation.trigger_type !== 'manual' || cfg.stop_on_reply !== true) return false
+  if (!pending.contact_id || !pending.log_id) return false
+  const db = supabaseAdmin()
+  try {
+    const { data: log } = await db
+      .from('automation_logs')
+      .select('created_at')
+      .eq('id', pending.log_id)
+      .maybeSingle()
+    const since = (log as { created_at?: string } | null)?.created_at
+    if (!since) return false
+    const { data: convs } = await db
+      .from('conversations')
+      .select('id')
+      .eq('account_id', automation.account_id)
+      .eq('contact_id', pending.contact_id)
+    const ids = ((convs ?? []) as { id: string }[]).map((c) => c.id)
+    if (ids.length === 0) return false
+    const { count } = await db
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .in('conversation_id', ids)
+      .eq('sender_type', 'customer')
+      .gt('created_at', since)
+    return (count ?? 0) > 0
+  } catch (err) {
+    console.error('[automations] reply check failed:', err)
+    return false
+  }
+}
+
 // ------------------------------------------------------------
 // Internal execution
 // ------------------------------------------------------------
 
-async function executeAutomation(automation: Automation, input: DispatchInput) {
+async function executeAutomation(
+  automation: Automation,
+  input: DispatchInput,
+): Promise<string | null> {
   const db = supabaseAdmin()
 
   const { data: log, error: logErr } = await db
@@ -193,7 +274,7 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
 
   if (logErr || !log) {
     console.error('[automations] cannot create log:', logErr)
-    return
+    return null
   }
 
   await executeStepsFrom({
@@ -217,6 +298,7 @@ async function executeAutomation(automation: Automation, input: DispatchInput) {
   if (rpcErr) {
     console.error('[automations] increment counter failed:', rpcErr)
   }
+  return log.id as string
 }
 
 interface ExecuteArgs {

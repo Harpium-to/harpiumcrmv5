@@ -54,8 +54,15 @@ export function buildSystemPrompt(args: {
   mode: 'draft' | 'auto_reply'
   /** Knowledge-base excerpts retrieved for the current question. */
   knowledge?: string[]
+  /**
+   * Capabilities this agent was granted, each a ready-made section —
+   * today the agenda (lib/agenda/ai.ts). They are the scaffold's own
+   * words, not the customer's or the operator's, so they rank as
+   * instructions.
+   */
+  capabilities?: string[]
 }): string {
-  const { userPrompt, mode, knowledge } = args
+  const { userPrompt, mode, knowledge, capabilities } = args
   const parts: string[] = [
     'You are a customer-messaging assistant for a business that uses a WhatsApp CRM. ' +
       'You are shown the recent WhatsApp conversation between the business (assistant) and a customer (user). ' +
@@ -68,7 +75,7 @@ export function buildSystemPrompt(args: {
 
   if (mode === 'auto_reply') {
     parts.push(
-      `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, or the request needs information you do not have — reply with exactly ${HANDOFF_SENTINEL} and nothing else. A human agent will then take over. Prefer handing off over guessing.`,
+      `You are replying automatically with no human in the loop. If you cannot confidently and safely help — the customer explicitly asks for a human, is upset or complaining, the business instructions below say to pass this kind of request to a person, or the request needs information you do not have — hand the conversation off: write one short message telling the customer that someone from the team will continue the conversation (use the wording or the person's name the business instructions give, if any), then end your reply with ${HANDOFF_SENTINEL}. That message is sent to the customer and a human agent then takes over, so never hand off in silence. Prefer handing off over guessing.`,
     )
   }
 
@@ -76,10 +83,14 @@ export function buildSystemPrompt(args: {
     parts.push(`Business context and instructions:\n${userPrompt.trim()}`)
   }
 
+  for (const capability of capabilities ?? []) {
+    if (capability.trim()) parts.push(capability.trim())
+  }
+
   if (knowledge && knowledge.length > 0) {
     const fallback =
       mode === 'auto_reply'
-        ? `if they don't cover the question, do not guess — reply with exactly ${HANDOFF_SENTINEL} so a human can help`
+        ? `if they don't cover the question, do not guess — hand off as described above (a short message to the customer, then ${HANDOFF_SENTINEL}) so a human can help`
         : "if they don't cover the question, don't guess — say you'll check and follow up"
     parts.push(
       'Knowledge base — excerpts from the business\'s own documentation, retrieved for this question. ' +

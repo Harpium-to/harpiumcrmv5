@@ -45,11 +45,15 @@ it. Grant the minimum.
 | -------------------- | ---------------------------------------- |
 | `messages:send`      | Send WhatsApp messages                   |
 | `messages:read`      | Read messages and delivery status        |
-| `contacts:read`      | List and read contacts                   |
-| `contacts:write`     | Create and update contacts               |
+| `contacts:read`      | List and read contacts, their notes, and the account's tags |
+| `contacts:write`     | Create and update contacts; add notes    |
 | `conversations:read` | List and read conversations              |
+| `conversations:write` | Take a conversation over (pause the bot, assign it) |
 | `deals:read`         | List and read deals and pipelines        |
-| `deals:write`        | Update deals (move stage, mark won/lost) |
+| `deals:write`        | Create and update deals (move stage, mark won/lost) |
+| `quick_replies:read` | List the account's quick replies         |
+| `tasks:read`         | List contacts' tasks                     |
+| `tasks:write`        | Create, edit and complete tasks          |
 | `broadcasts:send`    | Launch broadcast campaigns               |
 | `webhooks:manage`    | Register and manage outbound webhooks    |
 
@@ -79,6 +83,7 @@ may be reworded.
 | 400    | `bad_request`  | Malformed input                                  |
 | 404    | `not_found`    | No such resource                                 |
 | 500    | `internal`     | Server error                                     |
+| 503    | `unavailable`  | The deployment lacks a migration the endpoint needs |
 
 ## Rate limits
 
@@ -112,10 +117,16 @@ curl https://your-crm.example.com/api/v1/me \
 {
   "data": {
     "account": { "id": "…", "name": "Acme Inc" },
-    "key": { "id": "…", "scopes": ["messages:send"] }
+    "key": { "id": "…", "scopes": ["messages:send"] },
+    "person": null
   }
 }
 ```
+
+`person` is `{ "id", "name" }` for a personal key — the Chrome
+extension's — and `null` for an account-level key, which belongs to the
+CRM rather than to whoever created it. `name` is the person's name in
+the CRM, or `null` when they never filled it in.
 
 ### `POST /api/v1/messages`
 
@@ -166,7 +177,86 @@ Domain error codes beyond the table above: `whatsapp_not_configured`
 (400), `meta_error` (502 — the request reached Meta and it rejected the
 send), `template_malformed` (500).
 
+### `GET /api/v1/whatsapp/sender`
+
+The WhatsApp number a message sent through this API leaves from right
+now. Scope: `messages:send`. For a client that must not send from a
+number other than the one its user sees — the Chrome extension offers
+to send only when this is the number logged in to WhatsApp Web.
+
+```json
+{
+  "data": {
+    "provider": "meta",
+    "path": "oficial",
+    "phone": "5563992286787"
+  }
+}
+```
+
+- `provider`: `meta`, `uazapi` (QR code), `evolution`, or `null` when
+  nothing is connected — the door `POST /api/v1/messages` would use.
+- `path`: the path the CRM chose (`oficial` / `nao_oficial`, migration
+  `061`), or `null` when not chosen.
+- `phone`: digits with country code, read from the provider on every
+  call (Meta's API, or the QR-code instance while it is connected).
+  `null` when it couldn't be read, and always for Evolution: don't send
+  on an assumption. The Chrome extension's personal keys get
+  `messages:send` from migration `062`.
+
+### Sequences
+
+A sequence is an automation with the **Sequência (disparo manual)**
+trigger: messages with waits between them, started by hand on one
+contact. Built in the CRM's automation builder; a sequence has no
+conditions, and any two of its messages are at least a minute apart.
+All three endpoints need `messages:send`.
+
+- `GET /api/v1/sequences?contact_id=<uuid>` — the active sequences:
+  `{ "id", "name", "description", "messages", "duration_minutes",
+  "stop_on_reply", "running" }`. `running` is for the contact given
+  (false without one). `stop_on_reply`: after each wait, the sequence
+  ends there if the customer wrote since it started.
+- `POST /api/v1/sequences/{id}/start` with `{ "contact_id" }` — sends
+  the first messages now; the scheduler (`/api/automations/cron`)
+  carries on after each wait. `201 { "data": { "log_id" } }`. Refused
+  with `409` when the sequence is off (`inactive`), already running for
+  the contact (`already_running`) or the contact has no conversation
+  (`no_conversation`); `422 invalid_sequence` when it breaks the rules
+  above; `429 daily_limit` after 100 starts in 24 hours in the CRM.
+- `POST /api/v1/sequences/{id}/stop` with `{ "contact_id" }` — drops
+  what was still waiting to be sent. `{ "data": { "stopped": n } }`,
+  `0` when it wasn't running.
+
+### Scheduled messages
+
+One message to one contact at a set time — a text, or a quick reply's
+file with its caption — sent by the CRM's scheduler
+(`/api/automations/cron`) through the same send core as the inbox.
+Needs migration `064`; before it these answer `503 unavailable`. All
+need `messages:send`.
+
+- `GET /api/v1/contacts/{id}/scheduled-messages` — what is waiting,
+  soonest first, then the last 5 done: `{ "id", "text", "media",
+  "send_at", "only_if_no_reply", "status", "outcome", "created_at" }`.
+  `status` is `scheduled`, `sending`, `sent`, `skipped`, `cancelled` or
+  `failed`; `outcome` says why it was skipped or failed.
+- `POST /api/v1/contacts/{id}/scheduled-messages` with `{ "text",
+  "quick_reply_id"?, "send_at", "only_if_no_reply"? }` — `send_at` from
+  1 minute to 90 days ahead; `quick_reply_id` takes that reply's file
+  (`text` is then the caption). With `only_if_no_reply` it is a
+  follow-up: skipped if the customer writes before `send_at`. At most
+  20 waiting per contact (`409 too_many`). `201` with the message.
+- `DELETE /api/v1/scheduled-messages/{id}` — cancel one that has not
+  gone yet (`409 not_scheduled` otherwise).
+
 ### `GET /api/v1/contacts`
+
+Every contact carries `opted_out`: `true` when it asked not to receive
+automatic messages (migration `066`) — bulk sends, template broadcasts,
+sequences and manual flows leave it out. `PATCH /api/v1/contacts/{id}`
+accepts `{ "opted_out": true | false }`. `POST /api/v1/broadcasts`
+answers how many it left out as `opted_out`.
 
 List contacts, newest first. Scope: `contacts:read`. Paginated (see
 [Pagination](#pagination)). Optional filters: `?search=` (matches name
@@ -223,6 +313,162 @@ curl -X PATCH https://your-app/api/v1/contacts/<id> \
   -d '{ "temperature": "hot", "potential": 80, "source": "instagram" }'
 ```
 
+### `GET` / `POST /api/v1/contacts/{id}/notes`
+
+The team's own annotations about a contact — never sent to the
+customer. Scopes: `contacts:read` / `contacts:write`. A contact in
+another account returns `404`.
+
+`GET` returns the most recent notes, newest first. Not paginated:
+`?limit=` (default `20`, at most `50`).
+
+```json
+{
+  "data": [
+    {
+      "id": "…",
+      "text": "Prefere contato à tarde.",
+      "author": { "id": "…", "name": "Ana Lima" },
+      "created_at": "…"
+    }
+  ]
+}
+```
+
+`POST` takes `{ "text": "…" }` (required, up to 4000 characters) and
+returns the new note with `201`. `author` is the person the key belongs
+to — whoever created it — and `null` only if that profile is gone.
+
+```bash
+curl -X POST https://your-app/api/v1/contacts/<id>/notes \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Prefere contato à tarde." }'
+```
+
+### `GET /api/v1/tags`
+
+The account's tags, sorted by name: `{ "id", "name", "color" }`. Scope:
+`contacts:read`. Not paginated. To put tags on a contact, send their
+**names** as `tags` in `PATCH /api/v1/contacts/{id}`; a name that
+doesn't exist yet is created.
+
+### `GET /api/v1/quick-replies`
+
+The account's text quick replies, sorted by title:
+`{ "id", "title", "text" }`. Scope: `quick_replies:read`. Not paginated.
+Interactive quick replies (buttons, lists) are not returned.
+
+`text` may contain `{{nome}}`, `{{primeiro_nome}}` and `{{empresa}}`,
+returned as written — fill them from the contact before using the text.
+The Chrome extension's personal keys get this scope from migration
+`059`.
+
+With `?include=media` the list also has the replies with a file
+(migration `063`), and every item carries `media`: `null` for a text
+reply, else `{ "kind", "url", "filename" }` — `kind` is `image`,
+`video`, `document` or `audio`, and `text` is the caption (`""` when
+there is none; an audio never has one). Send one with
+`POST /api/v1/messages`: `type` = `media.kind`, `media_url` =
+`media.url`, `text` = the caption filled in, and `filename` for a
+document. Without the parameter the response is exactly as before.
+
+### Tasks
+
+A task is a to-do about a contact, for a person — "ligar na quinta".
+Needs migration `060`; without it these endpoints answer `503`.
+
+```json
+{
+  "id": "…", "title": "Ligar na quinta",
+  "due_at": "2026-11-12T17:00:00+00:00", "done_at": null,
+  "contact_id": "…",
+  "contact": { "id": "…", "name": "Maria Souza", "phone": "+5531999998888" },
+  "assigned_to": { "id": "…", "name": "Ana Lima" },
+  "created_at": "…"
+}
+```
+
+- **`GET /api/v1/contacts/{id}/tasks`** — the contact's open tasks,
+  soonest first, undated ones last. Scope: `tasks:read`. `?status=done`
+  or `all` for the rest. At most 100.
+- **`POST /api/v1/contacts/{id}/tasks`** — add one. Scope: `tasks:write`.
+  Body: `title` (required, up to 200 characters) and `due_at` (optional).
+  The task is for the person the key belongs to, who gets a notification
+  in the CRM when it comes due.
+- **`GET /api/v1/tasks`** — open tasks across contacts. Scope:
+  `tasks:read`. `?assigned=me` keeps the ones for the person the key
+  belongs to; `?status=` as above.
+- **`PATCH /api/v1/tasks/{id}`** — scope `tasks:write`. Send any of
+  `title`, `due_at` and `done` (`true` marks it done now, `false`
+  reopens it). Moving `due_at` makes the task remind again.
+
+`due_at` is an ISO date-time **with its offset**
+(`2026-11-12T14:00:00-03:00`), or `null` for no date. A bare date is a
+`400`: midnight UTC is the evening before in Brazil.
+
+### `GET /api/v1/contacts/{id}/conversation`
+
+Where the contact's WhatsApp conversation stands in the CRM. Scope:
+`conversations:read`. `data` is `null` when the CRM has no conversation
+with the contact.
+
+```json
+{
+  "data": {
+    "id": "…", "status": "open", "channel": "whatsapp",
+    "ai": "answering",
+    "handoff_summary": null,
+    "waiting_since": null,
+    "assigned_to": null, "assigned_to_me": false,
+    "last_message_at": "…"
+  }
+}
+```
+
+`ai` is `answering` (the bot replies here), `paused` (the account has
+the bot on, but a person took this conversation or it handed off) or
+`off` (the account has no auto-reply). `waiting_since` is since when the
+customer waits for a person after a handoff — `null` when nobody is
+waiting, or on a deployment without migration `058`.
+
+### `POST /api/v1/conversations/{id}/takeover`
+
+Take the conversation over: pauses the bot on it and makes the person
+the key belongs to its owner — what "Assumir" does in the inbox. Scope:
+`conversations:write`. No body. Returns the state above. Safe to repeat.
+
+### `POST /api/v1/conversations/{id}/handback`
+
+Give the conversation back to the AI — the inbox's "Retomar IA": clears
+the pause and the handoff note, releases the owner and gives the bot a
+fresh reply budget here. Scope: `conversations:write`. Answers the same
+shape as `GET /api/v1/contacts/{id}/conversation`.
+
+### `POST /api/v1/conversations/{id}/flow/pause`
+
+Stop the chatbot flow running on this conversation; the run ends as
+`paused_by_agent`, as when an attendant replies. Safe to repeat. Scope:
+`conversations:write`. Answers the conversation's state.
+
+The state of a conversation (`GET /api/v1/contacts/{id}/conversation`)
+carries `flow`: `{ "run_id", "flow_id", "name" }` while a flow conducts
+it, else `null`.
+
+### Manual flows
+
+Chatbot flows whose trigger is **manual**, started on one contact. Both
+need `messages:send`.
+
+- `GET /api/v1/flows` — the active manual flows: `{ "id", "name",
+  "description" }`.
+- `POST /api/v1/flows/{id}/start` with `{ "contact_id" }` — runs the
+  flow until it waits for the customer. `201 { "data": { "run_id" } }`.
+  Refused with `409` when the flow is not active (`inactive`), the
+  contact already has a flow running (`already_running`) or no
+  conversation (`no_conversation`); `422 invalid_flow` when it has no
+  entry; `429 daily_limit` after 100 manual starts in 24 hours in the CRM.
+
 ### `GET /api/v1/conversations`
 
 List conversations, newest first. Scope: `conversations:read`.
@@ -255,6 +501,7 @@ filters: `?contact_id=`, `?pipeline_id=` and `?status=` (`open` /
       "id": "…", "title": "Implante", "value": 1200.5, "currency": "BRL",
       "status": "open", "notes": null, "expected_close_date": "2026-12-01",
       "closed_at": null, "contact_id": "…", "conversation_id": null,
+      "contact": { "id": "…", "name": "Maria Souza", "phone": "+5531999998888" },
       "pipeline": { "id": "…", "name": "Vendas" },
       "stage": { "id": "…", "name": "Proposta", "color": "#f59e0b", "position": 1 },
       "created_at": "…", "updated_at": "…"
@@ -264,9 +511,38 @@ filters: `?contact_id=`, `?pipeline_id=` and `?status=` (`open` /
 }
 ```
 
-`value` is a number. `closed_at` is when the deal reached `won` or
+`contact` is the deal's contact as `id`, `name` and `phone` — enough to
+label a card without a request per deal — and `null` once that contact
+is deleted. `value` is a number. `closed_at` is when the deal reached `won` or
 `lost`; it is set by the database and is `null` while the deal is open
 (or on a deployment without migration `046`).
+
+### `POST /api/v1/deals`
+
+Open a deal for a contact. Scope: `deals:write`. Returns the deal with
+`201`. It is always created `open`, in the account's default currency.
+
+| Field | Accepts |
+|---|---|
+| `contact_id` | **required** — a contact of this account |
+| `title` | **required** — non-empty string |
+| `value` | number, `0` or more (default `0`) |
+| `notes` | string |
+| `expected_close_date` | `"YYYY-MM-DD"` |
+| `pipeline_id` | a pipeline of this account |
+| `stage_id` | a stage of a pipeline of this account |
+
+Where it lands on the board: on `stage_id` when given (and it must be a
+stage of `pipeline_id`, if you send both); otherwise on the first stage
+of `pipeline_id`; with neither, on the first stage of the account's
+first pipeline. An account with no pipeline gets a `400`.
+
+```bash
+curl -X POST https://your-app/api/v1/deals \
+  -H "Authorization: Bearer $WACRM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "contact_id": "<contact id>", "title": "Plano anual", "value": 4800 }'
+```
 
 ### `GET` / `PATCH /api/v1/deals/{id}`
 
