@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,6 +34,24 @@ import {
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
+/**
+ * Values to start a NEW deal with (ignored when editing). The inbox
+ * passes the contact right away and the AI's suggestion when it
+ * arrives. A field the person already edited is kept, unless
+ * `replace` is set (the "fill again" button).
+ */
+export interface DealPrefill {
+  title?: string;
+  value?: number | null;
+  contact_id?: string;
+  stage_id?: string | null;
+  expected_close_date?: string | null;
+  notes?: string;
+  replace?: boolean;
+}
+
+type PrefillField = "title" | "value" | "contact" | "stage" | "date" | "notes";
+
 interface DealFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,6 +60,11 @@ interface DealFormProps {
   stages: PipelineStage[];
   defaultStageId?: string;
   onSaved: () => void;
+  prefill?: DealPrefill | null;
+  /** Saved on a new deal so the card links back to the conversation. */
+  conversationId?: string | null;
+  /** Shown above the fields (the inbox puts the AI status there). */
+  headerSlot?: React.ReactNode;
 }
 
 export function DealForm({
@@ -52,6 +75,9 @@ export function DealForm({
   stages,
   defaultStageId,
   onSaved,
+  prefill,
+  conversationId,
+  headerSlot,
 }: DealFormProps) {
   const t = useTranslations("Pipelines.form");
   const supabase = createClient();
@@ -76,12 +102,23 @@ export function DealForm({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Fields the person changed since the sheet opened: a prefill that
+  // arrives later (the AI takes a few seconds) must not overwrite them.
+  const touched = useRef(new Set<PrefillField>());
+  const edit =
+    <T,>(field: PrefillField, set: (v: T) => void) =>
+    (v: T) => {
+      touched.current.add(field);
+      set(v);
+    };
+
   // Reset the form fields every time the sheet opens or its input
   // props change. This is a legitimate prop-driven sync; the rule is
   // over-cautious here, hence the block-level disable.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
+    touched.current.clear();
     setConfirmDelete(false);
     if (deal) {
       setTitle(deal.title);
@@ -105,6 +142,28 @@ export function DealForm({
       setNotes("");
     }
   }, [open, deal, defaultStageId, stages, defaultCurrency]);
+
+  // Apply a prefill to a new deal — after the reset above (effects run
+  // in order), and again whenever a newer prefill arrives.
+  useEffect(() => {
+    if (!open || deal || !prefill) return;
+    if (prefill.replace) touched.current.clear();
+    const free = (f: PrefillField) => !touched.current.has(f);
+    if (prefill.title !== undefined && free("title")) setTitle(prefill.title);
+    if (prefill.value != null && free("value")) setValue(String(prefill.value));
+    if (prefill.contact_id && free("contact")) setContactId(prefill.contact_id);
+    if (
+      prefill.stage_id &&
+      free("stage") &&
+      stages.some((s) => s.id === prefill.stage_id)
+    ) {
+      setStageId(prefill.stage_id);
+    }
+    if (prefill.expected_close_date && free("date")) {
+      setExpectedCloseDate(prefill.expected_close_date);
+    }
+    if (prefill.notes !== undefined && free("notes")) setNotes(prefill.notes);
+  }, [open, deal, prefill, stages]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Load supporting data once the sheet is open
@@ -197,7 +256,13 @@ export function DealForm({
       }
       const { error } = await supabase
         .from("deals")
-        .insert({ ...payload, user_id: user.id, account_id: accountId, status: "open" });
+        .insert({
+          ...payload,
+          ...(conversationId ? { conversation_id: conversationId } : {}),
+          user_id: user.id,
+          account_id: accountId,
+          status: "open",
+        });
       if (error) {
         toast.error(t("toastFailedCreate"));
         setSaving(false);
@@ -259,11 +324,12 @@ export function DealForm({
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {headerSlot}
             <div className="grid gap-2">
               <Label className="text-muted-foreground">{t("title")}</Label>
               <Input
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => edit("title", setTitle)(e.target.value)}
                 placeholder={t("titlePlaceholder")}
                 className="border-border bg-muted text-foreground"
               />
@@ -273,7 +339,7 @@ export function DealForm({
               <Label className="text-muted-foreground">{t("contact")}</Label>
               <select
                 value={contactId}
-                onChange={(e) => setContactId(e.target.value)}
+                onChange={(e) => edit("contact", setContactId)(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               >
                 <option value="">{t("selectContact")}</option>
@@ -286,7 +352,7 @@ export function DealForm({
 
               {linkedConversation && (
                 <Link
-                  href="/inbox"
+                  href={`/inbox?c=${linkedConversation.id}`}
                   className="mt-1 inline-flex items-center gap-1.5 self-start rounded-md bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20"
                 >
                   <MessageSquare className="h-3 w-3" />
@@ -303,7 +369,7 @@ export function DealForm({
                   <Input
                     type="number"
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    onChange={(e) => edit("value", setValue)(e.target.value)}
                     placeholder="0"
                     className="border-border bg-muted pl-7 text-foreground"
                   />
@@ -330,7 +396,7 @@ export function DealForm({
               <Input
                 type="date"
                 value={expectedCloseDate}
-                onChange={(e) => setExpectedCloseDate(e.target.value)}
+                onChange={(e) => edit("date", setExpectedCloseDate)(e.target.value)}
                 className="border-border bg-muted text-foreground"
               />
             </div>
@@ -339,7 +405,7 @@ export function DealForm({
               <Label className="text-muted-foreground">{t("stage")}</Label>
               <select
                 value={stageId}
-                onChange={(e) => setStageId(e.target.value)}
+                onChange={(e) => edit("stage", setStageId)(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-muted px-2.5 text-sm text-foreground outline-none focus:border-primary"
               >
                 {stages.map((s) => (
@@ -370,7 +436,7 @@ export function DealForm({
               <Label className="text-muted-foreground">{t("notes")}</Label>
               <Textarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => edit("notes", setNotes)(e.target.value)}
                 placeholder={t("notesPlaceholder")}
                 className="min-h-[100px] border-border bg-muted text-foreground"
               />

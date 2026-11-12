@@ -43,7 +43,8 @@
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
     "reports": "Reports",
-    "help": "Help"
+    "help": "Help",
+    "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}"
   },
   "TopBar": {
     "openMenu": "Open menu",
@@ -150,7 +151,15 @@
       "clearAll": "Clear all",
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "filterWaiting": "Waiting for a person",
+      "waitingStrip": "{count, plural, one {# conversation waiting for a person} other {# conversations waiting for a person}}",
+      "waitingLate": "{count, plural, one {# late} other {# late}}",
+      "waitingShow": "Show",
+      "waitingShowAll": "Show all",
+      "waitingNobody": "Nobody took it",
+      "waitingMine": "Yours, no reply yet",
+      "waitingAssigned": "Assigned, no reply yet"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -291,7 +300,32 @@
         "unknown": "The customer got no reply. Answer manually; the technical detail is also in the agents monitor.",
         "detail": "Technical detail: {detail}",
         "dismiss": "Dismiss notice"
+      },
+      "waiting": {
+        "nobodyTitle": "The AI handed this conversation to the team. Someone needs to take it.",
+        "assignedTitle": "Assigned to a teammate, but the customer has had no reply yet",
+        "mineTitle": "You took this conversation. Reply to the customer.",
+        "since": "Waiting for a reply for {time}",
+        "justNow": "Just handed to the team",
+        "late": "late",
+        "takeOver": "Take this conversation"
       }
+    },
+    "newDeal": {
+      "button": "New",
+      "choosePipeline": "Which pipeline?",
+      "pipeline": "Pipeline: {name}",
+      "duplicate": "{count, plural, one {This contact already has # open deal} other {This contact already has # open deals}}",
+      "aiLoading": "The AI is reading the conversation to fill in the deal...",
+      "aiDone": "Filled in by the AI from the conversation. Check it before creating.",
+      "aiRefill": "Fill in again",
+      "aiRetry": "Try again",
+      "aiOff": "With the AI turned on in AI Agents, the form comes filled in with a summary of the conversation.",
+      "aiNoMessages": "There are no text messages to summarize yet.",
+      "aiNoConversation": "Open the conversation for the AI to fill in the deal.",
+      "aiError": "Couldn't fill in with the AI. Fill it in by hand or try again.",
+      "noPipelines": "Create a pipeline in Pipelines before creating deals.",
+      "noStages": "This pipeline has no stages. Create them in Pipelines."
     }
   },
   "Contacts": {
@@ -2216,5 +2250,16 @@
     "suggestForecast": "What is stuck in the forecast?",
     "customFrom": "From",
     "customTo": "to"
+  },
+  "Handoff": {
+    "toastTitle": "{name} needs a person",
+    "toastBody": "The AI handed the conversation to the team. Someone needs to reply to the customer.",
+    "someone": "A customer",
+    "open": "Open conversation",
+    "alertTitle": "{count, plural, one {# conversation waiting for a person} other {# conversations waiting for a person}}",
+    "alertOldest": "{name} has been waiting {time}",
+    "alertOldestNow": "{name} was just handed to the team",
+    "late": "late",
+    "answer": "Answer"
   }
 }
