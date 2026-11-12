@@ -16,11 +16,12 @@ import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { UUID } from '@/lib/google/oauth-flow'
+import { crmOrigin } from '@/lib/google/origin'
 
 export async function POST(request: Request) {
   try {
     const ctx = await requireRole('agent')
-    const { origin } = new URL(request.url)
+    const origin = crmOrigin(request)
     const body = (await request.json().catch(() => null)) as { eventId?: unknown } | null
     const eventId = typeof body?.eventId === 'string' ? body.eventId : null
     if (eventId !== null && !UUID.test(eventId)) {

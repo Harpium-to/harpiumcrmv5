@@ -21,11 +21,12 @@ import { listOwnedCalendars } from '@/lib/google/calendar-api'
 import { getGoogleAccessToken } from '@/lib/google/connections'
 import { GoogleAuthError, googleOAuthConfig } from '@/lib/google/oauth'
 import { UUID } from '@/lib/google/oauth-flow'
+import { crmOrigin } from '@/lib/google/origin'
 
 export async function POST(request: Request) {
   try {
     const ctx = await requireRole('admin')
-    const { origin } = new URL(request.url)
+    const origin = crmOrigin(request)
     const body = (await request.json().catch(() => null)) as {
       calendarId?: unknown
       connectionId?: unknown

@@ -6,6 +6,7 @@ import { resumeTask } from '@/lib/agents/tasks'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { processCalendarNotifications } from '@/lib/agenda/messages'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
+import { crmOrigin } from '@/lib/google/origin'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -129,7 +130,7 @@ export async function PATCH(
       }
       // Approved or refused, Google Agenda follows (069).
       if ((flipped ?? []).length > 0) {
-        const { origin } = new URL(request.url)
+        const origin = crmOrigin(request)
         after(() => processGoogleCalendarSync(supabaseAdmin(), { eventId, crmUrl: origin }))
       }
     }
