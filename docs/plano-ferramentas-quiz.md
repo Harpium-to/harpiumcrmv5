@@ -27,7 +27,7 @@ O dono aprovou as cinco recomendações e pediu as quatro fases de uma vez. Um c
 ### O que foi conferido e o que não foi
 
 - **Conferido:**
-  - 2.371 testes automáticos passando, entre eles a migration 072 rodando num Postgres de teste com as regras de acesso, e uma visita completa virando contato e lead pelo código real de recebimento;
+  - 2.373 testes automáticos passando, entre eles a migration 072 rodando num Postgres de teste com as regras de acesso, e uma visita completa virando contato e lead pelo código real de recebimento;
   - build de produção;
   - no navegador, com dados de exemplo: o quiz do início ao resultado, as abas do construtor, a prévia e o relatório.
 - **Não conferido:** o caminho inteiro contra o banco de produção, porque a migration 072 ainda não foi aplicada. Isso inclui criar um quiz pela tela, publicar, responder pelo link e ver o lead no CRM. É o primeiro teste a fazer depois de aplicar a migration.
