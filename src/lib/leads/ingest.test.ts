@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { fakeDb, type Row } from './fake-db.test-helper'
-import { ingestLead, reprocessLead } from './ingest'
+import { ingestLead, MAX_NEW_FIELDS_PER_LEAD, reprocessLead } from './ingest'
 import { noteMarker } from './note'
 import { normalizeLead } from './parse'
 
@@ -32,8 +32,18 @@ function world(over: Partial<Record<string, Row[]>> = {}): Record<string, Row[]>
   }
 }
 
+/** The contact's custom values, by field name. */
+function valuesOf(t: Record<string, Row[]>, contactId: string): Record<string, string> {
+  const name = new Map(t.custom_fields.map((f) => [f.id, String(f.field_name)]))
+  const out: Record<string, string> = {}
+  for (const v of t.contact_custom_values) {
+    if (v.contact_id === contactId) out[name.get(String(v.custom_field_id)) ?? '?'] = String(v.value)
+  }
+  return out
+}
+
 describe('ingestLead — Harpium Lead v1 from the quiz', () => {
-  it('creates the contact and writes tags, custom field and note', async () => {
+  it('creates the contact and writes tags, custom fields and note', async () => {
     const t = world()
     const db = fakeDb(t)
     const raw = quiz()
@@ -57,16 +67,30 @@ describe('ingestLead — Harpium Lead v1 from the quiz', () => {
     expect(names).toEqual(['Verba-Baixa', 'quiz-planejados', 'rota-a'])
     expect(t.contact_tags).toHaveLength(3)
 
-    expect(t.contact_custom_values).toEqual([
-      expect.objectContaining({ contact_id: r.contactId, custom_field_id: 'cf-fat', value: '75a150' }),
-    ])
+    // Every piece of the lead in a field of its own: the existing
+    // "Faturamento", and new ones for the rest (named after the key or
+    // the question, marked as created by a lead).
+    expect(valuesOf(t, String(r.contactId))).toEqual({
+      Faturamento: '75a150',
+      UF: 'TO',
+      'Ticket medio': '40a80',
+      'Maior desafio': 'Só pedem preço',
+      Rota: 'A',
+    })
+    expect(t.custom_fields.find((f) => f.field_name === 'Maior desafio')).toMatchObject({
+      account_id: ACC.id,
+      user_id: 'owner-1',
+      field_type: 'text',
+      field_key: 'maior_desafio',
+      created_from: 'lead',
+    })
 
+    // The note stays as the lead's history; fields that found a home
+    // are no longer repeated under "Outros dados".
     expect(t.contact_notes).toHaveLength(1)
     const note = String(t.contact_notes[0].note_text)
     expect(note).toContain('• Maior desafio: Só pedem preço')
-    expect(note).toContain('• uf: TO')
-    expect(note).toContain('• ticket_medio: 40a80')
-    expect(note).not.toContain('faturamento')
+    expect(note).not.toContain('Outros dados')
     expect(note).toContain(noteMarker(r.leadId))
   })
 
@@ -87,6 +111,24 @@ describe('ingestLead — Harpium Lead v1 from the quiz', () => {
     // A typed name stays; an empty company erases nothing; a new city replaces.
     expect(t.contacts[0]).toMatchObject({ name: 'Ana', company: 'Planejados Silva', city: 'Araguaína' })
     expect(t.contact_notes).toHaveLength(2)
+    // The fields were reused, not created twice.
+    expect(t.custom_fields.filter((f) => f.field_name === 'Maior desafio')).toHaveLength(1)
+  })
+
+  it('a newer lead replaces a field value; an existing field matches without accents or case', async () => {
+    const t = world({
+      custom_fields: [{ id: 'cf-desafio', account_id: ACC.id, field_name: 'MAIOR DESAFIO' }],
+    })
+    const db = fakeDb(t)
+    const first = quiz()
+    const r = await ingestLead(db, ACC, normalizeLead(first), first)
+    const second = quiz({
+      id_externo: 'sessao-2',
+      respostas: [{ pergunta: 'Maior desafío', resposta: 'Falta de leads' }],
+    })
+    await ingestLead(db, ACC, normalizeLead(second), second)
+    expect(valuesOf(t, String(r.contactId))['MAIOR DESAFIO']).toBe('Falta de leads')
+    expect(t.custom_fields.filter((f) => /desaf/i.test(String(f.field_name)))).toHaveLength(1)
   })
 
   it('the same id_externo within 24 h is not written twice', async () => {
@@ -158,16 +200,119 @@ describe('ingestLead — de/para mappings', () => {
       expect.objectContaining({ custom_field_id: 'cf-x', value: '5 mil' }),
     ])
     const note = String(t.contact_notes[0].note_text)
-    expect(note).toContain('• obs_interna: ligar depois')
+    expect(note).toContain('• Obs interna: ligar depois')
     expect(note).not.toContain('lixo')
+    // Nothing mapped elsewhere became a field.
+    expect(t.custom_fields.map((f) => f.field_name)).toEqual(['Investimento'])
   })
 
   it('refuses a custom field id from another account', async () => {
     const t = world({ custom_fields: [] })
     const raw = { nome: 'Caio', telefone: '11988887777', verba: '5 mil' }
     await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw, { mappings: { verba: 'custom:foreign' } })
-    expect(t.contact_custom_values).toHaveLength(0)
-    expect(String(t.contact_notes[0].note_text)).toContain('• verba: 5 mil')
+    // The foreign id is never written; the account gets its own field.
+    expect(t.contact_custom_values.map((v) => v.custom_field_id)).not.toContain('foreign')
+    expect(valuesOf(t, String(t.contacts[0].id))).toEqual({ Verba: '5 mil' })
+  })
+
+  it('maps an answer (not only a field) on the de/para', async () => {
+    const t = world()
+    const raw = quiz({ campos: {} })
+    await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw, {
+      mappings: { maior_desafio: 'ignore', rota: 'ignore' },
+    })
+    const values = valuesOf(t, String(t.contacts[0].id))
+    expect(values).toEqual({ UF: 'TO' })
+  })
+})
+
+describe('ingestLead — fields a lead creates', () => {
+  const many = (n: number) => {
+    const raw: Record<string, string> = { nome: 'Rui', telefone: '11977776666' }
+    for (let i = 0; i < n; i++) raw[`pergunta_${i}`] = `r${i}`
+    return raw
+  }
+
+  it('keeps filling a field a lead created after someone renamed it', async () => {
+    const t = world({
+      custom_fields: [
+        { id: 'cf-renamed', account_id: ACC.id, field_name: 'Desafio', field_key: 'maior_desafio', created_from: 'lead' },
+      ],
+    })
+    const raw = quiz({ campos: {} })
+    await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw)
+    expect(valuesOf(t, String(t.contacts[0].id)).Desafio).toBe('Só pedem preço')
+    expect(t.custom_fields.filter((f) => /desafio/i.test(String(f.field_name)))).toHaveLength(1)
+  })
+
+  it(`creates at most ${MAX_NEW_FIELDS_PER_LEAD} fields per lead; the rest goes to the note`, async () => {
+    const t = world({ custom_fields: [] })
+    const raw = many(MAX_NEW_FIELDS_PER_LEAD + 3)
+    await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw)
+    expect(t.custom_fields).toHaveLength(MAX_NEW_FIELDS_PER_LEAD)
+    const note = String(t.contact_notes[0].note_text)
+    expect(note).toContain(`• Pergunta ${MAX_NEW_FIELDS_PER_LEAD + 2}: r${MAX_NEW_FIELDS_PER_LEAD + 2}`)
+  })
+
+  it('stops creating fields once leads made 200 in the account', async () => {
+    const existing = Array.from({ length: 200 }, (_, i) => ({
+      id: `cf-${i}`,
+      account_id: ACC.id,
+      field_name: `Antigo ${i}`,
+      created_from: 'lead',
+    }))
+    const t = world({ custom_fields: existing })
+    const raw = many(2)
+    await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw)
+    expect(t.custom_fields).toHaveLength(200)
+    expect(String(t.contact_notes[0].note_text)).toContain('• Pergunta 1: r1')
+  })
+
+  it('reuses the field another lead created a moment ago (unique key refused the twin)', async () => {
+    const t = world({
+      custom_fields: [],
+    })
+    const base = fakeDb(t)
+    // The twin lands between our read and our insert.
+    const db = {
+      from(table: string) {
+        const q = base.from(table) as unknown as Record<string, unknown>
+        if (table !== 'custom_fields') return q
+        const insert = q.insert as (r: Row) => unknown
+        q.insert = (row: Row) => {
+          if (!row.field_key) return insert(row)
+          t.custom_fields.push({ id: 'cf-twin', account_id: ACC.id, field_name: row.field_name, field_key: row.field_key, created_from: 'lead' })
+          return { select: () => ({ single: async () => ({ data: null, error: { code: '23505', message: 'duplicate key' } }) }) }
+        }
+        return q
+      },
+    } as unknown as typeof base
+    const raw = { nome: 'Rui', telefone: '11977776666', verba: '5 mil' }
+    await ingestLead(db, ACC, normalizeLead(raw), raw)
+    expect(t.custom_fields).toHaveLength(1)
+    expect(t.contact_custom_values).toEqual([expect.objectContaining({ custom_field_id: 'cf-twin', value: '5 mil' })])
+  })
+
+  it('still creates the field before migration 070 (no field_key / created_from columns)', async () => {
+    const t = world({ custom_fields: [] })
+    const base = fakeDb(t)
+    const db = {
+      from(table: string) {
+        const q = base.from(table) as unknown as Record<string, unknown>
+        if (table !== 'custom_fields') return q
+        const insert = q.insert as (r: Row) => unknown
+        q.insert = (row: Row) =>
+          'field_key' in row
+            ? { select: () => ({ single: async () => ({ data: null, error: { code: 'PGRST204', message: "Could not find the 'created_from' column" } }) }) }
+            : insert(row)
+        return q
+      },
+    } as unknown as typeof base
+    const raw = { nome: 'Rui', telefone: '11977776666', verba: '5 mil' }
+    await ingestLead(db, ACC, normalizeLead(raw), raw)
+    expect(t.custom_fields).toEqual([expect.objectContaining({ field_name: 'Verba', field_type: 'text' })])
+    expect(t.custom_fields[0]).not.toHaveProperty('field_key')
+    expect(valuesOf(t, String(t.contacts[0].id))).toEqual({ Verba: '5 mil' })
   })
 })
 
@@ -187,6 +332,18 @@ describe('reprocessLead', () => {
     expect(t.contacts).toHaveLength(1)
     expect(t.contact_notes).toHaveLength(1)
     expect(t.contact_tags).toHaveLength(3)
+  })
+
+  it('fills empty fields but never replaces a value someone typed', async () => {
+    const raw = quiz()
+    const t = world({
+      contacts: [{ id: 'c1', account_id: ACC.id, phone: '+5563999990000', phone_normalized: '5563999990000', name: 'Ana' }],
+      contact_custom_values: [{ id: 'v1', contact_id: 'c1', custom_field_id: 'cf-fat', value: '150+' }],
+    })
+    await reprocessLead(fakeDb(t), ACC, { id: 'old', raw, contact_id: 'c1', created_at: '2026-11-01T00:00:00Z' })
+    const values = valuesOf(t, 'c1')
+    expect(values.Faturamento).toBe('150+')
+    expect(values['Maior desafio']).toBe('Só pedem preço')
   })
 
   it('only backfills an existing contact', async () => {

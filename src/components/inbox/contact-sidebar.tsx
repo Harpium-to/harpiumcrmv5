@@ -24,6 +24,7 @@ import { useTranslations } from "next-intl";
 import { useCan } from "@/hooks/use-can";
 import { NewDealButton } from "@/components/inbox/new-deal-button";
 import { ContactAppointments } from "@/components/agenda/contact-appointments";
+import { ContactFieldsSummary } from "@/components/contacts/contact-fields-summary";
 
 interface ContactSidebarProps {
   contact: Contact | null;
@@ -221,6 +222,9 @@ export function ContactSidebar({ contact, conversationId = null }: ContactSideba
               )}
             </div>
           </div>
+
+          {/* Custom fields: what a lead answered and what the team typed. */}
+          <ContactFieldsSummary contactId={contact.id} className="mt-4 border-t border-border pt-4" />
 
           {/* Divider */}
           <div className="my-4 border-t border-border" />

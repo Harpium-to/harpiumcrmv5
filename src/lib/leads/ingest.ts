@@ -7,6 +7,7 @@ import {
 } from '@/lib/contacts/resolve-import-tags'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 import { openLeadDeal } from './deal'
+import { leadFieldEntries, type LeadFieldEntry } from './fields'
 import { buildLeadNote, noteMarker } from './note'
 import { foldKey, leadTags, normalizeLead, type NormalizedLead } from './parse'
 
@@ -19,9 +20,12 @@ import { foldKey, leadTags, normalizeLead, type NormalizedLead } from './parse'
 //   2. An empty value never erases anything.
 //   3. Every delivery is a row in `leads` (the contact's lead history),
 //      even when the contact already existed.
-//   4. Answers, extra fields, UTMs, route and consent → a note.
+//   4. Answers, extra fields, UTMs, route and consent → a note (the
+//      lead's history on the contact).
 //   5. Tags (and the route tag, "rota-a") are applied, created if new.
-//   6. `fields` fill the custom field with the same name; the rest → note.
+//   6. Extra fields, answers, campaign, route and score fill custom
+//      fields (fields.ts): the de/para choice, else the field with the
+//      same name, else a new field named after it (migration 070).
 //   7. The raw payload is stored on the lead row.
 //   8. The same `id_externo` from the same origin within 24 h is not
 //      written twice.
@@ -319,6 +323,8 @@ interface EnrichArgs {
   leadId: string
   receivedAt: Date
   mappings: FieldMappings
+  /** `backfill` when reprocessing: custom values only fill empty ones. */
+  mode?: PatchMode
 }
 
 /**
@@ -341,7 +347,14 @@ export async function enrichContact(
 
   let extraFields: Record<string, string> = {}
   try {
-    extraFields = await applyFields(admin, account, contactId, lead, args.mappings)
+    extraFields = await applyFields(
+      admin,
+      account,
+      contactId,
+      lead,
+      args.mappings,
+      args.mode ?? 'replace',
+    )
   } catch (err) {
     console.error('[leads ingest] custom fields failed:', err)
     extraFields = { ...lead.fields }
@@ -371,10 +384,92 @@ async function applyTags(
   await assignImportedContactTags(admin, [{ contactId, tagNames }], tagIdByKey)
 }
 
+/** At most this many custom fields created by one lead. */
+export const MAX_NEW_FIELDS_PER_LEAD = 40
+/** At most this many custom fields created by leads in one account. */
+export const MAX_LEAD_FIELDS_PER_ACCOUNT = 200
+
+interface FieldDef {
+  id: string
+  field_name: string
+  field_key?: string | null
+  created_from?: string | null
+}
+
+/** Postgres / PostgREST telling that a column does not exist yet. */
+function missingColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message ?? '')
+}
+
+/** The account's custom fields, with 070's columns once it is applied. */
+async function loadFieldDefs(admin: SupabaseClient, accountId: string): Promise<FieldDef[]> {
+  const full = await admin
+    .from('custom_fields')
+    .select('id, field_name, field_key, created_from')
+    .eq('account_id', accountId)
+  if (!full.error) return (full.data ?? []) as FieldDef[]
+  if (!missingColumn(full.error)) throw full.error
+  const basic = await admin.from('custom_fields').select('id, field_name').eq('account_id', accountId)
+  if (basic.error) throw basic.error
+  return (basic.data ?? []) as FieldDef[]
+}
+
 /**
- * Write `lead.fields` to custom fields (same name, or the de/para
- * choice) and contact columns mapped on the de/para screen. Returns the
- * fields left for the note.
+ * Create the custom field a lead needs. With migration 070, a field
+ * another lead created a moment ago under the same key is reused (the
+ * unique index refuses the twin). Returns null when it can't be made.
+ */
+async function createLeadField(
+  admin: SupabaseClient,
+  account: LeadAccount,
+  entry: LeadFieldEntry,
+): Promise<string | null> {
+  const base = {
+    account_id: account.id,
+    user_id: account.ownerUserId,
+    field_name: entry.label,
+    field_type: 'text',
+  }
+  const first = await admin
+    .from('custom_fields')
+    .insert({ ...base, field_key: entry.key, created_from: 'lead' })
+    .select('id')
+    .single()
+  if (!first.error && first.data) return (first.data as { id: string }).id
+
+  if (first.error && isUniqueViolation(first.error)) {
+    const { data } = await admin
+      .from('custom_fields')
+      .select('id')
+      .eq('account_id', account.id)
+      .eq('field_key', entry.key)
+      .maybeSingle()
+    return (data as { id: string } | null)?.id ?? null
+  }
+
+  if (missingColumn(first.error)) {
+    // Before migration 070: the field still comes, without the guard.
+    const plain = await admin.from('custom_fields').insert(base).select('id').single()
+    if (!plain.error && plain.data) return (plain.data as { id: string }).id
+    console.error('[leads ingest] could not create field:', plain.error?.message)
+    return null
+  }
+
+  console.error('[leads ingest] could not create field:', first.error?.message)
+  return null
+}
+
+/**
+ * Write what the lead carries (extra fields, answers, campaign, route,
+ * score — see fields.ts) to the contact's custom fields: the de/para
+ * choice first, else the field with the same name, else a new field
+ * named after it. Contact columns mapped on the de/para are written
+ * too. Returns the extra fields left for the note's "Outros dados"
+ * (answers, campaign and route already have their own lines there).
+ *
+ * `replace` (a new lead): a filled value replaces the stored one.
+ * `backfill` (reprocessing): only empty values are filled.
  */
 async function applyFields(
   admin: SupabaseClient,
@@ -382,74 +477,111 @@ async function applyFields(
   contactId: string,
   lead: NormalizedLead,
   mappings: FieldMappings,
+  mode: PatchMode,
 ): Promise<Record<string, string>> {
-  const entries = Object.entries(lead.fields)
+  const entries = leadFieldEntries(lead)
   if (entries.length === 0) return {}
 
-  const { data: defs, error } = await admin
-    .from('custom_fields')
-    .select('id, field_name')
-    .eq('account_id', account.id)
-  if (error) throw error
-
+  const defs = await loadFieldDefs(admin, account.id)
   const byName = new Map<string, string>()
   const ownIds = new Set<string>()
-  for (const f of (defs ?? []) as { id: string; field_name: string }[]) {
+  let leadMade = 0
+  for (const f of defs) {
     ownIds.add(f.id)
+    if (f.created_from === 'lead') leadMade++
     const k = foldKey(f.field_name)
     if (k && !byName.has(k)) byName.set(k, f.id)
   }
+  // A field a lead created and someone renamed ("Qual o seu faturamento
+  // mensal?" → "Faturamento") keeps its key, so the answers still land
+  // in it. The current name wins when both match.
+  for (const f of defs) {
+    if (f.field_key && !byName.has(f.field_key)) byName.set(f.field_key, f.id)
+  }
 
   const leftover: Record<string, string> = {}
+  const toNote = (entry: LeadFieldEntry) => {
+    if (entry.origin === 'campo') leftover[entry.label] = entry.value
+  }
   const values = new Map<string, string>()
   const columnPatch: Record<string, string> = {}
+  const toCreate: LeadFieldEntry[] = []
 
-  for (const [key, value] of entries) {
-    const target = mappings[foldKey(key)]
+  for (const entry of entries) {
+    const target = mappings[entry.key]
     if (target === 'ignore') continue
     if (target === 'note') {
-      leftover[key] = value
+      toNote(entry)
       continue
     }
     if (target?.startsWith('contact:')) {
       const col = target.slice('contact:'.length)
       if ((MAPPABLE_CONTACT_COLUMNS as readonly string[]).includes(col)) {
-        columnPatch[col] = value
+        columnPatch[col] = entry.value
         continue
       }
     }
     if (target?.startsWith('custom:')) {
       const id = target.slice('custom:'.length)
       if (ownIds.has(id)) {
-        values.set(id, value)
+        values.set(id, entry.value)
         continue
       }
     }
-    const id = byName.get(foldKey(key))
-    if (id) values.set(id, value)
-    else leftover[key] = value
+    const id = byName.get(entry.key)
+    if (id) values.set(id, entry.value)
+    else toCreate.push(entry)
+  }
+
+  // New fields, within the caps; the rest stays in the note.
+  const room = Math.max(0, Math.min(MAX_NEW_FIELDS_PER_LEAD, MAX_LEAD_FIELDS_PER_ACCOUNT - leadMade))
+  for (const [i, entry] of toCreate.entries()) {
+    const id = i < room ? await createLeadField(admin, account, entry) : null
+    if (id) {
+      values.set(id, entry.value)
+      byName.set(entry.key, id)
+    } else {
+      toNote(entry)
+    }
   }
 
   if (values.size > 0) {
+    if (mode === 'backfill') {
+      const { data: current } = await admin
+        .from('contact_custom_values')
+        .select('custom_field_id, value')
+        .eq('contact_id', contactId)
+        .in('custom_field_id', Array.from(values.keys()))
+      for (const row of (current ?? []) as { custom_field_id: string; value: string | null }[]) {
+        if ((row.value ?? '').trim()) values.delete(row.custom_field_id)
+      }
+    }
     const rows = Array.from(values, ([custom_field_id, value]) => ({
       contact_id: contactId,
       custom_field_id,
       value,
     }))
-    const { error: upErr } = await admin
-      .from('contact_custom_values')
-      .upsert(rows, { onConflict: 'contact_id,custom_field_id' })
-    if (upErr) throw upErr
+    if (rows.length > 0) {
+      const { error: upErr } = await admin
+        .from('contact_custom_values')
+        .upsert(rows, { onConflict: 'contact_id,custom_field_id' })
+      if (upErr) throw upErr
+    }
   }
 
   if (Object.keys(columnPatch).length > 0) {
     const { data: current } = await admin
       .from('contacts')
-      .select('id, phone, name')
+      .select('*')
       .eq('id', contactId)
       .maybeSingle()
-    if (columnPatch.name && current && !nameIsPlaceholder(current as ContactRow)) {
-      delete columnPatch.name
+    const row = current as ContactRow | null
+    if (columnPatch.name && row && !nameIsPlaceholder(row)) delete columnPatch.name
+    if (mode === 'backfill' && row) {
+      for (const col of Object.keys(columnPatch)) {
+        const cur = row[col]
+        if (typeof cur === 'string' && cur.trim()) delete columnPatch[col]
+      }
     }
     if (Object.keys(columnPatch).length > 0) {
       await admin
@@ -585,6 +717,7 @@ export async function reprocessLead(
       leadId: stored.id,
       receivedAt: new Date(stored.created_at),
       mappings,
+      mode: 'backfill',
     })
     // A lead that only now found its contact lands in the funnel, as it
     // would have on arrival (rule 9). One that already had a contact

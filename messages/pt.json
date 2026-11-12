@@ -527,7 +527,14 @@
       "toastCreated": "Criado \"{name}\".",
       "toastRenameFailed": "Não foi possível renomear o campo.",
       "toastDeleteFailed": "Não foi possível excluir o campo.",
-      "toastDeleted": "Excluído \"{name}\"."
+      "toastDeleted": "Excluído \"{name}\".",
+      "fromLead": "criado por lead",
+      "fromLeadTitle": "Criado automaticamente quando um lead respondeu esta pergunta. Pode renomear: os próximos leads continuam caindo aqui."
+    },
+    "fieldsSummary": {
+      "title": "Campos",
+      "showAll": "Mostrar todos ({count})",
+      "showLess": "Mostrar menos"
     }
   },
   "Pipelines": {

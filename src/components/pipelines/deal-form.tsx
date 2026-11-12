@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { ContactFieldsSummary } from "@/components/contacts/contact-fields-summary";
 
 /**
  * Values to start a NEW deal with (ignored when editing). The inbox
@@ -359,6 +360,12 @@ export function DealForm({
                   {t("linkToConversation")}
                 </Link>
               )}
+
+              {/* What the contact answered (lead) and the team filled in. */}
+              <ContactFieldsSummary
+                contactId={contactId || null}
+                className="mt-1 rounded-lg border border-border bg-muted/40 p-3"
+              />
             </div>
 
             <div className="grid grid-cols-[1fr_110px] gap-3">

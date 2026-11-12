@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowRightLeft, Loader2, Save } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
+import { leadFieldEntries } from "@/lib/leads/fields";
 import { foldKey, normalizeLead } from "@/lib/leads/parse";
 import { Button } from "@/components/ui/button";
 
@@ -33,9 +34,9 @@ const SELECT_CLASS =
   "w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none";
 
 /**
- * The "de/para" per origin: for each extra field an origin sends, choose
- * where it goes. Without a choice, the field fills the custom field with
- * the same name, or goes to the contact's note.
+ * The "de/para" per origin: for each field or answer an origin sends,
+ * choose where it goes. Without a choice, it fills the custom field with
+ * the same name, created when the account has none (lib/leads/fields.ts).
  */
 export function LeadFieldMappings({
   leads,
@@ -46,18 +47,17 @@ export function LeadFieldMappings({
   canManage: boolean;
   sourceLabel: (source: string) => string;
 }) {
-  // Origins that sent extra fields, and the keys each one sent (with a sample).
+  // Origins and the fields / answers each one sent (with a sample), the
+  // same entries the ingest writes, so the keys agree.
   const byOrigin = useMemo(() => {
     const map = new Map<string, Map<string, { key: string; sample: string }>>();
     for (const l of leads) {
       const n = normalizeLead(l.raw);
       const source = n.source === "other" && l.source ? l.source : n.source;
-      for (const [key, value] of Object.entries(n.fields)) {
-        const folded = foldKey(key);
-        if (!folded) continue;
+      for (const entry of leadFieldEntries(n)) {
         let keys = map.get(source);
         if (!keys) map.set(source, (keys = new Map()));
-        if (!keys.has(folded)) keys.set(folded, { key, sample: value });
+        if (!keys.has(entry.key)) keys.set(entry.key, { key: entry.label, sample: entry.value });
       }
     }
     return map;
@@ -144,21 +144,21 @@ export function LeadFieldMappings({
         <div>
           <h2 className="font-semibold text-foreground">De/para por origem</h2>
           <p className="text-sm text-muted-foreground">
-            Escolha onde cai cada campo extra que uma origem envia. Sem escolha, ele preenche
-            o campo personalizado de mesmo nome ou vai para a nota do contato. Perguntas e
-            respostas sempre vão para a nota.
+            Escolha onde cai cada pergunta e cada campo que uma origem envia. Sem escolha,
+            ele preenche o campo personalizado de mesmo nome, criado se ainda não existir. A
+            nota do contato continua guardando o histórico de cada lead.
           </p>
         </div>
       </div>
 
       {origins.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Assim que chegar um lead com campos extras, eles aparecem aqui.
+          Assim que chegar um lead com perguntas ou campos extras, eles aparecem aqui.
         </p>
       ) : !available ? (
         <p className="text-xs text-amber-500">
           Disponível depois que a migration 068 for aplicada no banco. Até lá, vale a regra
-          automática (campo de mesmo nome, senão nota).
+          automática (campo de mesmo nome, criado se não existir).
         </p>
       ) : (
         <>
@@ -180,7 +180,7 @@ export function LeadFieldMappings({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">Campo recebido</th>
+                    <th className="py-2 pr-4 font-medium">Recebido</th>
                     <th className="py-2 pr-4 font-medium">Exemplo</th>
                     <th className="py-2 font-medium">Vai para</th>
                   </tr>
@@ -190,7 +190,7 @@ export function LeadFieldMappings({
                     const auto = fieldByFold.get(folded);
                     return (
                       <tr key={folded}>
-                        <td className="py-2 pr-4 font-mono text-xs">{key}</td>
+                        <td className="max-w-[18rem] py-2 pr-4 text-xs">{key}</td>
                         <td className="max-w-[14rem] truncate py-2 pr-4 text-muted-foreground" title={sample}>
                           {sample}
                         </td>
@@ -202,9 +202,9 @@ export function LeadFieldMappings({
                             className={SELECT_CLASS}
                           >
                             <option value="">
-                              Automático ({auto ? `campo ${auto.field_name}` : "nota"})
+                              Automático ({auto ? `campo ${auto.field_name}` : `novo campo ${key}`})
                             </option>
-                            <option value="note">Nota do contato</option>
+                            <option value="note">Só na nota do contato</option>
                             <option value="ignore">Ignorar</option>
                             <optgroup label="Contato">
                               {CONTACT_COLUMNS.map(([col, label]) => (

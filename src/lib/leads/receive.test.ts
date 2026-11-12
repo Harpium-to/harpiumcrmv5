@@ -102,7 +102,13 @@ describe('handleLeadIngest', () => {
     )
     expect(res.status).toBe(200)
     expect(tables.contacts[0]).toMatchObject({ name: 'Bia', phone: '+5511988887777' })
-    expect(String(tables.contact_notes[0].note_text)).toContain('• faturamento: 50 mil')
+    // The extra form field became a custom field of its own.
+    expect(tables.custom_fields).toEqual([
+      expect.objectContaining({ field_name: 'Faturamento', created_from: 'lead' }),
+    ])
+    expect(tables.contact_custom_values).toEqual([
+      expect.objectContaining({ custom_field_id: tables.custom_fields[0].id, value: '50 mil' }),
+    ])
   })
 
   it('401 for a wrong or missing token', async () => {
@@ -198,8 +204,7 @@ describe('handleLeadIngest — one URL per origin (068)', () => {
     })
     expect((await handleLeadIngest(post(body), TOKEN)).status).toBe(200)
     expect(tables.contacts[0].website).toBe('ana.com')
-    const note = String(tables.contact_notes[0].note_text)
-    expect(note).toContain('• outro: x')
-    expect(note).not.toContain('faturamento')
+    // "faturamento" ignored, "outro" got a field of its own.
+    expect((tables.custom_fields ?? []).map((f) => f.field_name)).toEqual(['Outro'])
   })
 })

@@ -527,7 +527,14 @@
       "toastCreated": "Created \"{name}\".",
       "toastRenameFailed": "Could not rename field.",
       "toastDeleteFailed": "Could not delete field.",
-      "toastDeleted": "Deleted \"{name}\"."
+      "toastDeleted": "Deleted \"{name}\".",
+      "fromLead": "from a lead",
+      "fromLeadTitle": "Created automatically when a lead answered this question. You can rename it: new leads keep landing here."
+    },
+    "fieldsSummary": {
+      "title": "Fields",
+      "showAll": "Show all ({count})",
+      "showLess": "Show less"
     }
   },
   "Pipelines": {
