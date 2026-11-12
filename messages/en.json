@@ -891,7 +891,8 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "agent_handoff": "Hand off to AI agent"
       },
       "triggers": {
         "new_message_received": {
@@ -929,6 +930,10 @@
         "manual": {
           "label": "Sequence (manual start)",
           "hint": "Starts when someone fires it for one contact, from the Chrome extension. Only messages, waits and actions; wait at least 1 minute between two messages."
+        },
+        "lead_received": {
+          "label": "Lead received",
+          "hint": "When a lead arrives at the lead URL (quiz, Google, Meta, Zapier, form). Filter by origin, route and tags."
         }
       },
       "trigger": "Trigger",
@@ -1032,7 +1037,21 @@
         "matchType": "Match type",
         "matchContains": "Contains",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "leadOrigins": "Origins",
+        "leadOriginsHint": "quiz-planejados, google",
+        "leadOriginsHelp": "Comma separated. Empty: any origin.",
+        "leadRoute": "Route",
+        "leadRouteAny": "Any route",
+        "leadTags": "Required tags",
+        "leadTagsHint": "low-budget, decision-maker:no",
+        "leadTagsHelp": "The lead must have all of them. Empty: no tag filter.",
+        "leadVarsHelp": "In messages you can use:",
+        "agentRole": "Agent",
+        "agentInstruction": "Instruction for the agent (optional)",
+        "agentInstructionHint": "E.g.: start by checking the budget before booking",
+        "agentHandoffHelp": "The agent receives the contact with the lead answers and opens the conversation on WhatsApp, within its working hours. Needs an active agent with this role.",
+        "leadOptOutHelp": "Contacts who opted out of automatic messages are skipped."
       }
     }
   },

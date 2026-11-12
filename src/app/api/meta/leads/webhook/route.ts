@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { supabaseAdmin } from '@/lib/leads/admin-client'
+import { dispatchLeadReceived } from '@/lib/leads/events'
 import { fetchLead } from '@/lib/leads/meta'
+import { loadFieldMappings } from '@/lib/leads/mappings'
 import { normalizeLead } from '@/lib/leads/parse'
 import { ingestLead } from '@/lib/leads/ingest'
 
@@ -97,10 +99,23 @@ async function processLead(
   const raw = await fetchLead(leadgenId, pageToken)
   const normalized = normalizeLead(raw)
 
-  await ingestLead(
+  const mappings = await loadFieldMappings(admin, page.account_id, normalized.source)
+  const result = await ingestLead(
     admin,
     { id: page.account_id, ownerUserId: account.owner_user_id },
     normalized,
     raw,
+    { mappings },
   )
+  // Meta retries deliveries; a repeat must not fire the flows again.
+  // After the 200: flows that send messages must not delay Meta's answer.
+  if (!result.duplicate) {
+    const event = {
+      accountId: page.account_id,
+      leadId: result.leadId,
+      contactId: result.contactId,
+      lead: normalized,
+    }
+    after(() => dispatchLeadReceived(admin, event))
+  }
 }

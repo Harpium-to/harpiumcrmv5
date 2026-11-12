@@ -6,6 +6,7 @@ import { generateReply } from '@/lib/ai/generate'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { logAiUsage } from '@/lib/ai/usage'
 import { sendChannelText } from '@/lib/channels/send-text'
+import { contactOptedOut } from '@/lib/contacts/opt-out'
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation'
 import type { AiConfig, AiUsage } from '@/lib/ai/types'
 
@@ -296,6 +297,15 @@ async function runMessageTask(
   }
 
   // ---- Fresh run ----
+  //
+  // An agent writing on its own is an automatic message: a contact who
+  // asked not to receive those (066) is never approached. (An approved
+  // message above was read and sent by a person's decision.)
+  if (task.contactId && (await contactOptedOut(db, accountId, task.contactId))) {
+    await failTask(db, { ...task, attempts: task.maxAttempts }, 'opted_out')
+    return 'failed'
+  }
+
   const contextStep = await startStep(db, {
     accountId,
     taskId: task.id,

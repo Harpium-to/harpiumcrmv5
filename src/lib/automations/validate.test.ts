@@ -335,3 +335,30 @@ describe("sequences (manual trigger)", () => {
     expect(waitMinutes(null)).toBe(0);
   });
 });
+
+describe('lead_received + agent_handoff', () => {
+  it('accepts any combination of optional filters', () => {
+    expect(validateTriggerForActivation('lead_received', {})).toEqual([])
+    expect(
+      validateTriggerForActivation('lead_received', {
+        origens: ['quiz-planejados'],
+        etiquetas: ['rota-a'],
+        rota: 'a',
+      }),
+    ).toEqual([])
+  })
+
+  it('refuses an unknown route or a non-list filter', () => {
+    expect(validateTriggerForActivation('lead_received', { rota: 'D' })[0]?.path).toBe('trigger.rota')
+    expect(validateTriggerForActivation('lead_received', { etiquetas: 'rota-a' })[0]?.path).toBe(
+      'trigger.etiquetas',
+    )
+  })
+
+  it('knows the agent handoff step', () => {
+    const step = (cfg: Record<string, unknown>) => [{ step_type: 'agent_handoff', step_config: cfg }]
+    expect(validateStepsForActivation(step({ role: 'sdr' }))).toEqual([])
+    expect(validateStepsForActivation(step({}))).toEqual([])
+    expect(validateStepsForActivation(step({ role: 'Drop Table' }))[0]?.path).toBe('steps[0].role')
+  })
+})

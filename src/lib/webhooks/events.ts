@@ -11,6 +11,7 @@ export const WEBHOOK_EVENTS = [
   'message.received', // an inbound WhatsApp message landed
   'message.status_updated', // a sent message advanced (sent/delivered/read)
   'conversation.created', // a new conversation was opened for a contact
+  'lead.received', // a lead arrived at the lead URL or from Meta Lead Ads
 ] as const;
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
@@ -21,6 +22,7 @@ export const WEBHOOK_EVENT_DESCRIPTIONS: Record<WebhookEvent, string> = {
   'message.status_updated':
     'Uma mensagem enviada mudou de status (enviada/entregue/lida/falhou)',
   'conversation.created': 'Uma conversa nova foi aberta',
+  'lead.received': 'Chegou um lead (quiz, Google, Meta, Zapier, formulário)',
 };
 
 /** Type-narrow an unknown value into a valid `WebhookEvent`. */

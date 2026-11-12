@@ -33,7 +33,9 @@ import {
   ArrowUp,
   MousePointerClick,
   List,
+  Bot,
 } from "lucide-react"
+import { AGENT_ROLES } from "@/lib/agents/roles"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -111,6 +113,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   condition: { label: "condition", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "send_webhook", icon: Webhook, border: "border-l-primary" },
   close_conversation: { label: "close_conversation", icon: CircleSlash, border: "border-l-primary" },
+  agent_handoff: { label: "agent_handoff", icon: Bot, border: "border-l-primary" },
 }
 
 const ADDABLE_STEPS: AutomationStepType[] = [
@@ -127,13 +130,18 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "condition",
   "send_webhook",
   "close_conversation",
+  "agent_handoff",
 ]
+
+/** Agent roles that talk to customers — the ones a contact can be handed to. */
+const MESSAGING_ROLES = AGENT_ROLES.filter((r) => r.tools.includes("messaging"))
 
 const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
   { value: "new_message_received" },
   { value: "first_inbound_message" },
   { value: "keyword_match" },
   { value: "interactive_reply" },
+  { value: "lead_received" },
   { value: "new_contact_created" },
   { value: "conversation_assigned" },
   { value: "tag_added" },
@@ -189,6 +197,8 @@ function blankConfig(type: AutomationStepType): Record<string, unknown> {
       return { url: "", headers: {}, body_template: "" }
     case "close_conversation":
       return {}
+    case "agent_handoff":
+      return { role: "sdr", instruction: "" }
     default:
       return {}
   }
@@ -852,6 +862,9 @@ function TriggerCard({
             {type === "interactive_reply" && (
               <InteractiveReplyConfig config={config} onChange={onConfigChange} t={t} />
             )}
+            {type === "lead_received" && (
+              <LeadReceivedConfig config={config} onChange={onConfigChange} t={t} />
+            )}
             {type === "tag_added" && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -1024,6 +1037,109 @@ function InteractiveReplyConfig({
         className="bg-muted font-mono text-foreground"
       />
       <p className="mt-1 text-[11px] text-muted-foreground">{t("replyIdsHelp")}</p>
+    </div>
+  )
+}
+
+/** A comma-separated list input that commits on blur / Enter. */
+function CommaListInput({
+  value,
+  onCommit,
+  placeholder,
+}: {
+  value: string[]
+  onCommit: (list: string[]) => void
+  placeholder: string
+}) {
+  const [draft, setDraft] = useState(value.join(", "))
+  function commit() {
+    const parsed = draft
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    setDraft(parsed.join(", "))
+    onCommit(parsed)
+  }
+  return (
+    <Input
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault()
+          commit()
+        }
+      }}
+      placeholder={placeholder}
+      className="bg-muted font-mono text-foreground"
+    />
+  )
+}
+
+/** Filters of the "Lead recebido" trigger: origins, route, required tags. */
+function LeadReceivedConfig({
+  config,
+  onChange,
+  t,
+}: {
+  config: Record<string, unknown>
+  onChange: (c: Record<string, unknown>) => void
+  t: ReturnType<typeof useTranslations>
+}) {
+  const origins = (config?.origens as string[] | undefined) ?? []
+  const tags = (config?.etiquetas as string[] | undefined) ?? []
+  const route = (config?.rota as string | undefined) ?? ""
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">
+          {t("config.leadOrigins")}
+        </label>
+        <CommaListInput
+          value={origins}
+          onCommit={(list) => onChange({ ...config, origens: list })}
+          placeholder={t("config.leadOriginsHint")}
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">{t("config.leadOriginsHelp")}</p>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">
+          {t("config.leadRoute")}
+        </label>
+        <select
+          value={route}
+          onChange={(e) => onChange({ ...config, rota: e.target.value })}
+          className={SELECT_CLASS}
+        >
+          <option value="">{t("config.leadRouteAny")}</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-muted-foreground">
+          {t("config.leadTags")}
+        </label>
+        <CommaListInput
+          value={tags}
+          onCommit={(list) => onChange({ ...config, etiquetas: list })}
+          placeholder={t("config.leadTagsHint")}
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">{t("config.leadTagsHelp")}</p>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {t("config.leadVarsHelp")}{" "}
+        {["{{ vars.primeiro_nome }}", "{{ vars.nome }}", "{{ vars.empresa }}", "{{ vars.origem }}", "{{ vars.rota }}"].map(
+          (v) => (
+            <code key={v} className="mr-1 whitespace-nowrap font-mono text-foreground">
+              {v}
+            </code>
+          ),
+        )}
+        <span className="mt-1 block">{t("config.leadOptOutHelp")}</span>
+      </p>
     </div>
   )
 }
@@ -1507,9 +1623,44 @@ function StepEditor({
           {t("config.closeConversationHint", { defaultValue: "Muda o status da conversa para \"fechada\". Não precisa configurar nada." })}
         </p>
       )
+    case "agent_handoff":
+      return (
+        <>
+          <FieldBlock label={t("config.agentRole")}>
+            <AgentRoleSelect
+              value={(cfg.role as string) || "sdr"}
+              onChange={(role) => set({ role })}
+            />
+          </FieldBlock>
+          <FieldBlock label={t("config.agentInstruction")}>
+            <Textarea
+              value={(cfg.instruction as string) ?? ""}
+              onChange={(e) => set({ instruction: e.target.value })}
+              placeholder={t("config.agentInstructionHint")}
+              className="min-h-16 bg-muted text-foreground"
+            />
+          </FieldBlock>
+          <p className="text-[11px] text-muted-foreground">{t("config.agentHandoffHelp")}</p>
+        </>
+      )
     default:
       return null
   }
+}
+
+function AgentRoleSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const tAgents = useTranslations("Agents")
+  const known = MESSAGING_ROLES.some((r) => r.id === value)
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={SELECT_CLASS}>
+      {MESSAGING_ROLES.map((r) => (
+        <option key={r.id} value={r.id}>
+          {tAgents(r.labelKey)}
+        </option>
+      ))}
+      {!known && <option value={value}>{value}</option>}
+    </select>
+  )
 }
 
 function FieldBlock({
@@ -1542,6 +1693,10 @@ function previewFor(step: BuilderStep): string {
       return `quando ${step.step_config.subject ?? "?"}`
     case "send_webhook":
       return (step.step_config.url as string) || "sem URL"
+    case "agent_handoff": {
+      const role = AGENT_ROLES.find((r) => r.id === ((step.step_config.role as string) || "sdr"))
+      return role ? `agente: ${role.id}` : ""
+    }
     default:
       return ""
   }
