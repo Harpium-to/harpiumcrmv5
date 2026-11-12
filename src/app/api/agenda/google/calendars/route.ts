@@ -15,11 +15,13 @@ import { listOwnedCalendars } from '@/lib/google/calendar-api'
 import { getGoogleAccessToken } from '@/lib/google/connections'
 import { GoogleAuthError, googleOAuthConfig } from '@/lib/google/oauth'
 import { UUID } from '@/lib/google/oauth-flow'
+import { crmOrigin } from '@/lib/google/origin'
 
 export async function GET(request: Request) {
   try {
     const ctx = await requireRole('admin')
-    const { origin, searchParams } = new URL(request.url)
+    const { searchParams } = new URL(request.url)
+    const origin = crmOrigin(request)
     const connectionId = searchParams.get('connection') ?? ''
     if (!UUID.test(connectionId)) {
       return NextResponse.json({ error: "'connection' inválido" }, { status: 400 })

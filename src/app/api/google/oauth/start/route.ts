@@ -22,9 +22,11 @@ import {
   GOOGLE_STATE_MAX_AGE,
   UUID,
 } from '@/lib/google/oauth-flow'
+import { crmOrigin } from '@/lib/google/origin'
 
 export async function GET(request: Request) {
-  const { origin, searchParams } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const origin = crmOrigin(request)
   const raw = searchParams.get('calendar')
   const calendarId = raw && UUID.test(raw) ? raw : null
 

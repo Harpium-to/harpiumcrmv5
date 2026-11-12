@@ -31,9 +31,11 @@ import {
   GOOGLE_STATE_COOKIE,
   type GoogleConnectResult,
 } from '@/lib/google/oauth-flow'
+import { crmOrigin } from '@/lib/google/origin'
 
 export async function GET(request: NextRequest) {
-  const { origin, searchParams } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  const origin = crmOrigin(request)
   const back = (result: GoogleConnectResult, calendarId?: string | null) => {
     const res = NextResponse.redirect(agendaReturnUrl(origin, result, calendarId))
     res.cookies.delete(GOOGLE_STATE_COOKIE)

@@ -20,6 +20,7 @@ import { deleteGoogleEvent } from '@/lib/google/calendar-api'
 import { getGoogleAccessToken, readRefreshToken } from '@/lib/google/connections'
 import { googleOAuthConfig, revokeGoogleToken } from '@/lib/google/oauth'
 import { UUID } from '@/lib/google/oauth-flow'
+import { crmOrigin } from '@/lib/google/origin'
 
 /** Removals done inside the request; anything beyond stays in Google. */
 const MAX_REMOTE_DELETES = 300
@@ -28,7 +29,7 @@ const PARALLEL = 5
 export async function POST(request: Request) {
   try {
     const ctx = await requireRole('admin')
-    const { origin } = new URL(request.url)
+    const origin = crmOrigin(request)
     const body = (await request.json().catch(() => null)) as {
       connectionId?: unknown
       deleteRemote?: unknown
