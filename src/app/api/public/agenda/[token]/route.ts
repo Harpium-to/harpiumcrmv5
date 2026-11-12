@@ -12,6 +12,7 @@
 
 import { after, NextResponse } from "next/server";
 
+import { refreshGoogleBusy } from "@/lib/agenda/google-busy";
 import { processGoogleCalendarSync } from "@/lib/agenda/google-sync";
 import { processCalendarNotifications } from "@/lib/agenda/messages";
 import {
@@ -51,6 +52,9 @@ export async function GET(
   const calendar = await loadPublicCalendar(admin, token);
   if (!calendar) return notFound();
 
+  // What the professional has in Google Agenda (071), read again if
+  // it is more than two minutes old.
+  await refreshGoogleBusy(admin, { calendarIds: [calendar.id], maxAgeMs: 120_000 });
   const slots = await publicSlots(admin, calendar, new Date());
   if (slots === null) {
     return NextResponse.json(
@@ -93,6 +97,8 @@ export async function POST(
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
+  // A slot taken in Google a minute ago must not be booked here (071).
+  await refreshGoogleBusy(admin, { calendarIds: [calendar.id], maxAgeMs: 30_000 });
   const outcome = await bookPublic(admin, calendar, parsed.input, new Date());
   if (outcome.status === "booked" || outcome.status === "pending") {
     // Into the professional's Google Agenda, if this agenda writes there

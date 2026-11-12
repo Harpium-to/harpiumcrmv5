@@ -40,7 +40,7 @@ import {
   zonedToUtc,
 } from '@/lib/agenda/time';
 import { googleResultMessage } from '@/lib/google/oauth-flow';
-import type { AgendaCalendar, AgendaEvent, GoogleConnection } from '@/types';
+import type { AgendaCalendar, AgendaEvent, GoogleBusyBlock, GoogleConnection } from '@/types';
 
 import { CalendarsDialog } from './calendars-dialog';
 import { EventDialog, type EventSeed } from './event-dialog';
@@ -113,6 +113,8 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [eventsLoaded, setEventsLoaded] = useState(false);
   const [pending, setPending] = useState<AgendaEvent[]>([]);
+  // What is busy in the professionals' Google Agenda (071), for the window.
+  const [googleBusy, setGoogleBusy] = useState<GoogleBusyBlock[]>([]);
   const [view, setView] = useState<View>('week');
   const [anchor, setAnchor] = useState(() => dayKeyOf(new Date(), DEFAULT_TIMEZONE));
   const [pickedCalendarId, setPickedCalendarId] = useState<string | null>(null);
@@ -201,22 +203,6 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
   }, [canManage]);
 
-  const googleActions = useMemo<GoogleAgendaActions | null>(
-    () =>
-      googleConnections === null
-        ? null
-        : {
-            connections: googleConnections,
-            list: (connectionId) => store.listGoogleCalendars(connectionId),
-            link: (calendarId, connectionId, googleCalendarId) =>
-              store.linkGoogle(calendarId, connectionId, googleCalendarId),
-            disconnect: (connectionId, deleteRemote) => store.disconnectGoogle(connectionId, deleteRemote),
-            onChanged: async () => {
-              await Promise.all([reloadCalendars(), reloadGoogle()]);
-            },
-          },
-    [googleConnections, reloadCalendars, reloadGoogle, store],
-  );
 
   // What the grid shows, and the window of events that feeds it.
   const zone = calendar?.timezone ?? DEFAULT_TIMEZONE;
@@ -235,9 +221,10 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
     if (!ready) return;
     // What waits for approval is read on its own, whatever week is on
     // screen: a request for next month must not go unseen.
-    const [rows, waiting] = await Promise.all([
+    const [rows, waiting, busy] = await Promise.all([
       store.loadEvents(windowFrom, windowTo),
       store.loadPending(new Date()),
+      store.loadGoogleBusy(windowFrom, windowTo),
     ]);
     if (rows === null) {
       toast.error('Não consegui carregar os agendamentos.');
@@ -245,12 +232,55 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
       setEvents(rows);
     }
     if (waiting !== null) setPending(waiting);
+    setGoogleBusy(busy);
     setEventsLoaded(true);
   }, [ready, store, windowFrom, windowTo]);
 
   useEffect(() => {
     void reloadEvents();
   }, [reloadEvents]);
+
+  const googleActions = useMemo<GoogleAgendaActions | null>(
+    () =>
+      googleConnections === null
+        ? null
+        : {
+            connections: googleConnections,
+            list: (connectionId) => store.listGoogleCalendars(connectionId),
+            link: (calendarId, connectionId, googleCalendarId) =>
+              store.linkGoogle(calendarId, connectionId, googleCalendarId),
+            disconnect: (connectionId, deleteRemote) => store.disconnectGoogle(connectionId, deleteRemote),
+            setShowBusy: (calendarId, show) => store.setGoogleShowBusy(calendarId, show),
+            connectLink: (calendarId) => store.createGoogleConnectLink(calendarId),
+            onChanged: async () => {
+              await Promise.all([reloadCalendars(), reloadGoogle()]);
+              await store.refreshGoogle();
+              await reloadEvents();
+            },
+          },
+    [googleConnections, reloadCalendars, reloadEvents, reloadGoogle, store],
+  );
+
+  // An agenda that shows Google: ask for a fresh read when the screen
+  // opens (the server spaces the reads), then show what came.
+  const showsGoogle = useMemo(
+    () =>
+      data?.status === 'ready' &&
+      data.calendars.some((c) => c.google_connection_id && c.google_show_busy !== false),
+    [data],
+  );
+  useEffect(() => {
+    if (!showsGoogle) return;
+    let cancelled = false;
+    void store.refreshGoogle().then(() => {
+      if (!cancelled) void reloadEvents();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Once per opening, not on every week the person flips to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showsGoogle, store]);
 
   // Someone else on the team may be booking too: re-read on a timer
   // and whenever the tab comes back, and keep the "now" line moving.
@@ -316,8 +346,18 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
 
   const loadBusy = useCallback(
     async (calendarId: string, from: Date, to: Date): Promise<Interval[] | null> => {
-      const rows = await store.loadEvents(from, to);
-      return rows === null ? null : busyOf(rows.filter((e) => e.calendar_id === calendarId));
+      const [rows, google] = await Promise.all([
+        store.loadEvents(from, to),
+        store.loadGoogleBusy(from, to),
+      ]);
+      if (rows === null) return null;
+      return [
+        ...busyOf(rows.filter((e) => e.calendar_id === calendarId)),
+        // Busy in Google (071): never offered as free.
+        ...google
+          .filter((b) => b.calendar_id === calendarId)
+          .map((b) => ({ start: new Date(b.starts_at), end: new Date(b.ends_at) })),
+      ];
     },
     [store],
   );
@@ -571,6 +611,23 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
         </p>
       ) : null}
 
+      {/* Google refused a stored access (G3): say so where admins look. */}
+      {canManage && googleConnections?.some((c) => c.status === 'needs_reconnect') ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm">
+          <span>
+            Reconecte o Google Agenda de{' '}
+            {googleConnections
+              .filter((c) => c.status === 'needs_reconnect')
+              .map((c) => c.email)
+              .join(', ')}
+            : enquanto isso, nada vai para o Google e os compromissos de lá não aparecem aqui.
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setCalendarsOpen(true)}>
+            Resolver
+          </Button>
+        </div>
+      ) : null}
+
       {pending.length > 0 ? (
         <div className="surface flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2.5">
           <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -609,6 +666,7 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
         canBook={canBook}
         onPickSlot={openSlot}
         onOpenEvent={openEvent}
+        googleBusy={googleBusy}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-muted-foreground">
@@ -637,6 +695,7 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
             : activeCalendars
         }
         hoursByCalendar={hoursByCalendar}
+        googleBusy={googleBusy}
         accountId={accountId}
         canBook={canBook}
         onSave={async (payload, id) => {

@@ -221,6 +221,16 @@ export interface AgendaCalendar {
   google_connection_id?: string | null;
   google_calendar_id?: string | null;
   google_calendar_name?: string | null;
+  /** 071: show (and block) what is in that Google calendar. */
+  google_show_busy?: boolean;
+}
+
+/** A time busy in the professional's Google Agenda, per agenda (071). Never the title. */
+export interface GoogleBusyBlock {
+  calendar_id: string;
+  starts_at: string;
+  ends_at: string;
+  all_day: boolean;
 }
 
 /** A Google account connected to the CRM, for the Agenda (069). */
@@ -282,6 +292,8 @@ export interface AgendaEvent {
    */
   google_sync_state?: 'pending' | 'syncing' | 'synced' | 'error' | null;
   google_sync_error?: string | null;
+  /** 071: someone moved or deleted it directly in Google ("Movido no Google…"). */
+  google_remote_notice?: string | null;
   /** Embedded by the agenda's own queries. */
   contact?: { id: string; name: string | null; phone: string | null } | null;
 }
@@ -341,7 +353,9 @@ export type NotificationType =
   /** A task for this person came due (060). */
   | 'task_due'
   /** A customer booked through an agenda's public link (067). */
-  | 'agenda_booking';
+  | 'agenda_booking'
+  /** Google Agenda: an appointment changed there, or the connection dropped (071). */
+  | 'agenda_google';
 
 export interface Notification {
   id: string;

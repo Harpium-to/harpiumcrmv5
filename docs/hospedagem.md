@@ -195,10 +195,11 @@ lembrete antes do horário e, como garantia, a confirmação de quem
 marcou. A confirmação sai na hora pela própria tela; o lembrete só sai
 pelo agendador, então com ele parado ninguém é lembrado.
 
-Também é ele a garantia do **Google Agenda** (migration 069): cada
-mudança vai para o Google na hora, e o que falhar (Google fora do ar,
-por exemplo) é reenviado pelo agendador, até 5 vezes, com intervalos
-crescentes.
+Também é ele a garantia do **Google Agenda** (migrations 069 e 071):
+- **Do CRM para o Google:** cada mudança vai para o Google na hora. O que falhar (Google fora do ar, por exemplo) é reenviado pelo agendador, até 5 vezes, com intervalos crescentes.
+- **Do Google para o CRM:** a cada ciclo, o agendador relê do Google os compromissos das agendas que os mostram. Com ele a cada 5 minutos, um compromisso novo no Google aparece no CRM em até 5 minutos. A IA e o link público ainda conferem o Google na hora de marcar.
+
+O link que o administrador manda ao profissional, `/conectar-google/<código>`, também funciona **sem login**.
 
 A agenda tem dois endereços que funcionam **sem login**, cada um atrás
 de um código secreto e desligado até um administrador ligar na agenda:

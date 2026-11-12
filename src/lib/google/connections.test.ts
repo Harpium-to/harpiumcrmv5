@@ -28,7 +28,12 @@ function fakeDb(secret: Record<string, unknown> | null) {
     }
     return chain
   }
-  return { db: { from } as unknown as SupabaseClient, secretUpdates, connectionUpdates }
+  const rpcs: { name: string; args: Record<string, unknown> }[] = []
+  const rpc = async (name: string, args: Record<string, unknown>) => {
+    rpcs.push({ name, args })
+    return { data: true, error: null }
+  }
+  return { db: { from, rpc } as unknown as SupabaseClient, secretUpdates, connectionUpdates, rpcs }
 }
 
 function deps(patch: Partial<TokenDeps> = {}): TokenDeps {
@@ -81,7 +86,10 @@ describe('getGoogleAccessToken', () => {
     })
     const error = await getGoogleAccessToken(world.db, 'conn', config, d).catch((e) => e)
     expect(error.revoked).toBe(true)
-    expect(world.connectionUpdates[0]).toMatchObject({ status: 'needs_reconnect' })
+    // 071: one call that marks it and tells the admins.
+    expect(world.rpcs).toEqual([
+      { name: 'google_connection_dropped', args: expect.objectContaining({ p_connection_id: 'conn' }) },
+    ])
   })
 
   it('Google merely busy: nothing is marked, the caller retries', async () => {
@@ -93,6 +101,7 @@ describe('getGoogleAccessToken', () => {
     })
     await expect(getGoogleAccessToken(world.db, 'conn', config, d)).rejects.toBeInstanceOf(GoogleAuthError)
     expect(world.connectionUpdates).toEqual([])
+    expect(world.rpcs).toEqual([])
   })
 
   it('a connection removed meanwhile counts as revoked', async () => {

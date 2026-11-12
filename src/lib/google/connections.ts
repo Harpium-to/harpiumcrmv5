@@ -100,6 +100,16 @@ export async function markNeedsReconnect(
   connectionId: string,
   reason: string,
 ): Promise<void> {
+  // 071: marks it once and tells the CRM's admins in the bell.
+  try {
+    const { error } = await db.rpc('google_connection_dropped', {
+      p_connection_id: connectionId,
+      p_reason: reason,
+    })
+    if (!error) return
+  } catch {
+    // Fall through to the plain update below.
+  }
   await db
     .from('google_connections')
     .update({ status: 'needs_reconnect', last_error: reason.slice(0, 500), updated_at: new Date().toISOString() })

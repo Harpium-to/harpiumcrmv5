@@ -13,7 +13,7 @@ import {
   zonedToUtc,
 } from '@/lib/agenda/time';
 import { cn } from '@/lib/utils';
-import type { AgendaCalendar, AgendaEvent } from '@/types';
+import type { AgendaCalendar, AgendaEvent, GoogleBusyBlock } from '@/types';
 
 /** Height of one hour. Everything vertical derives from it. */
 const HOUR_PX = 56;
@@ -42,6 +42,8 @@ interface TimeGridProps {
   canBook: boolean;
   onPickSlot: (column: GridColumn, minute: number) => void;
   onOpenEvent: (event: AgendaEvent) => void;
+  /** What is busy in the professional's Google Agenda (071): shown, not opened. */
+  googleBusy?: GoogleBusyBlock[];
 }
 
 /** Who or what an event is about, in one line. */
@@ -114,6 +116,38 @@ export function placeEvents(
   return placed;
 }
 
+/**
+ * Where a column's Google busy times sit — the same cut to the column's
+ * day as placeEvents, for blocks that only show.
+ */
+export function placeBusy(
+  column: Pick<GridColumn, 'calendar' | 'dayKey'>,
+  blocks: GoogleBusyBlock[],
+  range: [number, number],
+): { key: string; top: number; height: number; allDay: boolean }[] {
+  const zone = column.calendar.timezone;
+  const dayStart = zonedToUtc(column.dayKey, 0, zone).getTime();
+  const dayEnd = zonedToUtc(addDays(column.dayKey, 1), 0, zone).getTime();
+  const [from, until] = range;
+  const placed: { key: string; top: number; height: number; allDay: boolean }[] = [];
+  for (const block of blocks) {
+    if (block.calendar_id !== column.calendar.id) continue;
+    const start = new Date(block.starts_at).getTime();
+    const end = new Date(block.ends_at).getTime();
+    if (end <= dayStart || start >= dayEnd) continue;
+    const startMinute = Math.max(from, (Math.max(start, dayStart) - dayStart) / 60000);
+    const endMinute = Math.min(until, (Math.min(end, dayEnd) - dayStart) / 60000);
+    if (endMinute <= startMinute) continue;
+    placed.push({
+      key: `${block.starts_at}-${block.ends_at}`,
+      top: (startMinute - from) * PX_PER_MINUTE,
+      height: Math.max((endMinute - startMinute) * PX_PER_MINUTE, MIN_EVENT_PX),
+      allDay: block.all_day,
+    });
+  }
+  return placed;
+}
+
 /** The parts of [from, until] an agenda does not attend on a weekday. */
 function closedStretches(
   hours: HoursRow[],
@@ -144,6 +178,7 @@ export function TimeGrid({
   canBook,
   onPickSlot,
   onOpenEvent,
+  googleBusy = [],
 }: TimeGridProps) {
   const [from, until] = range;
   const hourMarks: number[] = [];
@@ -243,6 +278,19 @@ export function TimeGrid({
                       />
                     ),
                   )}
+
+                  {/* Busy in Google Agenda (071): shown under the CRM's own
+                      events, never opened — clicking there books, with a warning. */}
+                  {placeBusy(column, googleBusy, range).map(({ key, top, height, allDay }) => (
+                    <span
+                      key={key}
+                      aria-label="Ocupado no Google Agenda"
+                      className="agenda-block pointer-events-none absolute flex items-start overflow-hidden rounded-lg border border-dashed border-foreground/20 px-2 py-1 text-[11px] leading-tight text-muted-foreground"
+                      style={{ top: top + 1, height: height - 2, left: 4, right: 4 }}
+                    >
+                      <span className="truncate">{allDay ? 'Ocupado o dia todo (Google)' : 'Ocupado (Google)'}</span>
+                    </span>
+                  ))}
 
                   {placeEvents(column, events, range).map(({ event, top, height }) => {
                     const block = event.kind === 'block';

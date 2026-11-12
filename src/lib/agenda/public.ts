@@ -22,6 +22,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 
+import { googleBusyByCalendar } from './google-busy'
 import { busyOf, freeSlots, type HoursRow, type Slot } from './slots'
 import { dayKeyOf, safeTimeZone } from './time'
 
@@ -99,13 +100,16 @@ export async function publicSlots(
       .gt('ends_at', now.toISOString()),
   ])
   if (hours.error || events.error) return null
+  // What is busy in the professional's Google Agenda (071), if shown.
+  const google = await googleBusyByCalendar(admin, [calendar.id], now, until)
   return freeSlots({
     hours: (hours.data ?? []) as HoursRow[],
     slotMinutes: calendar.slotMinutes,
     timezone: calendar.timezone,
-    busy: busyOf(
-      (events.data ?? []) as { starts_at: string; ends_at: string; status: string }[],
-    ),
+    busy: [
+      ...busyOf((events.data ?? []) as { starts_at: string; ends_at: string; status: string }[]),
+      ...(google.get(calendar.id) ?? []),
+    ],
     fromDay: dayKeyOf(now, calendar.timezone),
     days: PUBLIC_BOOKING_DAYS,
     now,

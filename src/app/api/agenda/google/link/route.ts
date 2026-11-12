@@ -14,6 +14,7 @@
 
 import { after, NextResponse } from 'next/server'
 
+import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
@@ -112,6 +113,8 @@ export async function POST(request: Request) {
       .eq('account_id', ctx.accountId)
     if (error) throw error
 
+    // Read the new calendar now, so the screen shows it on its next load.
+    await refreshGoogleBusy(admin, { calendarIds: [calendarId], maxAgeMs: 0 })
     after(() => processGoogleCalendarSync(admin, { crmUrl: origin }))
     return NextResponse.json({ ok: true, googleCalendarName: name })
   } catch (err) {

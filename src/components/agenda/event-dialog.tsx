@@ -34,6 +34,7 @@ import type {
   AgendaEvent,
   AgendaEventKind,
   AgendaEventStatus,
+  GoogleBusyBlock,
 } from '@/types';
 
 import { ContactPicker, type PickedContact } from './contact-picker';
@@ -59,6 +60,8 @@ interface EventDialogProps {
   onClose: () => void;
   calendars: AgendaCalendar[];
   hoursByCalendar: Record<string, HoursRow[]>;
+  /** Busy in the professionals' Google Agenda (071): booking over it warns. */
+  googleBusy?: GoogleBusyBlock[];
   accountId: string | null;
   /** Viewers open an event to read it; nothing is editable. */
   canBook: boolean;
@@ -82,6 +85,7 @@ function EventForm({
   onClose,
   calendars,
   hoursByCalendar,
+  googleBusy = [],
   accountId,
   canBook,
   onSave,
@@ -135,6 +139,24 @@ function EventForm({
     !block &&
     startLocal.length >= 16 &&
     !withinHours(hoursByCalendar[calendarId] ?? [], startDay, startMinute, startMinute + duration);
+
+  // Busy in the professional's Google Agenda (071): allowed, but said.
+  const pickedStart = startLocal.length >= 16 ? fromLocalInput(startLocal, zone) : null;
+  const pickedEnd = pickedStart
+    ? block
+      ? fromLocalInput(endLocal, zone)
+      : new Date(pickedStart.getTime() + duration * 60000)
+    : null;
+  const overGoogle =
+    !cancelled &&
+    !!pickedStart &&
+    !!pickedEnd &&
+    googleBusy.some(
+      (b) =>
+        b.calendar_id === calendarId &&
+        new Date(b.starts_at) < pickedEnd &&
+        new Date(b.ends_at) > pickedStart,
+    );
 
   function build(nextStatus: AgendaEventStatus): EventWrite | string {
     if (!calendar) return 'Escolha uma agenda.';
@@ -354,6 +376,13 @@ function EventForm({
         )}
       </div>
 
+      {overGoogle ? (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          Esse horário está ocupado no Google Agenda do profissional. Dá para marcar mesmo assim, como
+          encaixe.
+        </p>
+      ) : null}
+
       {outsideHours ? (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           Fora do horário de atendimento desta agenda. Dá para marcar mesmo assim, como encaixe.
@@ -515,6 +544,16 @@ function GoogleLink(props: { title: string; start: string; minutes: number; deta
 /** Where this event stands in Google Agenda, when its agenda writes there (069). */
 function GoogleSyncLine({ event }: { event: AgendaEvent }) {
   const state = event.google_sync_state;
+  // Moved or deleted directly in Google (071): the CRM did not follow.
+  if (event.google_remote_notice) {
+    return (
+      <p className="inline-flex items-start gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <CalendarCheck className="mt-0.5 size-3 shrink-0" />
+        {event.google_remote_notice} O CRM não mudou nada: remarque ou cancele aqui, se for o caso.
+        Salvar este agendamento põe o Google de volta como está no CRM.
+      </p>
+    );
+  }
   if (!state) return null;
   const line =
     state === 'synced'
