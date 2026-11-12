@@ -17,6 +17,7 @@ import {
   Sparkles,
   Users,
   Workflow,
+  Wrench,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -49,6 +50,12 @@ export interface NavItem {
   group: "work" | "build" | "system";
   /** Renders a small "Beta" chip in the drawer / tooltip. */
   beta?: boolean;
+  /**
+   * Reached from a button in the top bar rather than the desktop rail
+   * (Ferramentas sits beside the agents chip). The mobile drawer still
+   * lists it, since the top bar's chips do not fit on a phone.
+   */
+  topbar?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -65,6 +72,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/flows", labelKey: "flows", icon: Workflow, group: "build", beta: true },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio, group: "build" },
   { href: "/canais", labelKey: "channels", icon: Plug, group: "build" },
+  { href: "/ferramentas", labelKey: "tools", icon: Wrench, group: "build", topbar: true },
   { href: "/settings", labelKey: "settings", icon: Settings, group: "system" },
   { href: "/ajuda", labelKey: "help", icon: LifeBuoy, group: "system" },
 ];

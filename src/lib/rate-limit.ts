@@ -175,6 +175,16 @@ export const RATE_LIMITS = {
    *  than a handful of appointments in a minute; this is what stops a
    *  script from filling someone's week. */
   publicAgendaBook: { limit: 6, windowMs: 60_000 },
+  /** A public quiz page loading its questions (per IP). Many visitors
+   *  of one ad can share an address behind a mobile carrier, so this is
+   *  roomy: it only has to make guessing addresses pointless. */
+  publicQuizRead: { limit: 240, windowMs: 60_000 },
+  /** One visit reporting its progress (per IP and visit). A person
+   *  sends one update per screen; 90/min is several times that. */
+  publicQuizVisit: { limit: 90, windowMs: 60_000 },
+  /** Every visit update from one address. The ceiling a script hits
+   *  when it invents a new visit id on each request. */
+  publicQuizWrite: { limit: 900, windowMs: 60_000 },
 } as const;
 
 /** Test-only helper. Clears the in-memory state so unit tests don't

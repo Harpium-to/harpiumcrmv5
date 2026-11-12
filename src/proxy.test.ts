@@ -111,3 +111,46 @@ describe("proxy — refreshed auth cookies survive redirects", () => {
     expect(res.cookies.get(ROTATED.name)?.value).toBe(ROTATED.value);
   });
 });
+
+describe("proxy — the public quiz", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("answers /q/<slug> and its API without touching the session", async () => {
+    refreshedCookies = [ROTATED];
+    for (const path of ["/q/diagnostico", "/api/public/quiz/diagnostico"]) {
+      const res = await proxy(new NextRequest(`https://app.test${path}`));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      // getUser() never ran, so nothing was written.
+      expect(res.cookies.get(ROTATED.name)).toBeUndefined();
+    }
+  });
+
+  it("sends a signed-out visitor of /ferramentas to the login", async () => {
+    const res = await proxy(new NextRequest("https://app.test/ferramentas/quiz"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+  });
+
+  it("serves a quiz at /<slug> on the quizzes' own domain", async () => {
+    vi.stubEnv("NEXT_PUBLIC_QUIZ_URL", "https://quiz.test");
+    const res = await proxy(
+      new NextRequest("https://quiz.test/diagnostico", { headers: { host: "quiz.test" } }),
+    );
+    expect(res.headers.get("x-middleware-rewrite")).toBe("https://quiz.test/q/diagnostico");
+  });
+
+  it("does not rewrite on any other host, nor the app's own routes", async () => {
+    vi.stubEnv("NEXT_PUBLIC_QUIZ_URL", "https://quiz.test");
+    mockUser = { id: "user-1" };
+    const elsewhere = await proxy(
+      new NextRequest("https://app.test/diagnostico", { headers: { host: "app.test" } }),
+    );
+    expect(elsewhere.headers.get("x-middleware-rewrite")).toBeNull();
+    // Even if the variable pointed at the CRM itself, /dashboard stays /dashboard.
+    const own = await proxy(
+      new NextRequest("https://quiz.test/dashboard", { headers: { host: "quiz.test" } }),
+    );
+    expect(own.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+});

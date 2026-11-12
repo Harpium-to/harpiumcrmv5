@@ -44,7 +44,8 @@
     "menuSignOut": "Sign out",
     "reports": "Reports",
     "help": "Help",
-    "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}"
+    "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}",
+    "tools": "Tools"
   },
   "TopBar": {
     "openMenu": "Open menu",
