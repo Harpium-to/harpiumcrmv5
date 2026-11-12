@@ -210,6 +210,22 @@ export interface AgendaCalendar {
   feed_enabled: boolean;
   feed_token: string;
   created_at: string;
+  /**
+   * Google Agenda (069): the connected account this agenda writes to,
+   * and which of its calendars. Absent before 069 is applied.
+   */
+  google_connection_id?: string | null;
+  google_calendar_id?: string | null;
+  google_calendar_name?: string | null;
+}
+
+/** A Google account connected to the CRM, for the Agenda (069). */
+export interface GoogleConnection {
+  id: string;
+  email: string;
+  /** 'needs_reconnect': Google refused the stored access; sign in again. */
+  status: 'connected' | 'needs_reconnect';
+  last_error: string | null;
 }
 
 /** One stretch of an agenda's opening hours. */
@@ -256,6 +272,12 @@ export interface AgendaEvent {
   reminder_at: string | null;
   reminder_error: string | null;
   created_at: string;
+  /**
+   * Google Agenda (069): null when its agenda does not write there;
+   * otherwise how the last send went. Absent before 069 is applied.
+   */
+  google_sync_state?: 'pending' | 'syncing' | 'synced' | 'error' | null;
+  google_sync_error?: string | null;
   /** Embedded by the agenda's own queries. */
   contact?: { id: string; name: string | null; phone: string | null } | null;
 }

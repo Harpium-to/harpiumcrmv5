@@ -155,7 +155,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Para o cliente ser avisado, ligue a confirmação e o lembrete na engrenagem, em cada agenda, e ajuste o texto se quiser.",
       "Para o agente de IA marcar sozinho, abra o agente em Agentes e dê a ele a ferramenta Agenda. Ele passa a ver os horários livres dos próximos 10 dias e só oferece o que está livre.",
       "Para o cliente marcar sozinho, edite a agenda na engrenagem, ligue o Link público de agendamento e envie o link. Ele escolhe um horário livre e informa nome e WhatsApp.",
-      "Para ver a agenda no celular, ligue Ver no Google Agenda, Apple ou Outlook na mesma tela e cole o endereço no aplicativo de agenda.",
+      "Para os agendamentos irem direto para o Google Agenda do profissional, um administrador edita a agenda na engrenagem e clica em Conectar com o Google. O profissional entra com a conta dele e pronto: o que for marcado, remarcado ou cancelado aparece lá na hora.",
+      "Para ver a agenda no celular sem conectar uma conta, ligue Ver no Google Agenda, Apple ou Outlook na mesma tela e cole o endereço no aplicativo de agenda.",
     ],
     tips: [
       "Dois agendamentos não cabem no mesmo horário da mesma agenda: o sistema recusa o segundo.",
@@ -166,6 +167,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Pelo link público, a pessoa só vê os horários livres dos próximos 30 dias, nunca quem ocupa os outros. Desligar o link faz ele parar de funcionar na hora.",
       "Cada agendamento feito pelo link avisa no sino quem pode marcar. O que espera aprovação aparece no topo da Agenda, em Aguardando aprovação, seja qual for a semana.",
       "O endereço para Google, Apple e Outlook é só de leitura e o aplicativo atualiza a cada algumas horas. Ele mostra os nomes dos clientes, então passe só para quem pode ver a agenda.",
+      "Com o Google Agenda conectado, o evento no Google leva o nome e o WhatsApp do cliente, e o cliente não recebe convite do Google. Mude sempre pelo CRM: o que for alterado direto no Google não volta para o CRM.",
+      "Se aparecer Precisa conectar de novo (a senha do Google mudou ou o acesso foi removido), edite a agenda e clique em Conectar de novo. Nada se perde: o que ficou para trás vai para o Google em seguida.",
       "Dá para marcar fora do horário de atendimento, como encaixe. A tela avisa antes de salvar.",
       "Cancelar libera o horário e guarda o registro; ligue Mostrar cancelados para vê-los.",
       "Quem tem acesso de leitura vê a agenda, mas não marca nem altera.",

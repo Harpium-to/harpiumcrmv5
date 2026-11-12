@@ -11,7 +11,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isMissingTable } from '@/lib/auth/account-context'
-import type { AgendaCalendar, AgendaEvent, AgendaHours } from '@/types'
+import type { GoogleCalendarEntry } from '@/lib/google/calendar-api'
+import type { AgendaCalendar, AgendaEvent, AgendaHours, GoogleConnection } from '@/types'
 
 import type { HoursRow } from './slots'
 
@@ -82,6 +83,56 @@ export interface AgendaStore {
   saveCalendar(calendar: CalendarWrite, hours: HoursRow[], id?: string): Promise<WriteError>
   setCalendarActive(id: string, active: boolean): Promise<WriteError>
   deleteCalendar(id: string): Promise<WriteError>
+  /**
+   * Google accounts connected to the CRM (069); null when this server
+   * does not have the Google Agenda yet (migration not applied).
+   */
+  loadGoogleConnections(): Promise<GoogleConnection[] | null>
+  /** The calendars a connected account owns, to choose where an agenda writes. */
+  listGoogleCalendars(connectionId: string): Promise<GoogleResult<GoogleCalendarEntry[]>>
+  /** Point an agenda at a Google calendar; connectionId null stops it writing there. */
+  linkGoogle(calendarId: string, connectionId: string | null, googleCalendarId?: string): Promise<GoogleResult<true>>
+  /** Disconnect an account; deleteRemote also removes upcoming events from Google. */
+  disconnectGoogle(connectionId: string, deleteRemote: boolean): Promise<GoogleResult<{ removed: number }>>
+}
+
+/** What a Google action answered: the data, or why not (and whether to reconnect). */
+export type GoogleResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string; reconnect: boolean }
+
+async function callGoogleApi<T>(url: string, init?: RequestInit): Promise<GoogleResult<T>> {
+  try {
+    const response = await fetch(url, {
+      ...init,
+      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    })
+    const json = (await response.json().catch(() => ({}))) as Record<string, unknown>
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: typeof json.error === 'string' ? json.error : 'Não consegui falar com o Google agora.',
+        reconnect: json.reconnect === true,
+      }
+    }
+    return { ok: true, data: json as T }
+  } catch {
+    return { ok: false, error: 'Sem conexão com o servidor. Tente de novo.', reconnect: false }
+  }
+}
+
+/** Ask the server to send this change to Google now (069). Fire and forget. */
+function nudgeGoogle(eventId: string | null) {
+  void fetch('/api/agenda/google/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(eventId ? { eventId } : {}),
+  }).catch(() => {})
+}
+
+/** A column this server's database does not have yet (an unapplied migration). */
+function isMissingColumn(error: { code?: string } | null): boolean {
+  return !!error && (error.code === '42703' || error.code === 'PGRST204')
 }
 
 const CALENDAR_COLUMNS =
@@ -89,69 +140,99 @@ const CALENDAR_COLUMNS =
 const HOURS_COLUMNS = 'id, calendar_id, weekday, starts, ends'
 const EVENT_COLUMNS =
   'id, calendar_id, kind, contact_id, title, notes, starts_at, ends_at, status, source, notify, confirmation_at, confirmation_error, reminder_at, reminder_error, created_at, contact:contacts(id, name, phone)'
+// The same, plus Google Agenda (069). Read first; a database without
+// 069 answers "no such column" and the plain list is used from then on.
+const CALENDAR_COLUMNS_GOOGLE = `${CALENDAR_COLUMNS}, google_connection_id, google_calendar_id, google_calendar_name`
+const EVENT_COLUMNS_GOOGLE = EVENT_COLUMNS.replace(
+  ', contact:contacts',
+  ', google_sync_state, google_sync_error, contact:contacts',
+)
 
 export function createSupabaseAgendaStore(
   supabase: SupabaseClient,
   accountId: string,
   userId: string | null,
 ): AgendaStore {
+  // False once the database turned out not to have 069 yet.
+  let withGoogle = true
+
+  /** Run an events read with the Google columns, falling back without them. */
+  async function readEvents(
+    query: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string } | null }>,
+  ): Promise<AgendaEvent[] | null> {
+    if (withGoogle) {
+      const { data, error } = await query(EVENT_COLUMNS_GOOGLE)
+      if (!isMissingColumn(error)) return error ? null : ((data ?? []) as AgendaEvent[])
+      withGoogle = false
+    }
+    const { data, error } = await query(EVENT_COLUMNS)
+    return error ? null : ((data ?? []) as AgendaEvent[])
+  }
+
   return {
     async loadCalendars() {
-      const [calendars, hours] = await Promise.all([
+      const readCalendars = (columns: string) =>
         supabase
           .from('calendars')
-          .select(CALENDAR_COLUMNS)
+          .select(columns)
           .eq('account_id', accountId)
-          .order('created_at', { ascending: true }),
+          .order('created_at', { ascending: true })
+      const [firstRead, hours] = await Promise.all([
+        readCalendars(withGoogle ? CALENDAR_COLUMNS_GOOGLE : CALENDAR_COLUMNS),
         supabase.from('calendar_hours').select(HOURS_COLUMNS).eq('account_id', accountId),
       ])
+      let calendars = firstRead
+      if (withGoogle && isMissingColumn(calendars.error)) {
+        withGoogle = false
+        calendars = await readCalendars(CALENDAR_COLUMNS)
+      }
       const error = calendars.error ?? hours.error
       if (error) {
         return { status: isMissingTable(error) ? 'unavailable' : 'error' }
       }
       return {
         status: 'ready',
-        calendars: (calendars.data ?? []) as AgendaCalendar[],
+        calendars: (calendars.data ?? []) as unknown as AgendaCalendar[],
         hours: (hours.data ?? []) as AgendaHours[],
       }
     },
 
-    async loadEvents(from, to) {
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .select(EVENT_COLUMNS)
-        .eq('account_id', accountId)
-        // Touches the window: starts before it ends, ends after it starts.
-        .lt('starts_at', to.toISOString())
-        .gt('ends_at', from.toISOString())
-        .order('starts_at', { ascending: true })
-      if (error) return null
-      return (data ?? []) as unknown as AgendaEvent[]
+    loadEvents(from, to) {
+      return readEvents((columns) =>
+        supabase
+          .from('calendar_events')
+          .select(columns)
+          .eq('account_id', accountId)
+          // Touches the window: starts before it ends, ends after it starts.
+          .lt('starts_at', to.toISOString())
+          .gt('ends_at', from.toISOString())
+          .order('starts_at', { ascending: true }),
+      )
     },
 
-    async loadPending(now) {
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .select(EVENT_COLUMNS)
-        .eq('account_id', accountId)
-        .eq('status', 'pending')
-        .gt('ends_at', now.toISOString())
-        .order('starts_at', { ascending: true })
-        .limit(50)
-      if (error) return null
-      return (data ?? []) as unknown as AgendaEvent[]
+    loadPending(now) {
+      return readEvents((columns) =>
+        supabase
+          .from('calendar_events')
+          .select(columns)
+          .eq('account_id', accountId)
+          .eq('status', 'pending')
+          .gt('ends_at', now.toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(50),
+      )
     },
 
-    async loadContactEvents(contactId) {
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .select(EVENT_COLUMNS)
-        .eq('account_id', accountId)
-        .eq('contact_id', contactId)
-        .order('starts_at', { ascending: true })
-        .limit(200)
-      if (error) return null
-      return (data ?? []) as unknown as AgendaEvent[]
+    loadContactEvents(contactId) {
+      return readEvents((columns) =>
+        supabase
+          .from('calendar_events')
+          .select(columns)
+          .eq('account_id', accountId)
+          .eq('contact_id', contactId)
+          .order('starts_at', { ascending: true })
+          .limit(200),
+      )
     },
 
     async loadTemplates() {
@@ -190,11 +271,16 @@ export function createSupabaseAgendaStore(
           body: JSON.stringify({ eventId }),
         }).catch(() => {})
       }
+      // Same for Google Agenda: the database already knows whether this
+      // agenda writes there (069); this only makes it go now.
+      if (withGoogle && eventId) nudgeGoogle(eventId)
       return null
     },
 
     async deleteEvent(id) {
       const { error } = await supabase.from('calendar_events').delete().eq('id', id)
+      // A deleted event that was in Google is queued for removal (069).
+      if (!error && withGoogle) nudgeGoogle(null)
       return error
     },
 
@@ -226,7 +312,41 @@ export function createSupabaseAgendaStore(
 
     async deleteCalendar(id) {
       const { error } = await supabase.from('calendars').delete().eq('id', id)
+      if (!error && withGoogle) nudgeGoogle(null)
       return error
+    },
+
+    async loadGoogleConnections() {
+      const { data, error } = await supabase
+        .from('google_connections')
+        .select('id, email, status, last_error')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: true })
+      if (error) return null
+      return (data ?? []) as GoogleConnection[]
+    },
+
+    async listGoogleCalendars(connectionId) {
+      const result = await callGoogleApi<{ calendars: GoogleCalendarEntry[] }>(
+        `/api/agenda/google/calendars?connection=${encodeURIComponent(connectionId)}`,
+      )
+      return result.ok ? { ok: true, data: result.data.calendars } : result
+    },
+
+    async linkGoogle(calendarId, connectionId, googleCalendarId) {
+      const result = await callGoogleApi('/api/agenda/google/link', {
+        method: 'POST',
+        body: JSON.stringify({ calendarId, connectionId, googleCalendarId }),
+      })
+      return result.ok ? { ok: true, data: true } : result
+    },
+
+    async disconnectGoogle(connectionId, deleteRemote) {
+      const result = await callGoogleApi<{ removed?: number }>('/api/agenda/google/disconnect', {
+        method: 'POST',
+        body: JSON.stringify({ connectionId, deleteRemote }),
+      })
+      return result.ok ? { ok: true, data: { removed: result.data.removed ?? 0 } } : result
     },
   }
 }

@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { mapApprovalRow } from '@/lib/agents/approvals'
 import { resumeTask } from '@/lib/agents/tasks'
+import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { processCalendarNotifications } from '@/lib/agenda/messages'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 
@@ -125,6 +126,11 @@ export async function PATCH(
       // than at the scheduler's next run (which remains the safety net).
       if (decision === 'approve' && (flipped ?? []).length > 0) {
         await processCalendarNotifications(supabaseAdmin(), eventId)
+      }
+      // Approved or refused, Google Agenda follows (069).
+      if ((flipped ?? []).length > 0) {
+        const { origin } = new URL(request.url)
+        after(() => processGoogleCalendarSync(supabaseAdmin(), { eventId, crmUrl: origin }))
       }
     }
 
