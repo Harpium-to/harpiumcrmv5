@@ -6,6 +6,7 @@ import { generateReply } from '@/lib/ai/generate'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { logAiUsage } from '@/lib/ai/usage'
 import { sendChannelText } from '@/lib/channels/send-text'
+import { contactOptedOut } from '@/lib/contacts/opt-out'
 import { resolveConversationByPhone } from '@/lib/whatsapp/resolve-conversation'
 import type { AiConfig, AiUsage } from '@/lib/ai/types'
 
@@ -296,6 +297,15 @@ async function runMessageTask(
   }
 
   // ---- Fresh run ----
+  //
+  // An agent writing on its own is an automatic message: a contact who
+  // asked not to receive those (066) is never approached. (An approved
+  // message above was read and sent by a person's decision.)
+  if (task.contactId && (await contactOptedOut(db, accountId, task.contactId))) {
+    await failTask(db, { ...task, attempts: task.maxAttempts }, 'opted_out')
+    return 'failed'
+  }
+
   const contextStep = await startStep(db, {
     accountId,
     taskId: task.id,
@@ -472,7 +482,17 @@ async function resolveTarget(
     .select('user_id')
     .eq('account_id', accountId)
     .maybeSingle()
-  const ownerUserId = (owner as { user_id?: string } | null)?.user_id
+  // A CRM on the unofficial path (D1) has no Meta config: the CRM's
+  // owner stands in, as the UAZAPI webhook already does for inserts.
+  let ownerUserId = (owner as { user_id?: string } | null)?.user_id
+  if (!ownerUserId) {
+    const { data: account } = await db
+      .from('accounts')
+      .select('owner_user_id')
+      .eq('id', accountId)
+      .maybeSingle()
+    ownerUserId = (account as { owner_user_id?: string } | null)?.owner_user_id
+  }
   if (!ownerUserId) return null
 
   if (task.conversationId && task.contactId) {

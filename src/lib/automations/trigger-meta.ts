@@ -39,6 +39,14 @@ export const TRIGGER_META: Record<AutomationTriggerType, TriggerMeta> = {
     label: 'Resposta de botão / lista',
     pillClass: 'border-pink-500/30 bg-pink-500/10 text-pink-300',
   },
+  manual: {
+    label: 'Sequência (disparo manual)',
+    pillClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  },
+  lead_received: {
+    label: 'Lead recebido',
+    pillClass: 'border-orange-500/30 bg-orange-500/10 text-orange-300',
+  },
 }
 
 export function triggerMeta(t: AutomationTriggerType | string): TriggerMeta {

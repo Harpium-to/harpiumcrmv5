@@ -16,6 +16,7 @@ import type { AgentApproval } from "@/lib/agents/types";
 /** Known action kinds → a label. Anything else reads as "Ação". */
 const KIND_LABEL: Record<string, string> = {
   send_message: "kindSendMessage",
+  schedule_meeting: "kindScheduleMeeting",
   discount: "kindDiscount",
   give_discount: "kindDiscount",
   proposal: "kindProposal",
@@ -209,9 +210,11 @@ function ApprovalRow({
             disabled={!canDecide || pending}
           />
         </div>
-      ) : (
-        // No message body — show the raw action so approving is never a
-        // blind click. A JSON blob is not pretty, but it is honest.
+      ) : approval.kind === "schedule_meeting" ? null : (
+        // A booking's summary already says who, with whom and when, and
+        // its payload is only ids. Anything else with no message body
+        // shows the raw action so approving is never a blind click. A
+        // JSON blob is not pretty, but it is honest.
         <pre className="mt-3 overflow-x-auto rounded-xl bg-foreground/5 p-3 text-xs text-muted-foreground">
           {JSON.stringify(approval.payload, null, 2)}
         </pre>

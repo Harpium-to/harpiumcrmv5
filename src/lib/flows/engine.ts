@@ -881,6 +881,44 @@ export async function dispatchInboundToFlows(
   }
 }
 
+/**
+ * Start a flow by hand on one contact (a flow with the `manual`
+ * trigger), from the Chrome extension beside the chat (Fase 7). The
+ * caller has already checked that the flow and the contact belong to
+ * the account and that the contact has this conversation. Runs the flow
+ * from its entry node until it waits for the customer.
+ *
+ * `already_running` when the contact has a flow running — one at a
+ * time per contact, as the partial unique index on flow_runs keeps it.
+ */
+export async function startManualFlowRun(
+  flow: FlowRow,
+  args: { contactId: string; conversationId: string },
+): Promise<{ started: true; run_id: string | null } | { started: false; reason: "already_running" | "no_entry" }> {
+  if (!flow.entry_node_id) return { started: false, reason: "no_entry" };
+  const db = supabaseAdmin();
+  const running = await loadActiveRunForContact(db, flow.account_id, args.contactId);
+  if (running) return { started: false, reason: "already_running" };
+  const nodes = await loadAllNodes(db, flow.id);
+  const result = await startNewRun(
+    db,
+    flow,
+    {
+      accountId: flow.account_id,
+      userId: flow.user_id,
+      contactId: args.contactId,
+      conversationId: args.conversationId,
+      // No customer message starts it: a person did.
+      message: { kind: "text", text: "", meta_message_id: `manual:${Date.now()}` },
+    },
+    nodes,
+  );
+  if (result.outcome === "duplicate_inbound_ignored") {
+    return { started: false, reason: "already_running" };
+  }
+  return { started: true, run_id: result.flow_run_id ?? null };
+}
+
 async function handleReplyForActiveRun(
   db: AdminClient,
   run: FlowRunRow,

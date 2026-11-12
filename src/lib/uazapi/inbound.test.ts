@@ -19,10 +19,14 @@ function setup() {
 
 const msg = (over: Partial<UazapiInboundMessage> = {}): UazapiInboundMessage => ({
   counterpartPhone: '5511999990000',
+  counterpartLid: null,
   text: 'Bom dia!',
   externalId: 'wa-1',
   name: 'Ana',
   fromMe: false,
+  mediaKind: null,
+  interactiveReplyId: null,
+  sentAt: null,
   ...over,
 })
 

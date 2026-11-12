@@ -43,6 +43,7 @@ describe('serializeContact', () => {
       job_title: null,
       instagram: null,
       website: null,
+      opted_out: false,
       tags: [{ id: 't1', name: 'vip', color: '#fff' }],
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-02T00:00:00Z',
@@ -72,6 +73,13 @@ describe('serializeContact', () => {
 });
 
 describe('parseContactPatch', () => {
+  it('turns opted_out into the moment, or clears it', () => {
+    const on = parseContactPatch({ opted_out: true });
+    expect(on.ok && typeof on.updates.opted_out_at).toBe('string');
+    expect(parseContactPatch({ opted_out: false })).toEqual({ ok: true, updates: { opted_out_at: null } });
+    expect(parseContactPatch({ opted_out: 'sim' }).ok).toBe(false);
+  });
+
   it('updates only the keys present, accepting strings and null', () => {
     expect(parseContactPatch({ name: 'Ana', segment: null })).toEqual({
       ok: true,

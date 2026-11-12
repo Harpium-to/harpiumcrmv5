@@ -23,6 +23,7 @@
     "leads": "Leads",
     "channels": "Channels",
     "pipelines": "Pipelines",
+    "agenda": "Calendar",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
     "flows": "Flows",
@@ -42,7 +43,8 @@
     "menuSettings": "Settings",
     "menuSignOut": "Sign out",
     "reports": "Reports",
-    "help": "Help"
+    "help": "Help",
+    "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}"
   },
   "TopBar": {
     "openMenu": "Open menu",
@@ -149,7 +151,15 @@
       "clearAll": "Clear all",
       "noConversations": "No conversations found",
       "noMessagesYet": "No messages yet",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "filterWaiting": "Waiting for a person",
+      "waitingStrip": "{count, plural, one {# conversation waiting for a person} other {# conversations waiting for a person}}",
+      "waitingLate": "{count, plural, one {# late} other {# late}}",
+      "waitingShow": "Show",
+      "waitingShowAll": "Show all",
+      "waitingNobody": "Nobody took it",
+      "waitingMine": "Yours, no reply yet",
+      "waitingAssigned": "Assigned, no reply yet"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -290,7 +300,32 @@
         "unknown": "The customer got no reply. Answer manually; the technical detail is also in the agents monitor.",
         "detail": "Technical detail: {detail}",
         "dismiss": "Dismiss notice"
+      },
+      "waiting": {
+        "nobodyTitle": "The AI handed this conversation to the team. Someone needs to take it.",
+        "assignedTitle": "Assigned to a teammate, but the customer has had no reply yet",
+        "mineTitle": "You took this conversation. Reply to the customer.",
+        "since": "Waiting for a reply for {time}",
+        "justNow": "Just handed to the team",
+        "late": "late",
+        "takeOver": "Take this conversation"
       }
+    },
+    "newDeal": {
+      "button": "New",
+      "choosePipeline": "Which pipeline?",
+      "pipeline": "Pipeline: {name}",
+      "duplicate": "{count, plural, one {This contact already has # open deal} other {This contact already has # open deals}}",
+      "aiLoading": "The AI is reading the conversation to fill in the deal...",
+      "aiDone": "Filled in by the AI from the conversation. Check it before creating.",
+      "aiRefill": "Fill in again",
+      "aiRetry": "Try again",
+      "aiOff": "With the AI turned on in AI Agents, the form comes filled in with a summary of the conversation.",
+      "aiNoMessages": "There are no text messages to summarize yet.",
+      "aiNoConversation": "Open the conversation for the AI to fill in the deal.",
+      "aiError": "Couldn't fill in with the AI. Fill it in by hand or try again.",
+      "noPipelines": "Create a pipeline in Pipelines before creating deals.",
+      "noStages": "This pipeline has no stages. Create them in Pipelines."
     }
   },
   "Contacts": {
@@ -375,6 +410,7 @@
         "details": "Details",
         "activity": "Activity",
         "notes": "Notes",
+        "tasks": "Tasks",
         "custom": "Custom Fields",
         "deals": "Deals",
         "noTags": "No tags",
@@ -855,7 +891,8 @@
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
-        "close_conversation": "Close Conversation"
+        "close_conversation": "Close Conversation",
+        "agent_handoff": "Hand off to AI agent"
       },
       "triggers": {
         "new_message_received": {
@@ -889,6 +926,14 @@
         "time_based": {
           "label": "Time-Based",
           "hint": "On a recurring schedule"
+        },
+        "manual": {
+          "label": "Sequence (manual start)",
+          "hint": "Starts when someone fires it for one contact, from the Chrome extension. Only messages, waits and actions; wait at least 1 minute between two messages."
+        },
+        "lead_received": {
+          "label": "Lead received",
+          "hint": "When a lead arrives at the lead URL (quiz, Google, Meta, Zapier, form). Filter by origin, route and tags."
         }
       },
       "trigger": "Trigger",
@@ -992,7 +1037,21 @@
         "matchType": "Match type",
         "matchContains": "Contains",
         "matchExact": "Exact",
-        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed."
+        "closeConversationHint": "Sets the conversation status to \"closed\". No configuration needed.",
+        "leadOrigins": "Origins",
+        "leadOriginsHint": "quiz-planejados, google",
+        "leadOriginsHelp": "Comma separated. Empty: any origin.",
+        "leadRoute": "Route",
+        "leadRouteAny": "Any route",
+        "leadTags": "Required tags",
+        "leadTagsHint": "low-budget, decision-maker:no",
+        "leadTagsHelp": "The lead must have all of them. Empty: no tag filter.",
+        "leadVarsHelp": "In messages you can use:",
+        "agentRole": "Agent",
+        "agentInstruction": "Instruction for the agent (optional)",
+        "agentInstructionHint": "E.g.: start by checking the budget before booking",
+        "agentHandoffHelp": "The agent receives the contact with the lead answers and opens the conversation on WhatsApp, within its working hours. Needs an active agent with this role.",
+        "leadOptOutHelp": "Contacts who opted out of automatic messages are skipped."
       }
     }
   },
@@ -1575,6 +1634,78 @@
       "syncRetryDone": "Request sent to Meta.",
       "syncExpired": "It's been more than 24 hours since connecting, and Meta no longer accepts the request for past chats."
     },
+    "whatsappPath": {
+      "title": "WhatsApp connection",
+      "description": "Choose how the company's WhatsApp connects to the CRM. You can change it later.",
+      "chooseTitle": "How do you want to connect WhatsApp?",
+      "chooseDesc": "The CRM features are the same on both paths. What changes is the cost, the risk and how the number works on the phone.",
+      "oficialTitle": "Official",
+      "oficialSubtitle": "Meta API",
+      "oficialPoints": {
+        "connect": "Connects through the Facebook window, in about 3 minutes",
+        "risk": "No risk of the number being banned",
+        "cost": "Meta charges for templates (messages the business starts). Replying within 24 h is free",
+        "window": "To message someone who hasn't written in 24 h, only with a template Meta approved",
+        "phone": "The number stays in the WhatsApp Business app on the phone; WhatsApp Web is disconnected",
+        "status": "Can't post status: Meta doesn't allow it"
+      },
+      "naoOficialTitle": "Unofficial",
+      "naoOficialSubtitle": "QR code, like WhatsApp Web",
+      "naoOficialPoints": {
+        "connect": "Connects by scanning a QR code with the phone",
+        "risk": "The number can be banned by WhatsApp, especially with bulk sending",
+        "cost": "No charge per message; the connection has a monthly fee",
+        "window": "Message any contact, at any time",
+        "phone": "The phone and WhatsApp Web keep working, and so does the Chrome extension",
+        "online": "The phone has to stay on and online"
+      },
+      "recommended": "Recommended",
+      "riskTitle": "Before choosing unofficial",
+      "riskText": "The QR-code connection isn't authorized by WhatsApp. The number can be banned at any time, without warning, especially when sending many messages to people who don't talk to the business. Neither Harpium nor the CRM can undo a ban.",
+      "riskAccept": "I understand the number can be banned by WhatsApp and I choose the unofficial path anyway.",
+      "riskAgency": "Only someone from the CRM itself can accept this risk. Ask the client's owner or an admin.",
+      "switchNote": "After switching, messages from the inbox, flows, automations and AI leave through the new path. Conversation history stays.",
+      "confirm": "Use this path",
+      "confirming": "Saving…",
+      "cancel": "Cancel",
+      "chosenToast": "Path chosen. Now connect the number.",
+      "adminOnly": "Only CRM admins choose the WhatsApp path.",
+      "migrationMissing": "Choosing the path needs migration 061 in the database. Until then, WhatsApp works as before.",
+      "current": "WhatsApp path",
+      "currentOficial": "Official (Meta API)",
+      "currentNaoOficial": "Unofficial (QR code)",
+      "change": "Change path",
+      "loadFailed": "Couldn't load the WhatsApp connection.",
+      "qr": {
+        "title": "WhatsApp by QR code",
+        "connected": "Connected",
+        "notConnected": "Not connected",
+        "statusLabel": "State: {status}",
+        "pairedNumber": "Paired number",
+        "connect": "Connect WhatsApp",
+        "reconnect": "New QR code",
+        "instructions": "On the phone: WhatsApp → Linked devices → Link a device. The code refreshes by itself.",
+        "scanToast": "Scan the QR code with WhatsApp on your phone",
+        "connectedToast": "WhatsApp connected: {phone}",
+        "connectedToastNoPhone": "WhatsApp connected",
+        "timeout": "Timed out. Click connect to get another QR code.",
+        "disconnect": "Disconnect",
+        "disconnecting": "Disconnecting…",
+        "disconnectConfirm": "Disconnect WhatsApp from this CRM? The phone stops listing it as a linked device and messages stop arriving here until you scan the QR code again.",
+        "disconnected": "WhatsApp disconnected.",
+        "failed": "Couldn't finish. {message}",
+        "offlineHint": "If the phone stays offline for too long, the connection drops and the QR code has to be scanned again.",
+        "noServer": "The QR-code connection server isn't set up yet. Talk to the agency.",
+        "manualServer": "This CRM uses its own server, set up by the agency.",
+        "evolutionNote": "This CRM uses an Evolution instance set up by the agency. It sends text only; for media and buttons, connect by QR code here.",
+        "importHistory": "Bring chats from the phone",
+        "importingHistory": "Bringing chats… {chats} chats, {messages} messages",
+        "importHistoryConfirm": "Copy into the CRM the 1:1 chats the phone already had (up to 90 days)? Contacts and messages keep their original dates. No automation, flow or AI agent runs, and nothing is marked unread. Safe to repeat without duplicates.",
+        "importHistoryDone": "{chats} chats brought, {messages} messages and {contacts} new contacts.",
+        "importHistoryNothing": "Nothing new to bring: the phone chats are already in the CRM.",
+        "importHistoryHint": "Old photos, videos and audio show as [photo], [video] or [audio], with the caption."
+      }
+    },
     "sections": {
       "overview": "Overview",
       "profile": "Your profile",
@@ -1877,7 +2008,7 @@
     "toolMessaging": "Messaging",
     "toolMessagingDesc": "Talk to the customer on authorised channels.",
     "toolCalendar": "Calendar",
-    "toolCalendarDesc": "Propose and book meetings.",
+    "toolCalendarDesc": "Check the agenda, offer free slots and book.",
     "toolProposals": "Proposals",
     "toolProposalsDesc": "Build proposals and request discount approval.",
     "toolDelegation": "Delegation",
@@ -1974,6 +2105,7 @@
     "approvalRejected": "Rejected",
     "approvalDecided": "Decided",
     "kindSendMessage": "Send a message",
+    "kindScheduleMeeting": "Book an appointment",
     "kindDiscount": "Grant a discount",
     "kindProposal": "Send a proposal",
     "kindContract": "Change a contract",
@@ -2124,5 +2256,16 @@
     "suggestForecast": "What is stuck in the forecast?",
     "customFrom": "From",
     "customTo": "to"
+  },
+  "Handoff": {
+    "toastTitle": "{name} needs a person",
+    "toastBody": "The AI handed the conversation to the team. Someone needs to reply to the customer.",
+    "someone": "A customer",
+    "open": "Open conversation",
+    "alertTitle": "{count, plural, one {# conversation waiting for a person} other {# conversations waiting for a person}}",
+    "alertOldest": "{name} has been waiting {time}",
+    "alertOldestNow": "{name} was just handed to the team",
+    "late": "late",
+    "answer": "Answer"
   }
 }

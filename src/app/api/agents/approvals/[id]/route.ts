@@ -3,6 +3,10 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { mapApprovalRow } from '@/lib/agents/approvals'
 import { resumeTask } from '@/lib/agents/tasks'
+import { processCalendarNotifications } from '@/lib/agenda/messages'
+import { supabaseAdmin } from '@/lib/automations/admin-client'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * PATCH /api/agents/approvals/:id  (agent+)
@@ -93,6 +97,34 @@ export async function PATCH(
           })
           .eq('id', approval.taskId)
           .eq('account_id', accountId)
+      }
+    }
+
+    // An appointment an AI agent reserved (lib/agenda/ai.ts) has no
+    // task: the appointment itself is what waits, as 'pending'.
+    // Approving books it, refusing frees the slot. Only while it is
+    // still pending — settled on the agenda meanwhile, there is
+    // nothing left to do. Under the operator's session, so RLS decides
+    // whether they may (agents and above).
+    const eventId = String(approval.payload.event_id ?? '')
+    if (approval.kind === 'schedule_meeting' && !approval.taskId && UUID.test(eventId)) {
+      const { data: flipped, error: eventError } = await supabase
+        .from('calendar_events')
+        .update({ status: decision === 'approve' ? 'scheduled' : 'cancelled' })
+        .eq('id', eventId)
+        .eq('account_id', accountId)
+        .eq('status', 'pending')
+        .select('id')
+      if (eventError) throw eventError
+      await supabase
+        .from('agent_approvals')
+        .update({ executed_at: new Date().toISOString() })
+        .eq('id', approval.id)
+        .eq('account_id', accountId)
+      // The customer was told the team would confirm: do it now rather
+      // than at the scheduler's next run (which remains the safety net).
+      if (decision === 'approve' && (flipped ?? []).length > 0) {
+        await processCalendarNotifications(supabaseAdmin(), eventId)
       }
     }
 

@@ -158,6 +158,108 @@ export interface ContactNote {
   created_at: string;
 }
 
+/** A to-do about a contact, for a person (migration 060). */
+export interface ContactTask {
+  id: string;
+  contact_id: string;
+  title: string;
+  /** When it should be done; null for a task with no date. */
+  due_at: string | null;
+  /** When it was marked done; null while open. */
+  done_at: string | null;
+  /** Who it is for — the person reminded when it comes due. */
+  assigned_to: string | null;
+  created_at: string;
+}
+
+/**
+ * An agenda (migration 067): a professional, a room, a resource —
+ * whatever takes bookings one at a time.
+ */
+export interface AgendaCalendar {
+  id: string;
+  account_id: string;
+  name: string;
+  /** "#rrggbb" — how its events are tinted. */
+  color: string;
+  /** Default length of an appointment, and the step of "horários livres". */
+  slot_minutes: number;
+  /** IANA zone its opening hours are written in. */
+  timezone: string;
+  /** False once archived: history stays, no new bookings. */
+  is_active: boolean;
+  /** Tell the customer when an appointment is booked or moved. */
+  confirm_enabled: boolean;
+  /** Null: the app's default wording. */
+  confirm_text: string | null;
+  /** An approved WhatsApp template to use instead (official API). */
+  confirm_template: string | null;
+  confirm_template_language: string | null;
+  /** Remind the customer `reminder_hours` before the appointment. */
+  reminder_enabled: boolean;
+  reminder_hours: number;
+  reminder_text: string | null;
+  reminder_template: string | null;
+  reminder_template_language: string | null;
+  /** The public booking link (/marcar/<public_token>) is open. */
+  public_enabled: boolean;
+  /** False: a booking from the link waits for a person's OK. */
+  public_auto_confirm: boolean;
+  public_token: string;
+  /** The iCalendar feed (/api/agenda/feed/<feed_token>) is open. */
+  feed_enabled: boolean;
+  feed_token: string;
+  created_at: string;
+}
+
+/** One stretch of an agenda's opening hours. */
+export interface AgendaHours {
+  id: string;
+  calendar_id: string;
+  /** ISO weekday, 1 = Monday … 7 = Sunday. */
+  weekday: number;
+  /** "HH:MM:SS" on the agenda's own clock. */
+  starts: string;
+  ends: string;
+}
+
+export type AgendaEventKind = 'appointment' | 'block';
+
+export type AgendaEventStatus =
+  /** Reserved by an AI agent, waiting for a person's OK. */
+  | 'pending'
+  | 'scheduled'
+  | 'confirmed'
+  | 'done'
+  | 'no_show'
+  | 'cancelled';
+
+/** An appointment or a block on an agenda. */
+export interface AgendaEvent {
+  id: string;
+  calendar_id: string;
+  kind: AgendaEventKind;
+  contact_id: string | null;
+  title: string | null;
+  notes: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: AgendaEventStatus;
+  /** Who booked it: the team, an AI agent, or the customer by the public link. */
+  source: 'team' | 'ai' | 'public';
+  /** Whether this appointment's customer is messaged about it. */
+  notify: boolean;
+  /** When the confirmation / reminder was sent off; null: not yet. */
+  confirmation_at: string | null;
+  /** Why it did not go, if it did not. */
+  confirmation_error: string | null;
+  reminder_at: string | null;
+  reminder_error: string | null;
+  created_at: string;
+  /** Embedded by the agenda's own queries. */
+  contact?: { id: string; name: string | null; phone: string | null } | null;
+}
+
 export type ConversationStatus = 'open' | 'pending' | 'closed';
 
 export interface Conversation {
@@ -194,6 +296,12 @@ export interface Conversation {
   ai_autoreply_disabled?: boolean;
   ai_reply_count?: number;
   ai_handoff_summary?: string | null;
+  /**
+   * When the AI handed this conversation to the team and no person has
+   * written to the customer since (migration 058). Kept by database
+   * triggers; null/absent means nobody is waiting.
+   */
+  needs_human_since?: string | null;
 }
 
 // ============================================================
@@ -203,7 +311,11 @@ export interface Conversation {
 export type NotificationType =
   | 'conversation_assigned'
   /** The agency asked the CRM owner for more access (051). */
-  | 'agency_access_request';
+  | 'agency_access_request'
+  /** A task for this person came due (060). */
+  | 'task_due'
+  /** A customer booked through an agenda's public link (067). */
+  | 'agenda_booking';
 
 export interface Notification {
   id: string;
@@ -455,7 +567,13 @@ export type AutomationTriggerType =
   | 'time_based'
   /** Customer tapped a reply button / list row whose id matches; lets
    *  multi-step menus be chained across automations. */
-  | 'interactive_reply';
+  | 'interactive_reply'
+  /** A sequence: started by a person on one contact, from the Chrome
+   *  extension (POST /api/v1/sequences/{id}/start). Never by an event. */
+  | 'manual'
+  /** A lead arrived at the lead URL (quiz, Google, Meta, Zapier…);
+   *  filtered by origin, route and tags (LeadReceivedTriggerConfig). */
+  | 'lead_received';
 
 export type AutomationStepType =
   | 'send_message'
@@ -470,9 +588,32 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
-  | 'close_conversation';
+  | 'close_conversation'
+  /** Hand the contact to an AI agent of a role (the Agent SDR by
+   *  default), which opens the conversation on WhatsApp. */
+  | 'agent_handoff';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
+
+/**
+ * `lead_received` filters. Every filter set must match; an empty one
+ * matches any lead. Origins compare as slugs ("Quiz Planejados" ==
+ * "quiz-planejados"), tags case-insensitively.
+ */
+export interface LeadReceivedTriggerConfig {
+  origens?: string[];
+  /** The lead must carry ALL of these tags (route tag included). */
+  etiquetas?: string[];
+  /** 'A' | 'B' | 'C', or empty for any route. */
+  rota?: string;
+}
+
+export interface AgentHandoffStepConfig {
+  /** Agent role to route to (`sdr` by default). */
+  role: string;
+  /** Extra direction for the agent ("comece validando o investimento"). */
+  instruction?: string;
+}
 
 export interface KeywordMatchTriggerConfig {
   keywords: string[];
@@ -501,6 +642,7 @@ export type AutomationTriggerConfig =
   | TagTriggerConfig
   | TimeBasedTriggerConfig
   | InteractiveReplyTriggerConfig
+  | LeadReceivedTriggerConfig
   | Record<string, unknown>;
 
 export interface SendMessageStepConfig {
@@ -587,6 +729,7 @@ export type AutomationStepConfig =
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
+  | AgentHandoffStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 
@@ -645,7 +788,7 @@ export interface AutomationLog {
 // Quick replies — reusable snippets (migration 035)
 // ============================================================
 
-export type QuickReplyKind = 'text' | 'interactive';
+export type QuickReplyKind = 'text' | 'interactive' | 'media';
 
 export interface QuickReply {
   id: string;
@@ -659,6 +802,13 @@ export interface QuickReply {
   content_text?: string | null;
   /** Set when `kind === 'interactive'`. */
   interactive_payload?: InteractiveMessagePayload | null;
+  /** Set when `kind === 'media'` (migration 063); `content_text` is then the caption. */
+  media_kind?: 'image' | 'video' | 'document' | 'audio' | null;
+  /** Public URL in the chat-media bucket. */
+  media_url?: string | null;
+  /** Path in the chat-media bucket, for removing the file with the reply. */
+  media_path?: string | null;
+  media_filename?: string | null;
   created_at: string;
   updated_at: string;
 }

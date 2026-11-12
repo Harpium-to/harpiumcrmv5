@@ -7,6 +7,7 @@ import {
   requireRole,
   toErrorResponse,
 } from '@/lib/auth/account'
+import { hasMinRole } from '@/lib/auth/roles'
 import { supabaseAdmin } from '@/lib/leads/admin-client'
 
 // Per-account lead-ingest config: the ingest token (secret in the public
@@ -38,6 +39,7 @@ export async function GET() {
     return NextResponse.json({
       token: data.token,
       googleKey: data.google_key ?? null,
+      canManage: hasMinRole(ctx.role, 'admin'),
     })
   } catch (err) {
     return toErrorResponse(err)

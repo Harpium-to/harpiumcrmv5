@@ -1,190 +1,456 @@
 /* ============================================================
  * The panel's own styles.
  *
- * Every rule is scoped under #crm-connector-panel and every property
- * is stated outright — no inheritance from the page. This stylesheet
- * is injected into WhatsApp Web, so anything left unset is whatever
- * WhatsApp happens to set today, and anything set loosely leaks into
- * their layout. Neither side should be able to restyle the other by
- * accident.
+ * This stylesheet is injected into WhatsApp Web, a page that is not
+ * ours and that restyles bare tags (button, p, input…) for its own
+ * purposes. Two rules keep the two sides apart:
  *
- * Deliberately NOT a copy of the CRM's own theme: this panel sits
- * inside someone else's product, and pretending to be a native part
- * of WhatsApp is both a visual lie and a support burden. It reads as
- * a tool clipped on top, which is what it is.
+ *   1. Everything is scoped under #crm-connector-panel, and inside it
+ *      `all: revert` puts every element back on the browser's default
+ *      before the rules below apply. WhatsApp's tag-level styles lose
+ *      to that on specificity, so the panel looks the same there as
+ *      on a blank page — which is also what makes it testable.
+ *   2. The one rule that reaches outside is the `#app` width at the
+ *      bottom: that is how the panel takes a column instead of
+ *      covering the chat.
+ *
+ * The look is the CRM's (Harpium: warm neutrals, cream on espresso),
+ * not WhatsApp's. The panel is a tool beside WhatsApp, and should read
+ * as one rather than pass for a native part of it. Light or dark
+ * follows what WhatsApp is showing — content.js sets `data-mode`.
  * ============================================================ */
 
 #crm-connector-panel {
+  all: initial;
+
+  /* Keep in step with PANEL_WIDTH in content.js and the #app rule. */
+  --crmc-width: 320px;
+  color-scheme: light;
+
+  --crmc-bg: oklch(0.975 0.006 72);
+  --crmc-surface: oklch(0.995 0.003 72);
+  --crmc-muted: oklch(0.945 0.007 72);
+  --crmc-border: oklch(0.9 0.01 72);
+  --crmc-fg: oklch(0.255 0.014 72);
+  --crmc-fg-muted: oklch(0.5 0.017 72);
+  --crmc-primary: oklch(0.255 0.014 72);
+  --crmc-primary-fg: oklch(0.955 0.011 72);
+  --crmc-primary-hover: oklch(0.34 0.014 72);
+  --crmc-ring: oklch(0.5 0.017 72);
+  --crmc-danger: oklch(0.5 0.19 27);
+  --crmc-shadow: 0 10px 30px rgba(20, 16, 12, 0.18);
+
   position: fixed;
-  top: 76px;
-  right: 16px;
+  top: 0;
+  right: 0;
+  bottom: 0;
   z-index: 2147483000;
-  width: 268px;
+  display: flex;
+  flex-direction: column;
+  width: var(--crmc-width);
   box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #111b21;
-  box-shadow: 0 10px 30px rgba(11, 20, 26, 0.18);
+  border-left: 1px solid var(--crmc-border);
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 13px;
   line-height: 1.45;
+  text-align: left;
   overflow: hidden;
 }
 
-@media (prefers-color-scheme: dark) {
-  #crm-connector-panel {
-    background: #202c33;
-    color: #e9edef;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  }
+#crm-connector-panel[data-mode="dark"] {
+  /* The browser's own pieces — the date picker, a select's list — in
+     the dark too. */
+  color-scheme: dark;
+  --crmc-bg: oklch(0.175 0.012 72);
+  --crmc-surface: oklch(0.235 0.012 72);
+  --crmc-muted: oklch(0.275 0.012 72);
+  --crmc-border: oklch(0.325 0.012 72);
+  --crmc-fg: oklch(0.955 0.011 72);
+  --crmc-fg-muted: oklch(0.72 0.013 72);
+  --crmc-primary: oklch(0.93 0.035 88);
+  --crmc-primary-fg: oklch(0.22 0.02 72);
+  --crmc-primary-hover: oklch(0.97 0.03 88);
+  --crmc-ring: oklch(0.93 0.035 88);
+  --crmc-danger: oklch(0.76 0.14 25);
+  --crmc-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
-#crm-connector-panel .crmc-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(134, 150, 160, 0.25);
+/* Not inside an <svg>: there the shape itself (`d`, `r`, `cx`…) is a
+   CSS property set by the element's attributes, and reverting it
+   erases the drawing. */
+#crm-connector-panel *:not(svg *),
+#crm-connector-panel *:not(svg *)::before,
+#crm-connector-panel *:not(svg *)::after {
+  all: revert;
+  box-sizing: border-box;
 }
 
-#crm-connector-panel .crmc-title {
-  flex: 1;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.6;
+/* ---- Where it sits ---------------------------------------- */
+
+/* Floating: the window is too narrow to share, or WhatsApp's root did
+   not take the narrower width. A card over the top-right corner. */
+#crm-connector-panel.crmc-floating {
+  top: 76px;
+  right: 16px;
+  bottom: auto;
+  width: 300px;
+  max-height: calc(100vh - 100px);
+  border: 1px solid var(--crmc-border);
+  border-radius: 14px;
+  box-shadow: var(--crmc-shadow);
 }
 
-#crm-connector-panel .crmc-icon {
-  all: unset;
-  cursor: pointer;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  text-align: center;
-  line-height: 22px;
-  opacity: 0.6;
+/* Collapsed: a tab on the edge, below WhatsApp's chat header so it
+   never sits on the header's own buttons. */
+#crm-connector-panel.crmc-collapsed {
+  top: 84px;
+  right: 0;
+  bottom: auto;
+  width: auto;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
-#crm-connector-panel .crmc-icon:hover {
-  opacity: 1;
-  background: rgba(134, 150, 160, 0.18);
-}
-
-#crm-connector-panel .crmc-body {
-  padding: 12px;
-}
-
+#crm-connector-panel.crmc-collapsed .crmc-head,
 #crm-connector-panel.crmc-collapsed .crmc-body {
   display: none;
 }
 
+#crm-connector-panel .crmc-tab {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 44px;
+  margin: 0;
+  padding: 0 0 0 4px;
+  border: 1px solid var(--crmc-border);
+  border-right: 0;
+  border-radius: 12px 0 0 12px;
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
+  box-shadow: var(--crmc-shadow);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#crm-connector-panel.crmc-collapsed .crmc-tab {
+  display: flex;
+}
+
+#crm-connector-panel .crmc-tab:hover {
+  width: 46px;
+}
+
+#crm-connector-panel .crmc-tab:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Header ----------------------------------------------- */
+
+#crm-connector-panel .crmc-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px 12px 14px;
+  border-bottom: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-logo {
+  display: block;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+#crm-connector-panel .crmc-brand {
+  flex: 1;
+  min-width: 0;
+}
+
+#crm-connector-panel .crmc-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+#crm-connector-panel .crmc-account {
+  display: block;
+  overflow: hidden;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-account:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--crmc-fg-muted);
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-icon:hover {
+  background: var(--crmc-muted);
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-icon:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 1px;
+}
+
+#crm-connector-panel .crmc-icon svg,
+#crm-connector-panel .crmc-icon svg * {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#crm-connector-panel .crmc-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+/* ---- Body ------------------------------------------------- */
+
+#crm-connector-panel .crmc-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#crm-connector-panel .crmc-who {
+  margin: 0 0 14px;
+}
+
 #crm-connector-panel .crmc-name {
   margin: 0;
-  font-size: 15px;
+  overflow-wrap: anywhere;
+  font-size: 17px;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 #crm-connector-panel .crmc-sub {
-  margin: 2px 0 0;
-  opacity: 0.6;
+  margin: 3px 0 0;
+  color: var(--crmc-fg-muted);
   font-variant-numeric: tabular-nums;
 }
 
 #crm-connector-panel .crmc-msg {
-  margin: 0;
-  opacity: 0.75;
+  margin: 6px 0 0;
+  color: var(--crmc-fg-muted);
+}
+
+#crm-connector-panel .crmc-msg:first-child {
+  margin-top: 0;
+}
+
+#crm-connector-panel .crmc-muted {
+  margin: 8px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-err {
+  margin: 8px 0 0;
+  color: var(--crmc-danger);
+  font-size: 12px;
+}
+
+/* A block of the record: Contato, Negócios, and what later phases
+   add beside them. */
+#crm-connector-panel .crmc-card {
+  margin: 0 0 10px;
+  padding: 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+}
+
+#crm-connector-panel .crmc-section {
+  margin: 0 0 8px;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#crm-connector-panel .crmc-card > .crmc-muted:first-of-type,
+#crm-connector-panel .crmc-deals > .crmc-muted:first-child {
+  margin-top: 0;
 }
 
 #crm-connector-panel .crmc-row {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  margin: 8px 0 0;
+  gap: 12px;
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 #crm-connector-panel .crmc-row span {
-  opacity: 0.55;
   flex-shrink: 0;
+  color: var(--crmc-fg-muted);
+  text-align: left;
 }
 
 #crm-connector-panel .crmc-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 10px;
+  margin: 10px 0 0;
 }
 
 #crm-connector-panel .crmc-tag {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(134, 150, 160, 0.2);
+  background: var(--crmc-muted);
   font-size: 11px;
 }
 
+/* ---- Buttons and links ------------------------------------ */
+
 #crm-connector-panel .crmc-btn {
   display: block;
-  box-sizing: border-box;
   width: 100%;
-  margin-top: 12px;
-  padding: 8px 12px;
+  margin: 12px 0 0;
+  padding: 9px 12px;
   border: 0;
   border-radius: 999px;
-  background: #00a884;
-  color: #ffffff;
+  background: var(--crmc-primary);
+  color: var(--crmc-primary-fg);
   font: inherit;
-  font-weight: 500;
+  font-weight: 600;
   text-align: center;
   text-decoration: none;
   cursor: pointer;
 }
 
 #crm-connector-panel .crmc-btn:hover {
-  background: #029a79;
+  background: var(--crmc-primary-hover);
 }
 
-/* Temperature: a segmented control. The label carries the meaning;
-   the dot only helps the eye find the selected one, so it never has
-   to be told apart by colour alone. */
+#crm-connector-panel .crmc-btn:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 2px;
+}
+
+#crm-connector-panel .crmc-btn.crmc-btn-small {
+  width: auto;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-link {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--crmc-fg);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-link:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 1px;
+}
+
+#crm-connector-panel .crmc-link.crmc-link-block {
+  display: block;
+  margin: 12px auto 0;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+#crm-connector-panel .crmc-linked {
+  margin: 6px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+/* ---- Temperature ------------------------------------------ */
+
+/* A segmented control. The label carries the meaning; the dot only
+   helps the eye find the selected one, so it never has to be told
+   apart by colour alone. */
 #crm-connector-panel .crmc-temp {
   display: flex;
   gap: 2px;
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   padding: 2px;
   border-radius: 999px;
-  background: rgba(134, 150, 160, 0.18);
+  background: var(--crmc-muted);
 }
 
 #crm-connector-panel .crmc-seg {
-  all: unset;
   flex: 1;
-  box-sizing: border-box;
+  margin: 0;
   padding: 5px 0;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
+  color: var(--crmc-fg-muted);
+  font: inherit;
   font-size: 12px;
   text-align: center;
   cursor: pointer;
-  opacity: 0.7;
 }
 
 #crm-connector-panel .crmc-seg:hover {
-  opacity: 1;
+  color: var(--crmc-fg);
 }
 
 #crm-connector-panel .crmc-seg:focus-visible {
-  outline: 2px solid #00a884;
+  outline: 2px solid var(--crmc-ring);
   outline-offset: 1px;
 }
 
 #crm-connector-panel .crmc-seg[aria-pressed="true"] {
-  opacity: 1;
-  background: #ffffff;
-  color: #111b21;
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(11, 20, 26, 0.16);
+  box-shadow: 0 1px 3px rgba(20, 16, 12, 0.18);
 }
 
 #crm-connector-panel .crmc-seg[aria-pressed="true"]::before {
@@ -207,51 +473,23 @@
 
 #crm-connector-panel .crmc-seg:disabled {
   cursor: progress;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
-#crm-connector-panel .crmc-err {
-  margin: 8px 0 0;
-  color: #c5221f;
-  font-size: 12px;
-}
+/* ---- Deals ------------------------------------------------ */
 
-@media (prefers-color-scheme: dark) {
-  #crm-connector-panel .crmc-seg[aria-pressed="true"] {
-    background: #2a3942;
-    color: #e9edef;
-    box-shadow: none;
-  }
-
-  #crm-connector-panel .crmc-err {
-    color: #f28b82;
-  }
-}
-
-/* Deals: one block per open deal, with its stage as a native select —
-   the browser's own picker is keyboard- and screen-reader-ready, and
-   it can't be restyled by WhatsApp's CSS into something unreadable. */
+/* One block per open deal, with its stage as a native select — the
+   browser's own picker is keyboard- and screen-reader-ready. */
 #crm-connector-panel .crmc-deals:empty {
   display: none;
 }
 
-#crm-connector-panel .crmc-section {
-  margin: 14px 0 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.55;
-}
-
-#crm-connector-panel .crmc-muted {
-  margin: 12px 0 0;
-  font-size: 12px;
-  opacity: 0.6;
-}
-
 #crm-connector-panel .crmc-deal {
-  margin: 8px 0 0;
+  margin: 0 0 10px;
+}
+
+#crm-connector-panel .crmc-deal:last-child {
+  margin-bottom: 0;
 }
 
 #crm-connector-panel .crmc-deal-head {
@@ -263,44 +501,1121 @@
 
 #crm-connector-panel .crmc-deal-title {
   overflow: hidden;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 #crm-connector-panel .crmc-deal-value {
   flex-shrink: 0;
+  color: var(--crmc-fg-muted);
   font-variant-numeric: tabular-nums;
-  opacity: 0.7;
 }
 
-#crm-connector-panel .crmc-stage {
+#crm-connector-panel .crmc-select {
   display: block;
-  box-sizing: border-box;
   width: 100%;
-  margin: 4px 0 0;
-  padding: 5px 8px;
-  border: 1px solid rgba(134, 150, 160, 0.4);
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--crmc-border);
   border-radius: 8px;
-  background: transparent;
-  color: inherit;
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
-#crm-connector-panel .crmc-stage:focus-visible {
-  outline: 2px solid #00a884;
+#crm-connector-panel .crmc-select:focus-visible {
+  outline: 2px solid var(--crmc-ring);
   outline-offset: 1px;
 }
 
-#crm-connector-panel .crmc-stage:disabled {
+#crm-connector-panel .crmc-select:disabled {
   cursor: progress;
   opacity: 0.5;
 }
 
-@media (prefers-color-scheme: dark) {
-  #crm-connector-panel .crmc-stage option {
-    background: #202c33;
-    color: #e9edef;
-  }
+#crm-connector-panel .crmc-select option {
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-stage {
+  margin: 5px 0 0;
+}
+
+#crm-connector-panel .crmc-deal-actions {
+  margin: 5px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+#crm-connector-panel .crmc-deals:not(:empty) + .crmc-dealform:not(:empty) {
+  margin-top: 12px;
+}
+
+#crm-connector-panel .crmc-dealform > .crmc-btn {
+  margin-top: 0;
+}
+
+/* ---- Tabs ------------------------------------------------- */
+
+#crm-connector-panel .crmc-tempslot:not(:empty) {
+  margin: 0 0 12px;
+}
+
+#crm-connector-panel .crmc-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 14px;
+  border-bottom: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-tabbtn {
+  flex: 1 1 auto;
+  margin: 0 0 -1px;
+  padding: 8px 2px;
+  /* Four tabs share the column: a count stays beside its label. */
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--crmc-fg-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-tabbtn:hover {
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-tabbtn[aria-selected="true"] {
+  border-bottom-color: var(--crmc-primary);
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-tabbtn:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: -2px;
+}
+
+#crm-connector-panel .crmc-count {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--crmc-muted);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ---- Forms ------------------------------------------------ */
+
+#crm-connector-panel .crmc-form {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-field {
+  display: block;
+  margin: 0 0 10px;
+}
+
+#crm-connector-panel .crmc-field > span {
+  display: block;
+  margin: 0 0 4px;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+#crm-connector-panel .crmc-field .crmc-input,
+#crm-connector-panel .crmc-textarea {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+}
+
+#crm-connector-panel .crmc-textarea {
+  min-height: 68px;
+  padding: 8px 12px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+#crm-connector-panel .crmc-form > .crmc-btn {
+  margin-top: 8px;
+}
+
+#crm-connector-panel .crmc-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 0;
+}
+
+#crm-connector-panel .crmc-form-actions .crmc-btn {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-form .crmc-err {
+  margin: 0 0 8px;
+}
+
+#crm-connector-panel .crmc-btn:disabled,
+#crm-connector-panel .crmc-link:disabled,
+#crm-connector-panel .crmc-input:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+
+/* A second action on a screen that already has a main one. */
+#crm-connector-panel .crmc-btn.crmc-btn-quiet {
+  border: 1px solid var(--crmc-border);
+  background: transparent;
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-btn.crmc-btn-quiet:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-pane + .crmc-btn {
+  margin-top: 16px;
+}
+
+/* ---- Notes ------------------------------------------------ */
+
+#crm-connector-panel .crmc-notes {
+  margin: 14px 0 0;
+}
+
+#crm-connector-panel .crmc-notes > .crmc-muted:first-child {
+  margin-top: 0;
+}
+
+#crm-connector-panel .crmc-note {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+}
+
+#crm-connector-panel .crmc-note-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+#crm-connector-panel .crmc-note-meta {
+  margin: 5px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+/* ---- Editing tags ----------------------------------------- */
+
+#crm-connector-panel .crmc-tagedit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 6px;
+}
+
+#crm-connector-panel .crmc-tagedit .crmc-muted {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-tag.crmc-tag-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+#crm-connector-panel .crmc-tag-x {
+  margin: 0;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-tag-x:hover {
+  background: var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-tag-x:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 0;
+}
+
+#crm-connector-panel .crmc-tagadd {
+  display: flex;
+  gap: 6px;
+}
+
+#crm-connector-panel .crmc-tagadd .crmc-input {
+  flex: 1;
+  width: auto;
+}
+
+/* ---- Linking a chat to a contact by hand ------------------ */
+
+/* A lid chat whose number WhatsApp doesn't show, or the same number
+   saved twice. */
+#crm-connector-panel .crmc-search {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+
+#crm-connector-panel .crmc-input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 999px;
+  background: var(--crmc-surface);
+  color: var(--crmc-fg);
+  font: inherit;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-input::placeholder {
+  color: var(--crmc-fg-muted);
+  opacity: 1;
+}
+
+#crm-connector-panel .crmc-input:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 0;
+}
+
+#crm-connector-panel .crmc-results:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+#crm-connector-panel .crmc-result {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+  color: var(--crmc-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-result:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-result:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 1px;
+}
+
+#crm-connector-panel .crmc-result-name {
+  display: block;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-result-sub {
+  display: block;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Quick replies ---------------------------------------- */
+
+/* The bar that opens them stays at the bottom of the column, and only
+   exists once the extension is connected to a CRM. */
+#crm-connector-panel .crmc-foot {
+  display: none;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel.crmc-connected .crmc-foot {
+  display: flex;
+  gap: 8px;
+}
+
+#crm-connector-panel .crmc-foot .crmc-btn {
+  flex: 1;
+  width: auto;
+  margin: 0;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+/* The sheet takes the record's place without replacing it: the record
+   is hidden, not redrawn, so what was half-typed there survives. */
+#crm-connector-panel .crmc-sheet {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+#crm-connector-panel.crmc-sheet-open .crmc-sheet {
+  display: block;
+}
+
+#crm-connector-panel.crmc-sheet-open .crmc-body,
+#crm-connector-panel.crmc-sheet-open .crmc-foot,
+#crm-connector-panel.crmc-collapsed .crmc-sheet,
+#crm-connector-panel.crmc-collapsed .crmc-foot {
+  display: none;
+}
+
+#crm-connector-panel .crmc-sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+#crm-connector-panel .crmc-replies-search {
+  display: block;
+  width: 100%;
+}
+
+#crm-connector-panel .crmc-replies-status {
+  margin: 10px 0 0;
+  color: var(--crmc-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-replies-status:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-replies-status.crmc-err {
+  color: var(--crmc-danger);
+}
+
+#crm-connector-panel .crmc-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 0;
+}
+
+#crm-connector-panel .crmc-replies > .crmc-muted {
+  margin: 0;
+}
+
+/* Two lines of the text as it will go; the rest is one click away in
+   the message box, where it can still be edited. */
+#crm-connector-panel .crmc-reply-text {
+  display: -webkit-box;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: pre-line;
+}
+
+/* Sequences, under the replies. Not buttons themselves: the action
+   is the one beside them. */
+#crm-connector-panel .crmc-seqs:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+#crm-connector-panel .crmc-seqs-title {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-seqs > .crmc-muted {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-seq-main {
+  cursor: default;
+}
+
+#crm-connector-panel .crmc-seq-main:hover {
+  background: var(--crmc-surface);
+}
+
+#crm-connector-panel .crmc-optout {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+/* "Enviar agora | Agendar", and the time fields under it. */
+#crm-connector-panel .crmc-mode:not([hidden]) {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+#crm-connector-panel .crmc-mode-btn {
+  flex: 1;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--crmc-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-mode-btn.crmc-mode-on {
+  border-color: var(--crmc-primary);
+  background: var(--crmc-primary);
+  color: var(--crmc-primary-fg);
+}
+
+#crm-connector-panel .crmc-when:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 10px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-when-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel .crmc-when-at {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-when-text {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+#crm-connector-panel .crmc-when .crmc-when-send {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-sched:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+#crm-connector-panel .crmc-sched-done {
+  opacity: 0.6;
+}
+
+/* "Assinar como [nome]", under the search. */
+#crm-connector-panel .crmc-sign {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-sign-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--crmc-fg);
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-sign-on,
+#crm-connector-panel .crmc-when-noreply {
+  margin: 0;
+  accent-color: var(--crmc-primary);
+}
+
+#crm-connector-panel .crmc-sign-name {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-sign-name:disabled {
+  opacity: 0.55;
+}
+
+/* The file of a reply that has one: its kind and name. */
+#crm-connector-panel .crmc-reply-file {
+  display: block;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A reply and, when the CRM may send from this number, its "Enviar"
+   beside it. Never one inside the other: a button can't hold a button. */
+#crm-connector-panel .crmc-reply-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+#crm-connector-panel .crmc-reply-row > .crmc-reply {
+  flex: 1;
+  min-width: 0;
+}
+
+#crm-connector-panel .crmc-reply-send {
+  flex: none;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--crmc-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-reply-send:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-reply-send:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 1px;
+}
+
+/* Second click sends: it must look like it. */
+#crm-connector-panel .crmc-reply-send.crmc-reply-confirm {
+  border-color: var(--crmc-primary);
+  background: var(--crmc-primary);
+  color: var(--crmc-primary-fg);
+}
+
+#crm-connector-panel .crmc-reply-send:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+#crm-connector-panel .crmc-replies-note {
+  font-size: 12px;
+}
+
+/* ---- Tasks ------------------------------------------------ */
+
+#crm-connector-panel .crmc-task-title-input {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+}
+
+#crm-connector-panel .crmc-taskwhen {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+
+#crm-connector-panel .crmc-taskwhen .crmc-input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10px;
+}
+
+#crm-connector-panel .crmc-tasks,
+#crm-connector-panel .crmc-mytasks {
+  margin: 14px 0 0;
+}
+
+#crm-connector-panel .crmc-tasks > .crmc-muted:first-child,
+#crm-connector-panel .crmc-mytasks > .crmc-muted:first-child {
+  margin-top: 0;
+}
+
+#crm-connector-panel .crmc-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+}
+
+/* The tick: an empty circle that fills on the way to "done". */
+#crm-connector-panel .crmc-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  border: 1.5px solid var(--crmc-fg-muted);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-check:hover {
+  border-color: var(--crmc-primary);
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-check:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: 2px;
+}
+
+#crm-connector-panel .crmc-task-main {
+  flex: 1;
+  min-width: 0;
+}
+
+#crm-connector-panel .crmc-task-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#crm-connector-panel .crmc-task-when,
+#crm-connector-panel .crmc-task-who {
+  margin: 3px 0 0;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+}
+
+/* Late is said in words ("atrasada · …") and in colour; today only
+   gets the weight. */
+#crm-connector-panel .crmc-task[data-tone="overdue"] .crmc-task-when {
+  color: var(--crmc-danger);
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-task[data-tone="today"] .crmc-task-when {
+  color: var(--crmc-fg);
+  font-weight: 600;
+}
+
+/* How many of my tasks are late or for today. */
+#crm-connector-panel .crmc-badge {
+  margin-left: 5px;
+  background: var(--crmc-danger);
+  color: var(--crmc-bg);
+  font-weight: 700;
+}
+
+#crm-connector-panel .crmc-badge[hidden] {
+  display: none;
+}
+
+/* ---- The conversation in the CRM --------------------------- */
+
+#crm-connector-panel .crmc-conv:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-conv {
+  margin: 0 0 12px;
+}
+
+#crm-connector-panel .crmc-conv-box {
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-muted);
+}
+
+/* Someone is waiting for a person: the one banner that asks for
+   attention. */
+#crm-connector-panel .crmc-conv-box[data-tone="waiting"] {
+  border-color: var(--crmc-danger);
+}
+
+#crm-connector-panel .crmc-conv-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-conv-summary {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-conv-box .crmc-btn {
+  margin: 8px 0 0;
+}
+
+#crm-connector-panel .crmc-conv-box .crmc-conv-text + .crmc-conv-text {
+  margin-top: 4px;
+}
+
+/* Assumir, Devolver para a IA, Pausar fluxo: side by side when they fit. */
+#crm-connector-panel .crmc-conv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+#crm-connector-panel .crmc-conv-actions .crmc-btn {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-flows:not(:empty) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+#crm-connector-panel .crmc-flows > .crmc-muted {
+  margin: 0;
+}
+
+/* ---- Shortcuts in WhatsApp's chat header -------------------- */
+
+/* A child of the panel placed against the viewport, like the board:
+   content.js puts it over the empty stretch of the chat header. Shown
+   with the panel collapsed too — a shortcut opens it. */
+#crm-connector-panel .crmc-shortcuts {
+  position: fixed;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 36px;
+  margin: 0;
+  padding: 0 4px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 999px;
+  background: var(--crmc-bg);
+  box-shadow: 0 2px 8px rgba(20, 16, 12, 0.12);
+}
+
+#crm-connector-panel .crmc-shortcuts[hidden] {
+  display: none;
+}
+
+#crm-connector-panel .crmc-sc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--crmc-fg);
+  cursor: pointer;
+}
+
+#crm-connector-panel .crmc-sc:hover {
+  background: var(--crmc-muted);
+}
+
+#crm-connector-panel .crmc-sc:focus-visible {
+  outline: 2px solid var(--crmc-ring);
+  outline-offset: -2px;
+}
+
+#crm-connector-panel .crmc-sc:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+#crm-connector-panel .crmc-sc:disabled:hover {
+  background: transparent;
+}
+
+#crm-connector-panel .crmc-sc svg,
+#crm-connector-panel .crmc-sc svg * {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#crm-connector-panel .crmc-sc svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+}
+
+/* ---- The board -------------------------------------------- */
+
+/* A child of the panel, placed against the viewport: it covers
+   WhatsApp up to the panel's column. The panel clips its own content,
+   but not this — a fixed box answers to the viewport, not to it. */
+#crm-connector-panel .crmc-board {
+  position: fixed;
+  top: 0;
+  right: var(--crmc-width);
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  background: var(--crmc-bg);
+  color: var(--crmc-fg);
+}
+
+#crm-connector-panel.crmc-board-open .crmc-board {
+  display: flex;
+}
+
+/* Floating, there is no column to stop at: the board takes the whole
+   window, the panel's card included, and brings its own way out. */
+#crm-connector-panel.crmc-floating .crmc-board {
+  right: 0;
+}
+
+#crm-connector-panel.crmc-collapsed .crmc-board {
+  display: none;
+}
+
+#crm-connector-panel .crmc-board-head {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--crmc-border);
+}
+
+#crm-connector-panel .crmc-board-head .crmc-btn {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-board-pipe .crmc-select {
+  width: auto;
+  min-width: 140px;
+}
+
+#crm-connector-panel .crmc-board-pipename {
+  color: var(--crmc-fg-muted);
+}
+
+#crm-connector-panel .crmc-board-search {
+  flex: 1 1 180px;
+  max-width: 320px;
+}
+
+#crm-connector-panel .crmc-board-sum {
+  margin: 0 0 0 auto;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-board-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px 0;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-board-note:empty {
+  display: none;
+}
+
+#crm-connector-panel .crmc-board-cols {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px 16px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#crm-connector-panel .crmc-board-cols > .crmc-muted {
+  margin: 0;
+}
+
+#crm-connector-panel .crmc-kcol {
+  display: flex;
+  flex: 0 0 264px;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: var(--crmc-muted);
+}
+
+/* Where a dragged card will land. */
+#crm-connector-panel .crmc-kcol.crmc-kcol-over {
+  border-color: var(--crmc-ring);
+}
+
+#crm-connector-panel .crmc-kcol-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 8px;
+}
+
+#crm-connector-panel .crmc-kcol-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-kcol-head .crmc-count {
+  flex-shrink: 0;
+  background: var(--crmc-bg);
+}
+
+#crm-connector-panel .crmc-kcol-sum {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--crmc-fg-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+#crm-connector-panel .crmc-kcol-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+}
+
+#crm-connector-panel .crmc-kcol-list > .crmc-muted {
+  margin: 4px;
+}
+
+#crm-connector-panel .crmc-kcard {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--crmc-border);
+  border-radius: 12px;
+  background: var(--crmc-surface);
+  cursor: grab;
+}
+
+#crm-connector-panel .crmc-kcard.crmc-dragging {
+  opacity: 0.45;
+}
+
+#crm-connector-panel .crmc-kcard-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+#crm-connector-panel .crmc-kcard-who {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--crmc-fg-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#crm-connector-panel .crmc-kcard-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+#crm-connector-panel .crmc-kcard-value {
+  font-variant-numeric: tabular-nums;
+}
+
+#crm-connector-panel .crmc-kcard-move {
+  margin: 8px 0 0;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+/* ---- The one rule outside the panel ------------------------ */
+
+/* Docked: WhatsApp's root gives up a column. `left`/`right` matter
+   only if the root is positioned by them; they are harmless if not.
+   content.js confirms the root really got narrower and takes this
+   mark off when it didn't. An attribute and not a class: WhatsApp Web
+   drops classes it does not know from <html>. */
+html[data-crmc-docked] #app {
+  width: calc(100% - 320px) !important;
+  max-width: calc(100% - 320px) !important;
+  left: 0 !important;
+  right: auto !important;
 }

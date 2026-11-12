@@ -18,6 +18,34 @@ export function normalizePhone(phone: string): string {
 }
 
 /**
+ * Every digits-only form under which the same phone may be stored,
+ * the number itself first. Strict on purpose — unlike `phonesMatch`,
+ * two different people never share a key here.
+ *
+ * Today the only alternative form is the Brazilian ninth digit:
+ * mobiles moved from 8 to 9 digits (a leading 9), but WhatsApp still
+ * identifies many accounts registered before that by the old form —
+ * `553199998888` for the number the customer writes as
+ * `+55 31 99999-8888`. Either one may be what reached the CRM.
+ *
+ * Only mobiles qualify (the 8-digit part starts with 6–9; landlines
+ * start with 2–5), so a landline is never paired with a mobile.
+ *
+ * The Chrome extension keeps a copy of this rule (extension/phone.js)
+ * to double-check what the API returns; a test keeps the two equal.
+ */
+export function equivalentPhoneKeys(phone: string): string[] {
+  const digits = normalizePhone(phone)
+  if (!digits) return []
+  const keys = [digits]
+  const withNine = /^55([1-9]{2})9([6-9]\d{7})$/.exec(digits)
+  if (withNine) keys.push(`55${withNine[1]}${withNine[2]}`)
+  const withoutNine = /^55([1-9]{2})([6-9]\d{7})$/.exec(digits)
+  if (withoutNine) keys.push(`55${withoutNine[1]}9${withoutNine[2]}`)
+  return keys
+}
+
+/**
  * Compare two phone numbers accounting for trunk prefix differences.
  * e.g. "370063949836" (with trunk 0) matches "37063949836" (without trunk 0)
  * by comparing the last 8 digits.

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Sparkles, Hand, Undo2, Loader2, TriangleAlert, X } from "lucide-react";
+import { useNow } from "@/hooks/use-now";
+import { formatWait, waitInfo } from "@/lib/inbox/handoff-wait";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -9,40 +11,27 @@ import { useAuth } from "@/hooks/use-auth";
 import { createClient } from "@/lib/supabase/client";
 import { parseReplyFailure, type ParsedReplyFailure } from "@/lib/ai/reply-failure";
 import { autoReplyStatusFromConfig, type AiConfigSnapshot } from "@/lib/ai/autoreply-status";
+import { createAiConfigSnapshotCache } from "@/lib/ai/config-snapshot-cache";
 import type { AgentRunStatus } from "@/lib/agents/types";
 
 // ------------------------------------------------------------
-// The account's AI config is the same for every conversation, so cache
-// it per account and reuse it across thread switches instead of hitting
-// /api/ai/config every time the agent opens a chat. What it means for a
-// given thread depends on that thread's channel, so the status itself
-// is derived per thread from the cached snapshot.
-//
-// Keyed by accountId (a multi-account user switching workspaces must not
-// see the previous account's status), and only *successful* fetches are
-// cached — a transient failure returns null without poisoning the
-// cache, so it retries on the next thread open rather than hiding the
-// banner for the whole session.
+// The account's AI config is the same for every conversation, so the
+// threads share one short-lived copy per account (see
+// `config-snapshot-cache`: reused while fresh, read again after, so
+// turning the agent on or off reaches an inbox that is already open).
+// What it means for a given thread depends on that thread's channel,
+// so the status itself is derived per thread from the snapshot.
 // ------------------------------------------------------------
 // `agentMode` (an active agent speaks on this thread's channel) matters
 // twice: it turns the banner on even with the single-assistant switch
 // off — the dispatcher never reads that switch in agent mode — and it
 // is what makes `agent_runs` exist for the failure notice to read.
-const configCache = new Map<string, AiConfigSnapshot>();
-
-async function fetchAiConfigSnapshot(accountId: string): Promise<AiConfigSnapshot | null> {
-  const cached = configCache.get(accountId);
-  if (cached) return cached;
-  try {
+const aiConfigSnapshots = createAiConfigSnapshotCache({
+  load: async () => {
     const res = await fetch("/api/ai/config", { cache: "no-store" });
-    if (!res.ok) return null; // don't cache a transient failure
-    const snapshot = (await res.json()) as AiConfigSnapshot;
-    configCache.set(accountId, snapshot);
-    return snapshot;
-  } catch {
-    return null; // don't cache
-  }
-}
+    return res.ok ? ((await res.json()) as AiConfigSnapshot) : null;
+  },
+});
 
 // ------------------------------------------------------------
 // The last thing the bot did on this thread, from `agent_runs`.
@@ -142,6 +131,9 @@ interface AiThreadBannerProps {
   disabled: boolean;
   /** `conversations.ai_handoff_summary` — note the bot left on handoff. */
   handoffSummary?: string | null;
+  /** `conversations.needs_human_since` (058) — handed off and nobody
+   *  has answered the customer yet. */
+  needsHumanSince?: string | null;
   /** `conversations.channel` — which agents may answer depends on it.
    *  Absent before migration 047, which means WhatsApp. */
   channel?: string | null;
@@ -176,6 +168,7 @@ export function AiThreadBanner({
   conversationId,
   disabled,
   handoffSummary,
+  needsHumanSince,
   channel,
   assignedAgentId,
   currentUserId,
@@ -183,6 +176,8 @@ export function AiThreadBanner({
 }: AiThreadBannerProps) {
   const t = useTranslations("Inbox.aiBanner");
   const { accountId } = useAuth();
+  const now = useNow(30_000);
+  const wait = waitInfo(needsHumanSince, now);
   const [config, setConfig] = useState<AiConfigSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   // Optimistic local mirror of the pause flag so the banner flips
@@ -194,14 +189,24 @@ export function AiThreadBanner({
   // is a new run and shows again.
   const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
 
+  // Asked on every thread opened and whenever the tab comes back into
+  // view; the shared copy answers from memory while it is fresh. The
+  // banner keeps showing the previous answer until a new one arrives.
   useEffect(() => {
     if (!accountId) return;
     let alive = true;
-    fetchAiConfigSnapshot(accountId).then((c) => alive && setConfig(c));
+    const load = () =>
+      aiConfigSnapshots.get(accountId).then((c) => alive && setConfig(c));
+    load();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [accountId]);
+  }, [accountId, conversationId]);
 
   // Same rule as the dispatcher, for this thread's channel. Still
   // loading (null) → off.
@@ -244,6 +249,78 @@ export function AiThreadBanner({
     },
     [conversationId, currentUserId, onChange, t],
   );
+
+  // Handed off and nobody answered yet: the loudest state, shown even
+  // if the AI was switched off for the account since the handoff.
+  if (wait.waiting && paused) {
+    const mine = !!assignedAgentId && assignedAgentId === currentUserId;
+    const title = mine
+      ? t("waiting.mineTitle")
+      : assignedAgentId
+        ? t("waiting.assignedTitle")
+        : t("waiting.nobodyTitle");
+    return (
+      <div
+        role="alert"
+        className={cn(
+          "flex flex-col gap-2 border-y px-3 py-3 text-sm sm:flex-row sm:items-center sm:px-4",
+          wait.late
+            ? "border-red-700/40 bg-red-600 text-white"
+            : "border-amber-500/50 bg-amber-400 text-amber-950",
+        )}
+      >
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <span className="relative mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-black/10">
+            {wait.late && (
+              <span className="absolute inset-0 animate-ping rounded-full bg-white/40" aria-hidden />
+            )}
+            <Hand className="relative size-3.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold leading-tight">{title}</p>
+            <p className="text-xs opacity-90">
+              {wait.minutes < 1
+                ? t("waiting.justNow")
+                : t("waiting.since", { time: formatWait(wait.minutes) })}
+              {wait.late ? ` · ${t("waiting.late")}` : ""}
+            </p>
+            {handoffSummary && (
+              <p className="mt-1 line-clamp-2 text-xs opacity-90" title={handoffSummary}>
+                {handoffSummary}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 pl-9 sm:pl-0">
+          {!mine && (
+            <button
+              type="button"
+              onClick={() => toggle(true)}
+              disabled={busy}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors disabled:opacity-60",
+                wait.late
+                  ? "bg-white text-red-700 hover:bg-red-50"
+                  : "bg-amber-950 text-amber-50 hover:bg-amber-900",
+              )}
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Hand className="h-3.5 w-3.5" />}
+              {t("waiting.takeOver")}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => toggle(false)}
+            disabled={busy}
+            className="inline-flex items-center gap-1 rounded-md border border-current/30 px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-black/10 disabled:opacity-60"
+          >
+            <Undo2 className="h-3 w-3" />
+            {t("resume")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Account has no auto-reply → nothing to show. (Still loading → nothing.)
   if (!status.autoReplyOn) return null;

@@ -12,14 +12,20 @@ import type { UazapiInboundMessage } from './parse'
 // Unlike the Evolution path this also handles `fromMe` messages — the
 // operator replying from their own phone — which land as `agent`
 // messages so the thread stays whole. See parse.ts for why they arrive.
+//
+// Since D1 it also keeps media (copied to our storage through
+// `resolveMedia`, see media.ts) and button/list taps, and reports what
+// the engines need to react (`UazapiIngestResult`); the webhook route
+// decides whether they do.
 
-async function findOrCreateContact(
+export async function findOrCreateContact(
   admin: SupabaseClient,
   accountId: string,
   ownerUserId: string,
   phoneDigits: string,
   name: string | null,
-): Promise<string | null> {
+  lidDigits: string | null = null,
+): Promise<{ id: string; created: boolean } | null> {
   const phone = `+${phoneDigits}`
   const existing = await findExistingContact(admin, accountId, phone)
   if (existing) {
@@ -29,7 +35,36 @@ async function findOrCreateContact(
         .update({ name, updated_at: new Date().toISOString() })
         .eq('id', existing.id)
     }
-    return existing.id
+    return { id: existing.id, created: false }
+  }
+
+  // Before the parser learned to skip LIDs, a chat addressed by LID
+  // created a contact whose "phone" was the LID. Give that contact its
+  // real number now (exact match only), so its conversation and
+  // history carry on and replies reach the person — instead of a second
+  // contact for the same person.
+  if (lidDigits && lidDigits !== phoneDigits) {
+    const { data: byLid } = await admin
+      .from('contacts')
+      .select('id, name')
+      .eq('account_id', accountId)
+      .eq('phone_normalized', lidDigits)
+      .limit(1)
+      .maybeSingle()
+    const row = byLid as { id: string; name: string | null } | null
+    if (row) {
+      const patch: Record<string, unknown> = { phone, updated_at: new Date().toISOString() }
+      // The old placeholder name was the LID itself.
+      const oldName = (row.name ?? '').replace(/\D/g, '')
+      if (name && (!row.name || oldName === lidDigits)) patch.name = name
+      const { error: fixErr } = await admin.from('contacts').update(patch).eq('id', row.id)
+      if (!fixErr) return { id: row.id, created: false }
+      console.error('[uazapi inbound] LID contact fix failed:', fixErr.message)
+      if (isUniqueViolation(fixErr)) {
+        const raced = await findExistingContact(admin, accountId, phone)
+        if (raced) return { id: raced.id, created: false }
+      }
+    }
   }
 
   const { data, error } = await admin
@@ -45,15 +80,15 @@ async function findOrCreateContact(
   if (error) {
     if (isUniqueViolation(error)) {
       const raced = await findExistingContact(admin, accountId, phone)
-      return raced?.id ?? null
+      return raced ? { id: raced.id, created: false } : null
     }
     console.error('[uazapi inbound] contact create failed:', error.message)
     return null
   }
-  return data.id
+  return { id: data.id, created: true }
 }
 
-async function findOrCreateConversation(
+export async function findOrCreateConversation(
   admin: SupabaseClient,
   accountId: string,
   ownerUserId: string,
@@ -90,19 +125,48 @@ async function findOrCreateConversation(
   return { id: data.id, created: true }
 }
 
+/** What the engines need to react to a stored message. */
+export interface UazapiIngestResult {
+  contactId: string
+  conversationId: string
+  contactCreated: boolean
+  /** The contact's first customer message in this thread. */
+  isFirstInbound: boolean
+  contentType: string
+}
+
+/** Shown when a media file couldn't be kept, so the thread still says something arrived. */
+export const MEDIA_LABEL: Record<string, string> = {
+  image: '[foto]',
+  video: '[vídeo]',
+  audio: '[áudio]',
+  document: '[documento]',
+}
+
+/**
+ * Store one message. Returns null when nothing was stored (a contact or
+ * thread that couldn't be opened, or a redelivery).
+ *
+ * `resolveMedia` copies a received file to our storage and returns its
+ * URL (null on failure); it is called only after the redelivery check,
+ * so a repeated webhook doesn't download the file twice.
+ */
 export async function ingestUazapiInbound(
   admin: SupabaseClient,
   account: { id: string; ownerUserId: string },
   msg: UazapiInboundMessage,
-): Promise<void> {
-  const contactId = await findOrCreateContact(
+  opts: { resolveMedia?: (externalId: string) => Promise<string | null> } = {},
+): Promise<UazapiIngestResult | null> {
+  const contact = await findOrCreateContact(
     admin,
     account.id,
     account.ownerUserId,
     msg.counterpartPhone,
     msg.name,
+    msg.counterpartLid,
   )
-  if (!contactId) return
+  if (!contact) return null
+  const contactId = contact.id
 
   const conversation = await findOrCreateConversation(
     admin,
@@ -110,7 +174,7 @@ export async function ingestUazapiInbound(
     account.ownerUserId,
     contactId,
   )
-  if (!conversation) return
+  if (!conversation) return null
   const conversationId = conversation.id
 
   // The person's first message opened the thread → card in the funnel.
@@ -135,26 +199,78 @@ export async function ingestUazapiInbound(
       .eq('conversation_id', conversationId)
       .eq('message_id', msg.externalId)
       .limit(1)
-    if (dupe && dupe.length > 0) return
+    if (dupe && dupe.length > 0) return null
+  }
+
+  let mediaUrl: string | null = null
+  if (msg.mediaKind && msg.externalId && opts.resolveMedia) {
+    mediaUrl = await opts.resolveMedia(msg.externalId)
+  }
+  // A file we couldn't keep is stored as text saying it arrived.
+  const contentType = msg.interactiveReplyId
+    ? 'interactive'
+    : msg.mediaKind && mediaUrl
+      ? msg.mediaKind
+      : 'text'
+  const contentText =
+    msg.mediaKind && !mediaUrl
+      ? [MEDIA_LABEL[msg.mediaKind], msg.text].filter(Boolean).join(' ')
+      : msg.text || null
+
+  // Counted before the insert, as the Meta webhook does.
+  let isFirstInbound = false
+  if (!msg.fromMe) {
+    const { count } = await admin
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('sender_type', 'customer')
+    isFirstInbound = (count ?? 0) === 0
   }
 
   const nowIso = new Date().toISOString()
-  await admin.from('messages').insert({
+  const { error: insertErr } = await admin.from('messages').insert({
     conversation_id: conversationId,
     sender_type: msg.fromMe ? 'agent' : 'customer',
-    content_type: 'text',
-    content_text: msg.text,
+    content_type: contentType,
+    content_text: contentText,
+    media_url: mediaUrl,
     message_id: msg.externalId,
     status: 'delivered',
+    ...(msg.interactiveReplyId ? { interactive_reply_id: msg.interactiveReplyId } : {}),
   })
+  if (insertErr) {
+    console.error('[uazapi inbound] message insert failed:', insertErr.message)
+    return null
+  }
+
+  // A customer message counts as unread, like on the Meta path.
+  let unread: number | undefined
+  if (!msg.fromMe) {
+    const { data: conv } = await admin
+      .from('conversations')
+      .select('unread_count')
+      .eq('id', conversationId)
+      .maybeSingle()
+    unread = ((conv as { unread_count?: number } | null)?.unread_count ?? 0) + 1
+  }
+
   await admin
     .from('conversations')
     .update({
-      last_message_text: msg.text,
+      last_message_text: contentText || (msg.mediaKind ? `[${msg.mediaKind}]` : ''),
       last_message_at: nowIso,
       // An operator reply from the phone shouldn't reopen a closed thread.
-      ...(msg.fromMe ? {} : { status: 'open' }),
+      ...(msg.fromMe ? {} : { status: 'open', unread_count: unread }),
       updated_at: nowIso,
     })
     .eq('id', conversationId)
+
+  return {
+    contactId,
+    conversationId,
+    contactCreated: contact.created,
+    isFirstInbound,
+    contentType,
+  }
 }

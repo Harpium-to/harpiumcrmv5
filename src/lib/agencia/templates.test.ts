@@ -121,3 +121,57 @@ describe('describeApplySummary', () => {
     )
   })
 })
+
+describe('agendas in a template (migration 067)', () => {
+  const base = { pipelines: [], tags: [], custom_fields: [], quick_replies: [], automations: [] }
+  const agenda = {
+    name: 'Consultas',
+    color: '#3b82f6',
+    slot_minutes: 30,
+    hours: [
+      { weekday: 1, starts: '08:00', ends: '12:00' },
+      { weekday: 1, starts: '14:00', ends: '18:00' },
+    ],
+  }
+
+  it('accepts an agenda with its opening hours', () => {
+    expect(parseTemplateContent({ ...base, calendars: [agenda] })).toEqual({
+      ok: true,
+      content: { ...base, calendars: [agenda] },
+    })
+  })
+
+  it('a template with no agenda stores exactly what it did before', () => {
+    const parsed = parseTemplateContent(base)
+    expect(parsed).toEqual({ ok: true, content: base })
+    expect(parsed.ok && 'calendars' in parsed.content).toBe(false)
+  })
+
+  it('says what is wrong with an agenda, naming it', () => {
+    const parsed = parseTemplateContent({
+      ...base,
+      calendars: [
+        { name: '' },
+        { name: 'Sala', slot_minutes: 2, hours: [{ weekday: 8, starts: '08:00', ends: '12:00' }] },
+        { name: 'Sala', hours: [{ weekday: 1, starts: '18:00', ends: '08:00' }, { weekday: 1, starts: '8h', ends: '12:00' }] },
+      ],
+    })
+    expect(parsed.ok).toBe(false)
+    expect(!parsed.ok && parsed.errors).toEqual([
+      'Agenda 1: precisa de nome.',
+      'Agenda "Sala": "slot_minutes" precisa ser um inteiro entre 5 e 480.',
+      'Agenda "Sala", horário 1: "weekday" vai de 1 (segunda) a 7 (domingo).',
+      'Agenda "Sala", horário 1: o fim precisa ser depois do início.',
+      'Agenda "Sala", horário 2: "starts" e "ends" no formato HH:MM.',
+      'Agenda repetido: "Sala".',
+    ])
+  })
+
+  it('counts agendas, and mentions them only when there are any', () => {
+    const counts = templateCounts({ ...base, calendars: [agenda] })
+    expect(counts.calendars).toBe(1)
+    expect(describeCounts(counts)).toMatch(/, 1 agenda$/)
+    expect(describeCounts(templateCounts(base))).not.toContain('agenda')
+    expect(describeApplySummary({ calendars: 2 })).toMatch(/2 agendas\.$/)
+  })
+})

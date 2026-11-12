@@ -14,6 +14,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { PGlite } from '@electric-sql/pglite'
+import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import { uuid_ossp } from '@electric-sql/pglite/contrib/uuid_ossp'
 import { vector } from '@electric-sql/pglite-pgvector'
 
@@ -27,7 +28,7 @@ export function migrationFiles(): string[] {
 }
 
 export async function createDb(): Promise<PGlite> {
-  const db = new PGlite({ extensions: { uuid_ossp, vector } })
+  const db = new PGlite({ extensions: { uuid_ossp, vector, btree_gist } })
   await db.exec(readFileSync(STUBS, 'utf8'))
   return db
 }

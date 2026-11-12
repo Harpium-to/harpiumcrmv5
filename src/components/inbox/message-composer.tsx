@@ -55,6 +55,7 @@ import {
 import { validateInteractivePayload } from "@/lib/whatsapp/interactive";
 import type { InteractiveMessagePayload, QuickReply } from "@/types";
 import { QuickReplyPicker } from "./quick-reply-picker";
+import { fillQuickReply, type QuickReplyContact } from "@/lib/quick-replies/variables";
 
 /** Media content types an agent can send from the composer. */
 export type ComposerMediaKind = "image" | "video" | "document" | "audio";
@@ -103,7 +104,10 @@ const PICKER_ACCEPT: Record<"image" | "video" | "document", string> = {
 interface MediaDraft {
   kind: ComposerMediaKind;
   mediaUrl: string;
-  /** Storage path — used to GC the object if the draft is discarded. */
+  /**
+   * Storage path — used to GC the object if the draft is discarded.
+   * Empty for a quick reply's file, which the reply keeps owning.
+   */
   path: string;
   filename: string;
   caption: string;
@@ -118,6 +122,8 @@ interface MessageComposerProps {
   onOpenTemplates: () => void;
   replyTo?: ReplyDraft | null;
   onClearReply?: () => void;
+  /** Whose data fills `{{nome}}` and the other quick-reply variables. */
+  quickReplyContact?: QuickReplyContact | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -140,6 +146,7 @@ export function MessageComposer({
   onOpenTemplates,
   replyTo,
   onClearReply,
+  quickReplyContact,
 }: MessageComposerProps) {
   const t = useTranslations("Inbox.composer");
 
@@ -355,7 +362,8 @@ export function MessageComposer({
   }, [interactivePayload, t]);
 
   // A picked quick reply: text fills the composer; interactive opens the
-  // builder pre-filled so the agent can tweak before sending.
+  // builder pre-filled so the agent can tweak before sending; a file is
+  // staged like an attachment, caption filled in, for the agent to send.
   const handlePickQuickReply = useCallback(
     (qr: QuickReply) => {
       setQuickReplyOpen(false);
@@ -363,7 +371,25 @@ export function MessageComposer({
         openInteractiveBuilder(qr.interactive_payload);
         return;
       }
-      const body = qr.content_text ?? "";
+      if (qr.kind === "media" && qr.media_kind && qr.media_url) {
+        // An attachment staged before stays this agent's to discard.
+        removeStaged(draftRef.current?.path);
+        setDraft({
+          kind: qr.media_kind,
+          mediaUrl: qr.media_url,
+          // Not this draft's to delete: the quick reply owns the file.
+          path: "",
+          filename: qr.media_filename ?? "documento",
+          caption:
+            qr.media_kind === "audio"
+              ? ""
+              : fillQuickReply(qr.content_text ?? "", quickReplyContact ?? {}).text,
+        });
+        return;
+      }
+      // Variables are filled here, before the text reaches the box, so
+      // what the agent reviews is what the customer will read.
+      const body = fillQuickReply(qr.content_text ?? "", quickReplyContact ?? {}).text;
       // Separate the snippet from any existing draft with a newline so the
       // words don't run together ("Thanks" + "we'll…" → "Thankswe'll…").
       setText((prev) =>
@@ -378,7 +404,7 @@ export function MessageComposer({
         }
       });
     },
-    [openInteractiveBuilder, adjustHeight],
+    [openInteractiveBuilder, adjustHeight, quickReplyContact, removeStaged],
   );
 
   // Upload a captured file to chat-media and stage it as a draft.

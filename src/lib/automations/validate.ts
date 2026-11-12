@@ -27,7 +27,10 @@ interface StepLike {
   branches?: { yes?: StepLike[]; no?: StepLike[] }
 }
 
-export function validateStepsForActivation(steps: StepLike[]): ValidationIssue[] {
+export function validateStepsForActivation(
+  steps: StepLike[],
+  triggerType?: AutomationTriggerType | string,
+): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   if (!Array.isArray(steps) || steps.length === 0) {
     issues.push({
@@ -37,6 +40,62 @@ export function validateStepsForActivation(steps: StepLike[]): ValidationIssue[]
     return issues
   }
   walk(steps, '', issues)
+  if (triggerType === 'manual') issues.push(...validateSequenceSteps(steps))
+  return issues
+}
+
+// ------------------------------------------------------------
+// Sequences: automations with the `manual` trigger, started one at a
+// time on one contact — from the Chrome extension, beside the chat
+// (Fase 4B, step 5, of docs/plano-extensao-chrome.md).
+//
+// A sequence is a straight line of messages, waits and actions: no
+// conditions. And it never sends two messages back to back: between
+// any two, a wait of at least SEQUENCE_MIN_GAP_MINUTES. Automatic
+// sending in quick succession is what gets a QR-code number banned.
+// ------------------------------------------------------------
+
+export const SEQUENCE_MIN_GAP_MINUTES = 1
+
+/** The steps that send something to the customer. */
+export const SEND_STEP_TYPES = ['send_message', 'send_buttons', 'send_list', 'send_template']
+
+/** A wait step's length in minutes; 0 when it isn't a valid wait. */
+export function waitMinutes(config: unknown): number {
+  const c = (config ?? {}) as { amount?: unknown; unit?: unknown }
+  const amount = typeof c.amount === 'number' && Number.isFinite(c.amount) ? c.amount : 0
+  if (amount <= 0) return 0
+  const unit = c.unit === 'days' ? 1440 : c.unit === 'hours' ? 60 : c.unit === 'minutes' ? 1 : 0
+  return amount * unit
+}
+
+export function validateSequenceSteps(steps: StepLike[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  let sentBefore = false
+  let gap = 0
+  steps.forEach((step, i) => {
+    const path = `steps[${i}]`
+    if (step.step_type === 'condition') {
+      issues.push({
+        path,
+        message: 'uma sequência não tem condições: só mensagens, esperas e ações',
+      })
+    } else if (step.step_type === 'wait') {
+      gap += waitMinutes(step.step_config)
+    } else if (SEND_STEP_TYPES.includes(step.step_type)) {
+      if (sentBefore && gap < SEQUENCE_MIN_GAP_MINUTES) {
+        issues.push({
+          path,
+          message: `entre duas mensagens de uma sequência, espere pelo menos ${SEQUENCE_MIN_GAP_MINUTES} minuto`,
+        })
+      }
+      sentBefore = true
+      gap = 0
+    }
+  })
+  if (!sentBefore) {
+    issues.push({ path: 'steps', message: 'uma sequência precisa de pelo menos uma mensagem' })
+  }
   return issues
 }
 
@@ -146,6 +205,15 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
     case 'close_conversation':
       // No config required.
       break
+    case 'agent_handoff': {
+      // An empty role means the default (the SDR); anything else must
+      // at least be a plain role id.
+      const role = (step.step_config as { role?: unknown }).role
+      if (role !== undefined && role !== '' && (typeof role !== 'string' || !/^[a-z_]+$/.test(role))) {
+        issues.push({ path: `${path}.role`, message: 'escolha o agente que vai receber o contato' })
+      }
+      break
+    }
     default:
       issues.push({ path, message: `tipo de passo desconhecido: ${step.step_type}` })
   }
@@ -197,6 +265,18 @@ export function validateTriggerForActivation(
         path: 'trigger.reply_ids',
         message: 'os IDs de resposta não podem ficar vazios',
       })
+    }
+  } else if (triggerType === 'lead_received') {
+    // Every filter is optional (none = every lead); only shapes are checked.
+    const rota = cfg.rota
+    if (rota != null && rota !== '' && !['A', 'B', 'C'].includes(String(rota).toUpperCase())) {
+      issues.push({ path: 'trigger.rota', message: 'a rota precisa ser A, B ou C' })
+    }
+    for (const key of ['origens', 'etiquetas'] as const) {
+      const list = cfg[key]
+      if (list != null && (!Array.isArray(list) || list.some((v) => typeof v !== 'string'))) {
+        issues.push({ path: `trigger.${key}`, message: `${key} precisa ser uma lista de textos` })
+      }
     }
   }
 

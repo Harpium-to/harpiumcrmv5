@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  validateSequenceSteps,
   validateStepsForActivation,
   validateTriggerForActivation,
+  waitMinutes,
 } from "./validate";
 
 describe("validateStepsForActivation", () => {
@@ -286,3 +288,77 @@ describe("validateTriggerForActivation", () => {
     expect(validateTriggerForActivation("some_future_trigger", {})).toEqual([]);
   });
 });
+
+describe("sequences (manual trigger)", () => {
+  const msg = (text: string) => ({ step_type: "send_message", step_config: { text } });
+  const wait = (amount: number, unit: string) => ({ step_type: "wait", step_config: { amount, unit } });
+
+  it("accepts messages with a wait of at least a minute between them", () => {
+    expect(validateSequenceSteps([msg("a"), wait(1, "minutes"), msg("b"), wait(2, "days"), msg("c")])).toEqual([]);
+    // Actions between messages are fine; they don't count as messages.
+    expect(
+      validateSequenceSteps([
+        msg("a"),
+        { step_type: "add_tag", step_config: { tag_id: "t" } },
+        wait(1, "hours"),
+        msg("b"),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("refuses two messages in a row", () => {
+    const issues = validateSequenceSteps([msg("a"), msg("b")]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].path).toBe("steps[1]");
+    expect(issues[0].message).toMatch(/pelo menos 1 minuto/);
+  });
+
+  it("refuses conditions and a sequence without messages", () => {
+    expect(
+      validateSequenceSteps([msg("a"), { step_type: "condition", step_config: {} }]).map((i) => i.path),
+    ).toEqual(["steps[1]"]);
+    expect(validateSequenceSteps([wait(1, "days")]).map((i) => i.path)).toEqual(["steps"]);
+  });
+
+  it("applies only to the manual trigger", () => {
+    const backToBack = [msg("a"), msg("b")];
+    expect(validateStepsForActivation(backToBack)).toEqual([]);
+    expect(validateStepsForActivation(backToBack, "new_message_received")).toEqual([]);
+    expect(validateStepsForActivation(backToBack, "manual")).toHaveLength(1);
+  });
+
+  it("measures waits in minutes", () => {
+    expect(waitMinutes({ amount: 2, unit: "hours" })).toBe(120);
+    expect(waitMinutes({ amount: 1, unit: "days" })).toBe(1440);
+    expect(waitMinutes({ amount: 0, unit: "days" })).toBe(0);
+    expect(waitMinutes({ amount: 5, unit: "weeks" })).toBe(0);
+    expect(waitMinutes(null)).toBe(0);
+  });
+});
+
+describe('lead_received + agent_handoff', () => {
+  it('accepts any combination of optional filters', () => {
+    expect(validateTriggerForActivation('lead_received', {})).toEqual([])
+    expect(
+      validateTriggerForActivation('lead_received', {
+        origens: ['quiz-planejados'],
+        etiquetas: ['rota-a'],
+        rota: 'a',
+      }),
+    ).toEqual([])
+  })
+
+  it('refuses an unknown route or a non-list filter', () => {
+    expect(validateTriggerForActivation('lead_received', { rota: 'D' })[0]?.path).toBe('trigger.rota')
+    expect(validateTriggerForActivation('lead_received', { etiquetas: 'rota-a' })[0]?.path).toBe(
+      'trigger.etiquetas',
+    )
+  })
+
+  it('knows the agent handoff step', () => {
+    const step = (cfg: Record<string, unknown>) => [{ step_type: 'agent_handoff', step_config: cfg }]
+    expect(validateStepsForActivation(step({ role: 'sdr' }))).toEqual([])
+    expect(validateStepsForActivation(step({}))).toEqual([])
+    expect(validateStepsForActivation(step({ role: 'Drop Table' }))[0]?.path).toBe('steps[0].role')
+  })
+})

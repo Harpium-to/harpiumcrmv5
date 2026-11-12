@@ -17,6 +17,7 @@ describe('ExtensionPanelView (Settings › Extensão do Chrome)', () => {
     expect(html).toContain('href="/downloads/crm-connector.zip"');
     expect(html).toMatch(/versão \d+\.\d+\.\d+/);
     expect(html).toContain('Carregar sem compactação');
+    expect(html).toContain('Harpium CRM');
     expect(html).toContain('não lê suas conversas');
   });
 

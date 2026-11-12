@@ -86,6 +86,8 @@ export async function POST(request: Request) {
         total_recipients: plan.planned.length,
         accepted: plan.planned.length,
         rejected: plan.rejected,
+        // Left out: they asked not to receive automatic messages.
+        opted_out: plan.optedOut,
       },
       202
     );

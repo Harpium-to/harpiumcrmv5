@@ -44,6 +44,16 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
+import {
+  NOT_CONNECTED_UNOFFICIAL,
+  resolveWhatsAppProvider,
+} from '@/lib/channels/whatsapp-route';
+import {
+  sendUnofficialToConversation,
+  UnofficialSendError,
+  type UnofficialContent,
+  type UnofficialProvider,
+} from '@/lib/channels/unofficial-send';
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -216,6 +226,16 @@ export async function sendMessageToConversation(
   });
 
   const isMediaKind = (MEDIA_KINDS as readonly string[]).includes(messageType);
+
+  // The CRM's WhatsApp path decides the door (D1). Everything below is
+  // the Meta path; the unofficial one has its own sender.
+  const provider = await resolveWhatsAppProvider(db, accountId);
+  if (provider === null) {
+    throw new SendMessageError('whatsapp_not_configured', NOT_CONNECTED_UNOFFICIAL, 400);
+  }
+  if (provider !== 'meta') {
+    return sendThroughUnofficial(db, accountId, provider, params, isMediaKind);
+  }
 
   // Conversation + contact, account-scoped.
   const { data: conversation, error: convError } = await db
@@ -513,4 +533,68 @@ export async function sendMessageToConversation(
   }
 
   return { messageId: messageRecord.id, whatsappMessageId: waMessageId };
+}
+
+/**
+ * The unofficial-path half of `sendMessageToConversation`: same params,
+ * same result and error shapes, so the inbox and the public API don't
+ * know which door the message left by.
+ *
+ * Templates are Meta's: on this path there is nothing to approve them
+ * against, and the 24-hour window they exist for doesn't apply.
+ */
+async function sendThroughUnofficial(
+  db: SupabaseClient,
+  accountId: string,
+  provider: UnofficialProvider,
+  params: SendMessageParams,
+  isMediaKind: boolean
+): Promise<SendMessageResult> {
+  const { messageType, contentText, mediaUrl, filename, interactivePayload } = params;
+
+  if (messageType === 'template') {
+    throw new SendMessageError(
+      'template_requires_official',
+      'Modelos aprovados só existem no caminho oficial (API da Meta). No WhatsApp não oficial, mande a mensagem normalmente.',
+      400
+    );
+  }
+
+  const content: UnofficialContent =
+    messageType === 'interactive'
+      ? { kind: 'interactive', payload: interactivePayload! }
+      : isMediaKind
+        ? {
+            kind: 'media',
+            mediaKind: messageType as MediaKind,
+            url: mediaUrl!,
+            caption: contentText ?? null,
+            filename: filename ?? null,
+          }
+        : { kind: 'text', text: contentText! };
+
+  try {
+    const result = await sendUnofficialToConversation(db, {
+      provider,
+      accountId,
+      conversationId: params.conversationId,
+      content,
+      senderType: 'agent',
+      replyToMessageId: params.replyToMessageId ?? null,
+    });
+    return {
+      messageId: result.messageId,
+      whatsappMessageId: result.externalId ?? '',
+    };
+  } catch (err) {
+    if (err instanceof UnofficialSendError) {
+      throw new SendMessageError(err.code, err.message, err.status);
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    throw new SendMessageError(
+      'provider_error',
+      `Erro no WhatsApp não oficial: ${message}`,
+      502
+    );
+  }
 }

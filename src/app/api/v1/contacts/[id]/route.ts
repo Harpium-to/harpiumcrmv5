@@ -70,7 +70,11 @@ export async function PATCH(
       if (error) {
         // PGRST204: PostgREST doesn't know the column — the deployment
         // hasn't applied migration 045. Say so instead of a bare 500.
-        const missing = QUALIFICATION_FIELDS.filter((f) => f in updates);
+        const missing = [
+          ...QUALIFICATION_FIELDS.filter((f) => f in updates),
+          // Migration 066.
+          ...('opted_out_at' in updates ? ['opted_out'] : []),
+        ];
         if (error.code === 'PGRST204' && missing.length > 0) {
           return fail(
             'bad_request',

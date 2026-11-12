@@ -23,6 +23,7 @@
     "leads": "Leads",
     "channels": "Canais",
     "pipelines": "Funis",
+    "agenda": "Agenda",
     "broadcasts": "Transmissões",
     "automations": "Automações",
     "flows": "Fluxos",
@@ -42,7 +43,8 @@
     "menuSettings": "Configurações",
     "menuSignOut": "Sair",
     "reports": "Relatórios",
-    "help": "Ajuda"
+    "help": "Ajuda",
+    "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}"
   },
   "TopBar": {
     "openMenu": "Abrir menu",
@@ -149,7 +151,15 @@
       "clearAll": "Limpar tudo",
       "noConversations": "Nenhuma conversa encontrada",
       "noMessagesYet": "Nenhuma mensagem ainda",
-      "unknown": "Desconhecido"
+      "unknown": "Desconhecido",
+      "filterWaiting": "Aguardando atendente",
+      "waitingStrip": "{count, plural, one {# conversa aguardando atendente} other {# conversas aguardando atendente}}",
+      "waitingLate": "{count, plural, one {# atrasada} other {# atrasadas}}",
+      "waitingShow": "Ver",
+      "waitingShowAll": "Ver todas",
+      "waitingNobody": "Ninguém assumiu",
+      "waitingMine": "Com você, sem resposta",
+      "waitingAssigned": "Atribuída, sem resposta"
     },
     "messageThread": {
       "backToConversations": "Voltar para conversas",
@@ -290,7 +300,32 @@
         "unknown": "O cliente ficou sem resposta. Responda manualmente; o detalhe técnico também está no monitor dos agentes.",
         "detail": "Detalhe técnico: {detail}",
         "dismiss": "Dispensar aviso"
+      },
+      "waiting": {
+        "nobodyTitle": "A IA passou esta conversa para a equipe. Alguém precisa assumir.",
+        "assignedTitle": "Atribuída a alguém da equipe, mas o cliente ainda não teve resposta",
+        "mineTitle": "Você assumiu esta conversa. Responda o cliente.",
+        "since": "Esperando resposta há {time}",
+        "justNow": "Acabou de ser passada para a equipe",
+        "late": "atrasada",
+        "takeOver": "Assumir conversa"
       }
+    },
+    "newDeal": {
+      "button": "Novo",
+      "choosePipeline": "Em qual funil?",
+      "pipeline": "Funil: {name}",
+      "duplicate": "{count, plural, one {Este contato já tem # negócio aberto} other {Este contato já tem # negócios abertos}}",
+      "aiLoading": "A IA está lendo a conversa para preencher o negócio...",
+      "aiDone": "Preenchido pela IA a partir da conversa. Confira antes de criar.",
+      "aiRefill": "Preencher de novo",
+      "aiRetry": "Tentar de novo",
+      "aiOff": "Com a IA ativada em Agentes de IA, o formulário vem preenchido com o resumo da conversa.",
+      "aiNoMessages": "Ainda não há mensagens de texto para resumir.",
+      "aiNoConversation": "Abra a conversa para a IA preencher o negócio.",
+      "aiError": "Não foi possível preencher com a IA. Preencha à mão ou tente de novo.",
+      "noPipelines": "Crie um funil em Funis antes de criar negócios.",
+      "noStages": "Esse funil não tem etapas. Crie as etapas em Funis."
     }
   },
   "Contacts": {
@@ -375,6 +410,7 @@
         "details": "Detalhes",
         "activity": "Atividade",
         "notes": "Notas",
+        "tasks": "Tarefas",
         "custom": "Campos personalizados",
         "deals": "Negócios",
         "noTags": "Nenhuma etiqueta",
@@ -855,7 +891,8 @@
         "wait": "Aguardar",
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar webhook",
-        "close_conversation": "Fechar conversa"
+        "close_conversation": "Fechar conversa",
+        "agent_handoff": "Passar para agente de IA"
       },
       "triggers": {
         "new_message_received": {
@@ -889,6 +926,14 @@
         "time_based": {
           "label": "Baseado em tempo",
           "hint": "Em uma agenda recorrente"
+        },
+        "manual": {
+          "label": "Sequência (disparo manual)",
+          "hint": "Começa quando alguém dispara para um contato, pela extensão do Chrome. Só mensagens, esperas e ações; entre duas mensagens, espere pelo menos 1 minuto."
+        },
+        "lead_received": {
+          "label": "Lead recebido",
+          "hint": "Quando chega um lead pela URL de leads (quiz, Google, Meta, Zapier, formulário). Filtre por origem, rota e etiquetas."
         }
       },
       "trigger": "Gatilho",
@@ -992,7 +1037,21 @@
         "matchType": "Tipo de correspondência",
         "matchContains": "Contém",
         "matchExact": "Exata",
-        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária."
+        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária.",
+        "leadOrigins": "Origens",
+        "leadOriginsHint": "quiz-planejados, google",
+        "leadOriginsHelp": "Separadas por vírgula. Vazio: qualquer origem.",
+        "leadRoute": "Rota",
+        "leadRouteAny": "Qualquer rota",
+        "leadTags": "Etiquetas obrigatórias",
+        "leadTagsHint": "verba-baixa, decisor:nao",
+        "leadTagsHelp": "O lead precisa ter todas. Vazio: não filtra por etiqueta.",
+        "leadVarsHelp": "Nas mensagens você pode usar:",
+        "agentRole": "Agente",
+        "agentInstruction": "Instrução para o agente (opcional)",
+        "agentInstructionHint": "Ex.: comece validando o investimento antes de agendar",
+        "agentHandoffHelp": "O agente recebe o contato com as respostas do lead e abre a conversa no WhatsApp, no horário de trabalho dele. Precisa de um agente ativo com essa função.",
+        "leadOptOutHelp": "Contatos que pediram para não receber mensagens automáticas ficam de fora."
       }
     }
   },
@@ -1575,6 +1634,78 @@
       "syncRetryDone": "Pedido enviado à Meta.",
       "syncExpired": "Já passaram 24 horas desde a conexão, e a Meta não aceita mais o pedido das conversas antigas."
     },
+    "whatsappPath": {
+      "title": "Conexão do WhatsApp",
+      "description": "Escolha como o WhatsApp da empresa se liga ao CRM. Dá para trocar depois.",
+      "chooseTitle": "Como você quer conectar o WhatsApp?",
+      "chooseDesc": "Os recursos do CRM são os mesmos nos dois caminhos. Muda o custo, o risco e como o número fica no celular.",
+      "oficialTitle": "Oficial",
+      "oficialSubtitle": "API da Meta",
+      "oficialPoints": {
+        "connect": "Conecta pela janela do Facebook, em uns 3 minutos",
+        "risk": "Sem risco de bloqueio do número",
+        "cost": "A Meta cobra os modelos (mensagens que a empresa inicia). Responder o cliente em até 24 h não tem custo",
+        "window": "Para falar com quem não escreveu nas últimas 24 h, só com modelo aprovado pela Meta",
+        "phone": "O número continua no app WhatsApp Business do celular; o WhatsApp Web é desconectado",
+        "status": "Não posta status: a Meta não permite"
+      },
+      "naoOficialTitle": "Não oficial",
+      "naoOficialSubtitle": "QR code, como o WhatsApp Web",
+      "naoOficialPoints": {
+        "connect": "Conecta lendo um QR code com o celular",
+        "risk": "O número pode ser bloqueado pelo WhatsApp, principalmente com envio em massa",
+        "cost": "Sem cobrança por mensagem; há uma mensalidade da conexão",
+        "window": "Fala com qualquer contato, a qualquer hora",
+        "phone": "O celular e o WhatsApp Web continuam funcionando, e a extensão do Chrome também",
+        "online": "O celular precisa ficar ligado e com internet"
+      },
+      "recommended": "Recomendado",
+      "riskTitle": "Antes de escolher o não oficial",
+      "riskText": "A conexão por QR code não é autorizada pelo WhatsApp. O número pode ser bloqueado a qualquer momento, sem aviso, principalmente se enviar muitas mensagens para quem não conversa com a empresa. Nem a Harpium nem o CRM conseguem desfazer um bloqueio.",
+      "riskAccept": "Entendo que o número pode ser bloqueado pelo WhatsApp e escolho o caminho não oficial assim mesmo.",
+      "riskAgency": "Só alguém do próprio CRM pode aceitar esse risco. Peça ao dono ou a um administrador do cliente.",
+      "switchNote": "Ao trocar, as mensagens do inbox, dos fluxos, das automações e da IA passam a sair pelo novo caminho. O histórico das conversas fica.",
+      "confirm": "Usar este caminho",
+      "confirming": "Salvando…",
+      "cancel": "Cancelar",
+      "chosenToast": "Caminho escolhido. Agora conecte o número.",
+      "adminOnly": "Só administradores do CRM escolhem o caminho do WhatsApp.",
+      "migrationMissing": "Escolher o caminho precisa da migration 061 no banco. Até lá, o WhatsApp funciona como antes.",
+      "current": "Caminho do WhatsApp",
+      "currentOficial": "Oficial (API da Meta)",
+      "currentNaoOficial": "Não oficial (QR code)",
+      "change": "Trocar caminho",
+      "loadFailed": "Não foi possível carregar a conexão do WhatsApp.",
+      "qr": {
+        "title": "WhatsApp por QR code",
+        "connected": "Conectado",
+        "notConnected": "Não conectado",
+        "statusLabel": "Estado: {status}",
+        "pairedNumber": "Número pareado",
+        "connect": "Conectar WhatsApp",
+        "reconnect": "Gerar novo QR code",
+        "instructions": "No celular: WhatsApp → Aparelhos conectados → Conectar aparelho. O código se renova sozinho.",
+        "scanToast": "Leia o QR code com o WhatsApp do seu celular",
+        "connectedToast": "WhatsApp conectado: {phone}",
+        "connectedToastNoPhone": "WhatsApp conectado",
+        "timeout": "Tempo esgotado. Clique em conectar para gerar outro QR code.",
+        "disconnect": "Desconectar",
+        "disconnecting": "Desconectando…",
+        "disconnectConfirm": "Desconectar o WhatsApp deste CRM? O celular deixa de aparecer como aparelho conectado e as mensagens param de chegar aqui até você ler o QR code de novo.",
+        "disconnected": "WhatsApp desconectado.",
+        "failed": "Não foi possível concluir. {message}",
+        "offlineHint": "Se o celular ficar muito tempo sem internet, a conexão cai e é preciso ler o QR code de novo.",
+        "noServer": "O servidor da conexão por QR code ainda não foi configurado. Fale com a agência.",
+        "manualServer": "Este CRM usa um servidor próprio, configurado pela agência.",
+        "evolutionNote": "Este CRM usa uma instância Evolution configurada pela agência. Ela envia só texto; para mídia e botões, conecte por QR code aqui.",
+        "importHistory": "Trazer conversas do celular",
+        "importingHistory": "Trazendo conversas… {chats} conversas, {messages} mensagens",
+        "importHistoryConfirm": "Trazer para o CRM as conversas individuais que o celular já tinha (até 90 dias)? Os contatos e as mensagens são copiados com a data original. Nenhuma automação, fluxo ou agente de IA é disparado, e nada fica como não lido. Pode repetir sem duplicar.",
+        "importHistoryDone": "{chats} conversas trazidas, {messages} mensagens e {contacts} contatos novos.",
+        "importHistoryNothing": "Nada novo para trazer: as conversas do celular já estão no CRM.",
+        "importHistoryHint": "As fotos, vídeos e áudios antigos aparecem como [foto], [vídeo] ou [áudio], com a legenda."
+      }
+    },
     "sections": {
       "overview": "Visão geral",
       "profile": "Seu perfil",
@@ -1877,7 +2008,7 @@
     "toolMessaging": "Mensagens",
     "toolMessagingDesc": "Falar com o cliente nos canais autorizados.",
     "toolCalendar": "Agenda",
-    "toolCalendarDesc": "Propor e marcar reunião.",
+    "toolCalendarDesc": "Consultar a agenda, oferecer horários livres e marcar.",
     "toolProposals": "Propostas",
     "toolProposalsDesc": "Montar proposta e pedir aprovação de desconto.",
     "toolDelegation": "Delegação",
@@ -1974,6 +2105,7 @@
     "approvalRejected": "Rejeitada",
     "approvalDecided": "Decidido",
     "kindSendMessage": "Enviar mensagem",
+    "kindScheduleMeeting": "Marcar horário",
     "kindDiscount": "Conceder desconto",
     "kindProposal": "Enviar proposta",
     "kindContract": "Alterar contrato",
@@ -2124,5 +2256,16 @@
     "suggestForecast": "O que está travado na previsão?",
     "customFrom": "De",
     "customTo": "até"
+  },
+  "Handoff": {
+    "toastTitle": "{name} precisa de um atendente",
+    "toastBody": "A IA passou a conversa para a equipe. Alguém precisa responder o cliente.",
+    "someone": "Um cliente",
+    "open": "Abrir conversa",
+    "alertTitle": "{count, plural, one {# conversa esperando atendente} other {# conversas esperando atendente}}",
+    "alertOldest": "{name} espera há {time}",
+    "alertOldestNow": "{name} acabou de ser passado para a equipe",
+    "late": "atrasada",
+    "answer": "Atender"
   }
 }

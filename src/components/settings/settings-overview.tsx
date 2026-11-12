@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { SECTION_META, type SettingsSection } from './settings-sections';
 import { SettingsChip, StatusDot } from './settings-chip';
 import { ROLE_META } from './role-meta';
+import { fetchWhatsAppPathInfo, unofficialConnection } from '@/lib/channels/whatsapp-connection';
 
 interface OverviewCounts {
   members: number | null;
@@ -120,6 +121,15 @@ export function SettingsOverview({
     // WhatsApp connection status — slower, independent.
     (async () => {
       setWhatsappLoading(true);
+      // A CRM on the QR-code path has no official-API row: its state
+      // comes from the path endpoint, which knows both sides.
+      const unofficial = unofficialConnection(await fetchWhatsAppPathInfo());
+      if (cancelled) return;
+      if (unofficial) {
+        setWhatsapp(unofficial);
+        setWhatsappLoading(false);
+        return;
+      }
       const [row, health] = await Promise.allSettled([
         supabase
           .from('whatsapp_config')

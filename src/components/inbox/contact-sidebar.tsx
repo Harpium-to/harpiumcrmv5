@@ -21,16 +21,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useTranslations } from "next-intl";
+import { useCan } from "@/hooks/use-can";
+import { NewDealButton } from "@/components/inbox/new-deal-button";
+import { ContactAppointments } from "@/components/agenda/contact-appointments";
 
 interface ContactSidebarProps {
   contact: Contact | null;
+  /** The open thread — a deal created here links back to it. */
+  conversationId?: string | null;
 }
 
-export function ContactSidebar({ contact }: ContactSidebarProps) {
+export function ContactSidebar({ contact, conversationId = null }: ContactSidebarProps) {
   const tSidebar = useTranslations("Inbox.sidebar");
   const tThread = useTranslations("Inbox.messageThread");
 
   const { accountId } = useAuth();
+  const canCreateDeals = useCan("send-messages");
   const [copied, setCopied] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [notes, setNotes] = useState<ContactNote[]>([]);
@@ -182,6 +188,14 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
           {/* Divider */}
           <div className="my-4 border-t border-border" />
 
+          {/* Agenda (067): their appointments, and booking from the
+              conversation. Renders nothing — rule included — in a CRM
+              that has no agenda. */}
+          <ContactAppointments
+            contact={{ id: contact.id, name: contact.name ?? null, phone: contact.phone ?? null }}
+            divider
+          />
+
           {/* Tags */}
           <div>
             <div className="flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -216,6 +230,14 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
             <div className="flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <DollarSign className="h-3 w-3" />
               {tSidebar("deals")}
+              {canCreateDeals && contact && (
+                <NewDealButton
+                  contact={contact}
+                  conversationId={conversationId}
+                  openDeals={deals.filter((d) => (d.status ?? "open") === "open")}
+                  onCreated={fetchContactData}
+                />
+              )}
             </div>
             <div className="mt-2 space-y-2">
               {deals.length === 0 ? (

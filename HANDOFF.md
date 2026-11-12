@@ -261,8 +261,10 @@ e renderização da visão do modelo e do bloco da ficha.
 - **A API pública passou a respeitar o status do CRM** (brecha da
   Fase 2): suspenso = só leitura também pela API; arquivado = chave
   recusada (`src/lib/auth/api-context.ts`).
-- **Nome da extensão** continua "CRM Connector" no `manifest.json`.
-  Trocar para a marca da plataforma é decisão do dono.
+- **Nome da extensão**: "Harpium CRM" desde a 0.5.0 (era "CRM
+  Connector"). O `.zip` e a pasta continuam `crm-connector`, para o
+  Chrome tratar a atualização como a mesma extensão. Plano da extensão:
+  `docs/plano-extensao-chrome.md`.
 
 ## 1G. Fase 6 — modo suporte (055)
 

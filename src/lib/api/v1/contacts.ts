@@ -38,6 +38,12 @@ export interface ApiContact {
   job_title: string | null;
   instagram: string | null;
   website: string | null;
+  /**
+   * Asked not to receive automatic messages (migration 066): bulk sends,
+   * template broadcasts, sequences and flows started by hand leave them
+   * out. `false` before 066.
+   */
+  opted_out: boolean;
   tags: { id: string; name: string; color: string }[];
   created_at: string;
   updated_at: string;
@@ -73,6 +79,7 @@ export function serializeContact(row: Record<string, unknown>): ApiContact {
     job_title: (row.job_title as string | null) ?? null,
     instagram: (row.instagram as string | null) ?? null,
     website: (row.website as string | null) ?? null,
+    opted_out: typeof row.opted_out_at === 'string' && row.opted_out_at !== '',
     tags: joins
       .map((j) => j.tags)
       .filter((t): t is NonNullable<RawTagJoin['tags']> => t != null)
@@ -141,6 +148,13 @@ export function parseContactPatch(body: Record<string, unknown>): ContactPatch {
       };
     }
     updates.temperature = value;
+  }
+
+  if ('opted_out' in body) {
+    if (typeof body.opted_out !== 'boolean') {
+      return { ok: false, message: `'opted_out' precisa ser true ou false` };
+    }
+    updates.opted_out_at = body.opted_out ? new Date().toISOString() : null;
   }
 
   if ('potential' in body) {

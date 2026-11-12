@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { parseUazapiInbound } from './parse'
+import { mediaKindOf, parseUazapiConnection, parseUazapiInbound } from './parse'
 
 const inbound = {
   EventType: 'messages',
@@ -26,12 +26,52 @@ describe('parseUazapiInbound', () => {
     expect(parseUazapiInbound(inbound)).toEqual([
       {
         counterpartPhone: '5511888888888',
+        counterpartLid: null,
         text: 'Olá, preciso de ajuda.',
         externalId: 'MSG1',
         name: 'Maria',
         fromMe: false,
+        mediaKind: null,
+        interactiveReplyId: null,
+        sentAt: '2026-09-08T12:00:00.000Z',
       },
     ])
+  })
+
+  it('keeps media, with the caption as text or none at all', () => {
+    const [photo] = parseUazapiInbound({
+      ...inbound,
+      message: { ...inbound.message, messageType: 'ImageMessage', text: 'olha o modelo' },
+    })
+    expect(photo).toMatchObject({ mediaKind: 'image', text: 'olha o modelo', externalId: 'MSG1' })
+
+    const [voice] = parseUazapiInbound({
+      ...inbound,
+      message: { ...inbound.message, messageType: 'AudioMessage', text: '', content: { seconds: 4 } },
+    })
+    expect(voice).toMatchObject({ mediaKind: 'audio', text: '' })
+  })
+
+  it('keeps the id of a tapped button or list row', () => {
+    const [tap] = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        messageType: 'ButtonsResponseMessage',
+        text: 'Manhã',
+        buttonOrListid: 'manha',
+      },
+    })
+    expect(tap).toMatchObject({ interactiveReplyId: 'manha', text: 'Manhã', mediaKind: null })
+  })
+
+  it('drops reactions', () => {
+    expect(
+      parseUazapiInbound({
+        ...inbound,
+        message: { ...inbound.message, messageType: 'ReactionMessage', text: '👍', reaction: 'MSG0' },
+      }),
+    ).toEqual([])
   })
 
   it('uses the chat (not the sender) as counterpart when fromMe', () => {
@@ -50,6 +90,58 @@ describe('parseUazapiInbound', () => {
     expect(out[0].name).toBeNull()
   })
 
+  it('a chat addressed by LID keeps the real number and reports the LID', () => {
+    // What reached production on 2026-11-11: `sender` was the LID, the
+    // CRM saved "+20066104033409" and replies failed ("failed to resolve LID").
+    const out = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        chatid: '5563992286787@s.whatsapp.net',
+        sender: '20066104033409@lid',
+        sender_pn: '5563992286787@s.whatsapp.net',
+        sender_lid: '20066104033409@lid',
+      },
+    })
+    expect(out).toHaveLength(1)
+    expect(out[0].counterpartPhone).toBe('5563992286787')
+    expect(out[0].counterpartLid).toBe('20066104033409')
+  })
+
+  it('falls back to sender_pn, and never takes a LID for a phone', () => {
+    const viaPn = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        chatid: '20066104033409@lid',
+        sender: '20066104033409@lid',
+        sender_pn: '5563992286787@s.whatsapp.net',
+      },
+    })
+    expect(viaPn[0]).toMatchObject({ counterpartPhone: '5563992286787', counterpartLid: '20066104033409' })
+
+    const onlyLid = parseUazapiInbound({
+      ...inbound,
+      message: { ...inbound.message, chatid: '20066104033409@lid', sender: '20066104033409@lid' },
+    })
+    expect(onlyLid).toEqual([])
+  })
+
+  it('fromMe in a LID chat still answers to the chat number', () => {
+    const out = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        fromMe: true,
+        chatid: '5563992286787@s.whatsapp.net',
+        chatlid: '20066104033409@lid',
+        sender: '5511999999999@s.whatsapp.net',
+        text: 'Respondi pelo celular',
+      },
+    })
+    expect(out[0]).toMatchObject({ counterpartPhone: '5563992286787', counterpartLid: '20066104033409', fromMe: true })
+  })
+
   it('drops our own API echo', () => {
     expect(
       parseUazapiInbound({
@@ -59,7 +151,7 @@ describe('parseUazapiInbound', () => {
     ).toEqual([])
   })
 
-  it('drops groups, newsletters and non-text', () => {
+  it('drops groups, newsletters and messages with nothing to show', () => {
     expect(
       parseUazapiInbound({ ...inbound, message: { ...inbound.message, isGroup: true } }),
     ).toEqual([])
@@ -78,5 +170,39 @@ describe('parseUazapiInbound', () => {
     expect(parseUazapiInbound({ ...inbound, EventType: 'connection' })).toEqual([])
     expect(parseUazapiInbound(null)).toEqual([])
     expect(parseUazapiInbound({ EventType: 'messages' })).toEqual([])
+  })
+})
+
+describe('mediaKindOf', () => {
+  it('maps WhatsApp message types to ours', () => {
+    expect(mediaKindOf('ImageMessage')).toBe('image')
+    expect(mediaKindOf('StickerMessage')).toBe('image')
+    expect(mediaKindOf('VideoMessage')).toBe('video')
+    expect(mediaKindOf('AudioMessage')).toBe('audio')
+    expect(mediaKindOf('DocumentWithCaptionMessage')).toBe('document')
+    expect(mediaKindOf('ExtendedTextMessage')).toBeNull()
+    expect(mediaKindOf('Conversation')).toBeNull()
+    expect(mediaKindOf(null)).toBeNull()
+  })
+})
+
+describe('parseUazapiConnection', () => {
+  it('reads the new state and why it changed', () => {
+    expect(
+      parseUazapiConnection({
+        EventType: 'connection',
+        type: 'TemporaryBan',
+        instance: { status: 'disconnected', lastDisconnectReason: 'unknown' },
+      }),
+    ).toEqual({ status: 'disconnected', reason: 'TemporaryBan' })
+    expect(
+      parseUazapiConnection({ EventType: 'connection', instance: { status: 'connected' } }),
+    ).toEqual({ status: 'connected', reason: null })
+  })
+
+  it('is null for anything else', () => {
+    expect(parseUazapiConnection({ EventType: 'messages', instance: { status: 'x' } })).toBeNull()
+    expect(parseUazapiConnection({ EventType: 'connection' })).toBeNull()
+    expect(parseUazapiConnection('x')).toBeNull()
   })
 })

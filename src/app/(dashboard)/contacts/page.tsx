@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -39,6 +41,7 @@ import {
   Search,
   Plus,
   Upload,
+  Download,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -83,8 +86,12 @@ export default function ContactsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [editContactTags, setEditContactTags] = useState<ContactTag[]>([]);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailContactId, setDetailContactId] = useState<string | null>(null);
+  // A link straight to one contact — `/contacts?contact=<id>` — opens
+  // their details: the Chrome extension's "Abrir no CRM" and a task
+  // reminder in the bell both arrive this way.
+  const linkedContactId = useSearchParams().get('contact');
+  const [detailOpen, setDetailOpen] = useState(Boolean(linkedContactId));
+  const [detailContactId, setDetailContactId] = useState<string | null>(linkedContactId);
   const [importOpen, setImportOpen] = useState(false);
   const [customFieldsOpen, setCustomFieldsOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -362,6 +369,23 @@ export default function ContactsPage() {
             </Button>
           )}
           {canEditSettings && <HelpTip id="contacts.customFields" />}
+          {canEditSettings && (
+            // The list as shown: the same search and tag filter, every page.
+            <a
+              href={`/api/contacts/export?${new URLSearchParams({
+                ...(search.trim() ? { search: search.trim() } : {}),
+                ...(selectedTagIds.length ? { tags: selectedTagIds.join(',') } : {}),
+              }).toString()}`}
+              download
+              className={cn(
+                buttonVariants({ variant: 'outline' }),
+                'border-border text-muted-foreground hover:bg-muted',
+              )}
+            >
+              <Download className="size-4" />
+              Exportar CSV
+            </a>
+          )}
           <GatedButton
             variant="outline"
             canAct={canEdit}

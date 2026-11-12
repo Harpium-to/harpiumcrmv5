@@ -34,6 +34,16 @@ export const CRM_UNIQUE_KEYS: Record<string, UniqueKey[]> = {
   ],
 }
 
+/**
+ * Generated columns (GENERATED ALWAYS AS … STORED): recomputed on every
+ * insert and update, as Postgres does. contacts.phone_normalized (022)
+ * is what findExistingContact searches on.
+ */
+const GENERATED: Record<string, (row: Row) => Row> = {
+  contacts: (r) =>
+    'phone' in r ? { phone_normalized: String(r.phone ?? '').replace(/\D/g, '') } : {},
+}
+
 export interface MemoryDbOptions {
   seed?: Record<string, Row[]>
   unique?: Record<string, UniqueKey[]>
@@ -61,6 +71,7 @@ export function memoryDb(opts: MemoryDbOptions = {}): MemoryDb {
   let seq = 0
 
   const table = (name: string) => (tables[name] ??= [])
+  const generated = (name: string, r: Row): Row => GENERATED[name]?.(r) ?? {}
   const withDefaults = (name: string, r: Row): Row => {
     seq += 1
     return {
@@ -68,6 +79,7 @@ export function memoryDb(opts: MemoryDbOptions = {}): MemoryDb {
       // Strictly increasing so "oldest first" is deterministic.
       created_at: new Date(Date.UTC(2026, 0, 1) + seq * 1000).toISOString(),
       ...r,
+      ...generated(name, r),
     }
   }
 
@@ -242,7 +254,10 @@ export function memoryDb(opts: MemoryDbOptions = {}): MemoryDb {
 
       if (this.op === 'update') {
         const found = rows.filter((r) => this.filters.every((f) => f(r)))
-        for (const r of found) Object.assign(r, this.payload)
+        for (const r of found) {
+          Object.assign(r, this.payload)
+          Object.assign(r, generated(this.name, r))
+        }
         return this.returning ? this.shape(found) : { data: null, error: null }
       }
 

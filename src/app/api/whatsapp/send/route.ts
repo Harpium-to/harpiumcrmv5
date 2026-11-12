@@ -10,11 +10,7 @@ import {
   validateSendMessageParams,
   SendMessageError,
 } from '@/lib/whatsapp/send-message'
-import { getEvolutionConfig, isEvolutionReady } from '@/lib/evolution/config'
-import { sendEvolutionToConversation } from '@/lib/evolution/send'
-import { getUazapiConfig, isUazapiReady } from '@/lib/uazapi/config'
 import { sendInstagramToConversation } from '@/lib/instagram/send'
-import { sendUazapiToConversation } from '@/lib/uazapi/send'
 
 // The dashboard's outbound-send endpoint. It owns auth, per-user rate
 // limiting, and the two ways the UI targets a thread — an existing
@@ -221,86 +217,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Channel routing. An account can have more than one unofficial
-    // channel configured; UAZAPI is checked first because it is the one
-    // an operator pairs from inside the app, so an enabled UAZAPI
-    // instance is the more deliberate choice. Text only, same as
-    // Evolution: other types error rather than silently falling back to
-    // Meta (which may not even be configured).
-    const uazCfg = await getUazapiConfig(supabase, accountId)
-    if (isUazapiReady(uazCfg)) {
-      if (message_type !== 'text' || !content_text) {
-        return NextResponse.json(
-          {
-            error:
-              'O canal UAZAPI suporta apenas mensagens de texto por enquanto.',
-          },
-          { status: 400 }
-        )
-      }
-      try {
-        const result = await sendUazapiToConversation(
-          supabase,
-          accountId,
-          conversationId,
-          content_text
-        )
-        return NextResponse.json({
-          success: true,
-          message_id: result.messageId,
-          whatsapp_message_id: result.externalId,
-        })
-      } catch (err) {
-        return NextResponse.json(
-          {
-            error:
-              err instanceof Error ? err.message : 'Falha ao enviar pelo UAZAPI',
-          },
-          { status: 500 }
-        )
-      }
-    }
-
-    // Channel routing: if this account has an enabled Evolution instance,
-    // route the send through it instead of Meta. First cut supports text
-    // only — other message types return a clear error rather than silently
-    // falling back to Meta (which may not even be configured).
-    const evoCfg = await getEvolutionConfig(supabase, accountId)
-    if (isEvolutionReady(evoCfg)) {
-      if (message_type !== 'text' || !content_text) {
-        return NextResponse.json(
-          {
-            error:
-              'O canal Evolution suporta apenas mensagens de texto por enquanto.',
-          },
-          { status: 400 }
-        )
-      }
-      try {
-        const result = await sendEvolutionToConversation(
-          supabase,
-          accountId,
-          conversationId,
-          content_text
-        )
-        return NextResponse.json({
-          success: true,
-          message_id: result.messageId,
-          whatsapp_message_id: result.externalId,
-        })
-      } catch (err) {
-        return NextResponse.json(
-          {
-            error:
-              err instanceof Error ? err.message : 'Falha ao enviar pelo Evolution',
-          },
-          { status: 500 }
-        )
-      }
-    }
-
-    // Delegate to the shared send core (validates, sends to Meta with
-    // phone-variant retry, persists, pauses active flow runs). Its
+    // Delegate to the shared send core. It picks the door from the
+    // CRM's WhatsApp path (Meta, or the QR-code connection), sends,
+    // persists, and pauses active flow runs. Its
     // `SendMessageError` carries a machine code + HTTP status; the
     // dashboard maps it to the internal `{ error }` shape.
     try {

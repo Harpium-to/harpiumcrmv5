@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { Bell, CheckCheck, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { Bell, CalendarDays, CheckCheck, ListTodo, Loader2, ShieldCheck, UserPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { toast } from "sonner";
 const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   conversation_assigned: UserPlus,
   agency_access_request: ShieldCheck,
+  task_due: ListTodo,
+  agenda_booking: CalendarDays,
 };
 
 export default function NotificationsPage() {
@@ -117,6 +119,12 @@ export default function NotificationsPage() {
       if (!n.read_at) markRead(n.id);
       if (n.type === "agency_access_request") {
         router.push("/settings?tab=agencia");
+      } else if (n.type === "agenda_booking") {
+        // The agenda lists what is waiting for approval at the top.
+        router.push("/agenda");
+      } else if (n.type === "task_due" && n.contact_id) {
+        // Straight to the contact the task is about.
+        router.push(`/contacts?contact=${n.contact_id}`);
       } else if (n.conversation_id) {
         router.push(`/inbox?c=${n.conversation_id}`);
       }
