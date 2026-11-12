@@ -22,6 +22,8 @@ export type UazapiInboundMediaKind = 'image' | 'video' | 'audio' | 'document'
 export interface UazapiInboundMessage {
   /** The other party's phone, digits only, e.g. "5511999998888". */
   counterpartPhone: string
+  /** The other party's LID (digits), when the payload carries it. */
+  counterpartLid: string | null
   /** The text, the media caption, or the label of the tapped option. '' for media without a caption. */
   text: string
   externalId: string | null
@@ -64,12 +66,36 @@ function str(v: unknown): string | null {
   return null
 }
 
-/** Extract the phone (digits) from a WhatsApp JID, or null for groups. */
+function jidDigits(jid: string): string {
+  return jid.split('@')[0]?.split(':')[0]?.replace(/\D/g, '') ?? ''
+}
+
+/**
+ * Extract the phone (digits) from a WhatsApp JID, or null for groups,
+ * channels and LIDs. A LID ("123456789012345@lid") is WhatsApp's
+ * private id for an account, not a number: saving it as a phone made
+ * a contact "+20066104033409" that no reply could reach.
+ */
 function phoneFromJid(jid: string | null): string | null {
   if (!jid) return null
-  if (jid.includes('@g.us') || jid.includes('@newsletter')) return null
-  const digits = jid.split('@')[0]?.split(':')[0]?.replace(/\D/g, '') ?? ''
+  if (jid.includes('@g.us') || jid.includes('@newsletter') || jid.includes('@lid')) return null
+  const digits = jidDigits(jid)
   return digits.length >= 8 ? digits : null
+}
+
+/** The digits of a LID JID, or null when `jid` isn't one. */
+function lidFromJid(jid: string | null): string | null {
+  if (!jid || !jid.includes('@lid')) return null
+  const digits = jidDigits(jid)
+  return digits.length >= 8 ? digits : null
+}
+
+function firstOf<T>(values: (string | null)[], pick: (v: string | null) => T | null): T | null {
+  for (const v of values) {
+    const hit = pick(v)
+    if (hit) return hit
+  }
+  return null
 }
 
 /**
@@ -94,13 +120,24 @@ export function parseUazapiInbound(payload: unknown): UazapiInboundMessage[] {
   // here too so a mis-set webhook can't double-insert.
   if (message.wasSentByApi === true) return []
 
-  // Outbound: the counterpart is the chat. Inbound: it is the sender.
-  const jid = fromMe
-    ? (str(message.chatid) ?? str(message.sender))
-    : (str(message.sender) ?? str(message.sender_pn) ?? str(message.chatid))
-
-  const counterpartPhone = phoneFromJid(jid)
+  // In a 1:1 chat the counterpart is the chat itself, both directions.
+  // UAZAPI keeps `chatid` on the number (@s.whatsapp.net) even when
+  // WhatsApp addresses the chat by LID — the LID goes to `chatlid` /
+  // `sender_lid`, and `sender` may be the LID. So: chatid first, then
+  // the sender's resolved number, never a LID as a phone.
+  const chatid = str(message.chatid)
+  const phoneCandidates = fromMe
+    ? [chatid]
+    : [chatid, str(message.sender_pn), str(message.sender)]
+  const counterpartPhone = firstOf(phoneCandidates, phoneFromJid)
   if (!counterpartPhone) return []
+
+  // The LID too, when known: a contact saved earlier under it gets its
+  // real number back (see inbound.ts).
+  const lidCandidates = fromMe
+    ? [str(message.chatlid), chatid]
+    : [str(message.sender_lid), str(message.chatlid), str(message.sender), chatid]
+  const counterpartLid = firstOf(lidCandidates, lidFromJid)
 
   // A reaction is state on another message, not a message of its own.
   if (str(message.reaction)) return []
@@ -117,6 +154,7 @@ export function parseUazapiInbound(payload: unknown): UazapiInboundMessage[] {
   return [
     {
       counterpartPhone,
+      counterpartLid,
       text: text ?? (interactiveReplyId ?? ''),
       externalId: str(message.messageid) ?? str(message.id),
       // A name is only meaningful for the other party.
