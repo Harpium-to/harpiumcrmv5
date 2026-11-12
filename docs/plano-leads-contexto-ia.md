@@ -1,6 +1,7 @@
 # Leads com contexto completo: campos, funil e agente de IA
 
-Plano para aprovação, fase por fase. Nenhum código foi escrito ainda.
+Plano aprovado fase por fase. Decisões: as cinco recomendações abaixo foram
+aprovadas em 12/11/2026, junto com a Fase 1.
 
 ## O que existe hoje (lido no código)
 
@@ -32,7 +33,7 @@ Plano para aprovação, fase por fase. Nenhum código foi escrito ainda.
 Cada fase vira um PR para `main`, com testes, `tsc`, `eslint` e
 `next build` limpos. Merge só com o seu OK.
 
-### Fase 1. Apagar lead (sem migration)
+### Fase 1. Apagar lead (sem migration) · feita
 
 - Na lista de Leads, um ícone de lixeira em cada linha e uma caixa de
   seleção para **apagar vários de uma vez** (útil para limpar testes).
@@ -119,7 +120,7 @@ Editor:
   agente; cliente respondeu "oi" depois da saudação; conversa sem
   saudação nenhuma (aí o agente cumprimenta normalmente).
 
-### Fase 5. Plano futuro: Ferramentas e Quiz (só documento)
+### Fase 5. Plano futuro: Ferramentas e Quiz (só documento) · feita
 
 Novo arquivo `docs/implementacoes-futuras.md`, o lugar único do que fica
 para depois, com o primeiro item:
@@ -132,7 +133,7 @@ para depois, com o primeiro item:
 - Estrutura: você manda a que já tem pronta; o plano detalhado sai
   dela.
 
-## Decisões (com a recomendação marcada)
+## Decisões (aprovadas: a recomendação marcada)
 
 1. **Apagar lead de teste:** apagar só o lead, com a opção marcável de
    apagar também o contato de teste (**recomendado**) · sempre apagar o

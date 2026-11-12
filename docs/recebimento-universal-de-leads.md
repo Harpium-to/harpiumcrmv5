@@ -68,6 +68,14 @@ Google e Meta: colunas extras do formulário do Google e perguntas personalizada
 
 **Reprocessar** (tela Leads, administradores): passa os leads já guardados pelas regras de hoje. Só completa o contato (não sobrescreve), etiquetas e campos não duplicam, e a nota é escrita uma vez. Um lead que só agora encontra o contato também cai no funil (regra 9).
 
+## Apagar lead
+
+Na lista de Leads (administradores): a lixeira em cada linha, ou marcar vários e "Apagar selecionados". Código: `src/lib/leads/delete.ts` e `POST /api/leads/delete`.
+
+- Sai o registro do lead (com o pacote bruto) e a nota que ele deixou no contato. O contato continua.
+- Opção **"Apagar também o contato de teste"**: só aparece para contato que chegou ao CRM por esse lead (não existia antes), não tem outro lead fora dos que estão sendo apagados e nunca escreveu. Vão junto os negócios dele no funil, as conversas, as notas, as etiquetas e os campos. Contato que já conversou ou que já estava no CRM nunca é apagado por aqui.
+- Não dá para desfazer.
+
 ## Evento "lead recebido"
 
 Depois de gravar (nunca num reenvio):
