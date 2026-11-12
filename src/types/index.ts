@@ -140,6 +140,10 @@ export interface CustomField {
   field_name: string;
   field_type: string;
   field_options?: Record<string, unknown>;
+  /** Folded name, set on fields a lead created (migration 070). */
+  field_key?: string | null;
+  /** 'lead' when a received lead created the field (migration 070). */
+  created_from?: 'lead' | null;
   created_at: string;
 }
 

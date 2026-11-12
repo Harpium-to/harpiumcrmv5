@@ -269,6 +269,14 @@ function FieldRow({
         aria-label={t('renameAria', { name: field.field_name })}
         className="focus:border-primary h-8 border-transparent bg-transparent text-foreground hover:border-border"
       />
+      {field.created_from === 'lead' && (
+        <span
+          className="shrink-0 whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary"
+          title={t('fromLeadTitle')}
+        >
+          {t('fromLead')}
+        </span>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"

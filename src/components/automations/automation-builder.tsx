@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -65,6 +66,8 @@ import {
 import { interactivePayloadPreviewText } from "@/lib/whatsapp/interactive"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { CONTACT_VARIABLES } from "@/lib/automations/variables"
+import { variableKey } from "@/lib/contacts/profile"
 
 // ------------------------------------------------------------
 // Types (builder-local — mirror the flattened rows we POST)
@@ -1421,11 +1424,10 @@ function StepEditor({
     case "send_message":
       return (
         <FieldBlock label={t("config.messageText")}>
-          <Textarea
+          <MessageTextEditor
             value={(cfg.text as string) ?? ""}
-            onChange={(e) => set({ text: e.target.value })}
+            onChange={(text) => set({ text })}
             placeholder={t("config.placeholderMessageText")}
-            className="min-h-24 bg-muted text-foreground"
           />
         </FieldBlock>
       )
@@ -1660,6 +1662,87 @@ function AgentRoleSelect({ value, onChange }: { value: string; onChange: (v: str
       ))}
       {!known && <option value={value}>{value}</option>}
     </select>
+  )
+}
+
+/**
+ * The message text plus one-click variables: the contact's
+ * (`{{ contato.primeiro_nome }}`…) and each custom field of the account
+ * (`{{ campo.faturamento }}`), filled when the message is sent
+ * (lib/automations/variables.ts). Inserted where the cursor is.
+ */
+function MessageTextEditor({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string
+  onChange: (text: string) => void
+  placeholder: string
+}) {
+  const t = useTranslations("Automations.builder")
+  const { customFields } = useResources()
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  const fieldVars = Array.from(
+    new Map(
+      customFields
+        .map((f) => [variableKey(f.field_name), f.field_name] as const)
+        .filter(([key]) => key !== ""),
+    ),
+  )
+
+  const insert = (key: string) => {
+    const token = `{{ ${key} }}`
+    const el = ref.current
+    const start = el?.selectionStart ?? value.length
+    const end = el?.selectionEnd ?? value.length
+    const before = value.slice(0, start)
+    const pad = before && !/\s$/.test(before) ? " " : ""
+    const next = `${before}${pad}${token}${value.slice(end)}`
+    onChange(next)
+    const caret = before.length + pad.length + token.length
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(caret, caret)
+    })
+  }
+
+  const chip =
+    "rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground hover:border-primary hover:text-foreground"
+
+  return (
+    <div className="space-y-2">
+      <Textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="min-h-24 bg-muted text-foreground"
+      />
+      <div>
+        <p className="mb-1 text-[11px] text-muted-foreground">{t("config.insertVariable")}</p>
+        <div className="flex flex-wrap gap-1">
+          {CONTACT_VARIABLES.map((key) => (
+            <button key={key} type="button" className={chip} onClick={() => insert(key)}>
+              {key}
+            </button>
+          ))}
+          {fieldVars.map(([key, name]) => (
+            <button
+              key={key}
+              type="button"
+              className={chip}
+              title={name}
+              onClick={() => insert(`campo.${key}`)}
+            >
+              campo.{key}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">{t("config.insertVariableHelp")}</p>
+      </div>
+    </div>
   )
 }
 

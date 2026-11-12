@@ -563,7 +563,7 @@ export default function LeadsPage() {
                 size="sm"
                 disabled={reprocessing !== null}
                 onClick={() => void reprocess()}
-                title="Lê de novo os dados guardados de cada lead e grava no contato o que antes ficava de fora (respostas, etiquetas, campos). Não apaga nem troca o que já está preenchido."
+                title="Lê de novo os dados guardados de cada lead e grava no contato o que antes ficava de fora (respostas em campos, etiquetas). Só preenche o que está vazio: não apaga nem troca o que já está preenchido."
               >
                 {reprocessing === "all" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -979,8 +979,8 @@ function ZapierTutorial() {
           <code className="font-mono">campanha</code>,{" "}
           <code className="font-mono">etiquetas</code> e as{" "}
           <code className="font-mono">utm_*</code>. Qualquer outro campo também
-          entra: vai para o campo personalizado de mesmo nome ou para uma nota no
-          contato.
+          entra: vai para o campo personalizado de mesmo nome, criado se ainda não
+          existir.
         </Step>
         <Step n={4}>
           Teste — o lead aparece aqui na lista. Em <em>Ver dados recebidos</em>{" "}
@@ -1026,8 +1026,10 @@ function HarpiumV1Tutorial() {
       </p>
       <ul className="mt-2 space-y-1">
         <li>
-          <code className="font-mono">respostas</code> e{" "}
-          <code className="font-mono">nota</code> viram uma nota no contato.
+          Cada item de <code className="font-mono">respostas</code> vira um campo
+          personalizado com o nome da pergunta (criado se não existir). As respostas e a{" "}
+          <code className="font-mono">nota</code> também ficam numa nota no contato, como
+          histórico.
         </li>
         <li>
           <code className="font-mono">etiquetas</code> e a rota (
@@ -1038,7 +1040,7 @@ function HarpiumV1Tutorial() {
         </li>
         <li>
           Cada chave de <code className="font-mono">campos</code> preenche o campo
-          personalizado de mesmo nome; o que não existir vai para a nota.
+          personalizado de mesmo nome, criado se não existir.
         </li>
         <li>
           O mesmo <code className="font-mono">id_externo</code> da mesma origem em

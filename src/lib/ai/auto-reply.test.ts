@@ -256,6 +256,18 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(systemPrompt).toContain('Returns accepted within 30 days.')
   })
 
+  it('quotes the greeting an automation already sent, so the AI does not greet again', async () => {
+    h.buildConversationContext.mockResolvedValue([
+      { role: 'assistant', content: 'Oi, Ana! Vi que você respondeu nosso quiz.' },
+      { role: 'user', content: 'oi, quero saber o preço' },
+    ])
+    await dispatchInboundToAiReply(ARGS)
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).toContain(
+      'The business already greeted this customer in this conversation: "Oi, Ana! Vi que você respondeu nosso quiz."',
+    )
+  })
+
   it('stands down when an active message-level automation exists', async () => {
     h.state.autoResponders = [{ id: 'auto-1' }]
     await dispatchInboundToAiReply(ARGS)

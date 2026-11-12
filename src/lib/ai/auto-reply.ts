@@ -4,6 +4,8 @@ import { buildConversationContext } from './context'
 import { retrieveKnowledge } from './knowledge'
 import { generateReply } from './generate'
 import { buildSystemPrompt } from './defaults'
+import { loadContactProfile, renderContactProfile } from '@/lib/contacts/profile'
+import { findBusinessGreeting } from './greeting'
 import {
   DEFAULT_HANDOFF_NOTICE,
   buildHandoffSummary,
@@ -426,10 +428,23 @@ export async function dispatchInboundToAiReply(
         }
       }
 
+      // The whole customer: what a lead answered lives in its custom
+      // fields. Best-effort — without it the reply still goes out.
+      let customerProfile: string | null = null
+      try {
+        customerProfile = renderContactProfile(
+          await loadContactProfile(db, accountId, contactId),
+        )
+      } catch (err) {
+        console.error('[ai auto-reply] could not read the contact profile:', err)
+      }
+
       const systemPrompt = buildSystemPrompt({
         userPrompt: composePrompt(config, agent),
         mode: 'auto_reply',
         knowledge,
+        customerProfile,
+        priorGreeting: findBusinessGreeting(messages),
         capabilities: scheduling
           ? [agendaPrompt(scheduling.agenda, { needsApproval: scheduling.needsApproval })]
           : undefined,

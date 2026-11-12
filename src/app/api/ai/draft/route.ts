@@ -6,6 +6,8 @@ import { buildConversationContext } from '@/lib/ai/context'
 import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
+import { loadContactProfile, renderContactProfile } from '@/lib/contacts/profile'
+import { findBusinessGreeting } from '@/lib/ai/greeting'
 import { latestUserMessage } from '@/lib/ai/query'
 import { logAiUsage } from '@/lib/ai/usage'
 import { supabaseAdmin } from '@/lib/ai/admin-client'
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
     // row means "not yours / not found" either way.
     const { data: conversation, error: convErr } = await supabase
       .from('conversations')
-      .select('id')
+      .select('id, contact_id')
       .eq('id', conversationId)
       .maybeSingle()
     if (convErr) {
@@ -98,10 +100,21 @@ export async function POST(request: Request) {
       latestUserMessage(messages),
     )
 
+    // The customer as the CRM knows them (custom fields included), so
+    // the draft doesn't ask again what a form already answered.
+    const contactId = (conversation as { contact_id?: string | null }).contact_id
+    const customerProfile = contactId
+      ? renderContactProfile(
+          await loadContactProfile(supabase, accountId, contactId).catch(() => null),
+        )
+      : null
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'draft',
       knowledge,
+      customerProfile,
+      priorGreeting: findBusinessGreeting(messages),
     })
 
     const { text, usage } = await generateReply({ config, systemPrompt, messages })

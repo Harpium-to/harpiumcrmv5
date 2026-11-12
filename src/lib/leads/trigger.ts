@@ -117,7 +117,7 @@ export function handoffInput(
     }
     if (lead.nota) input.observacao_do_lead = lead.nota
     input.como_abrir =
-      'Abra a conversa citando algo concreto que o lead respondeu, para mostrar que você leu. Uma pergunta só.'
+      'Se a conversa ainda não começou, abra citando algo concreto que o lead respondeu, para mostrar que você leu. Se a empresa já mandou mensagem (uma automação, por exemplo), continue dela sem cumprimentar de novo. Uma pergunta só.'
   }
   const extra = (instruction ?? '').trim()
   if (extra) input.instrucao = extra

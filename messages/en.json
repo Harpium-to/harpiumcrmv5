@@ -527,7 +527,14 @@
       "toastCreated": "Created \"{name}\".",
       "toastRenameFailed": "Could not rename field.",
       "toastDeleteFailed": "Could not delete field.",
-      "toastDeleted": "Deleted \"{name}\"."
+      "toastDeleted": "Deleted \"{name}\".",
+      "fromLead": "from a lead",
+      "fromLeadTitle": "Created automatically when a lead answered this question. You can rename it: new leads keep landing here."
+    },
+    "fieldsSummary": {
+      "title": "Fields",
+      "showAll": "Show all ({count})",
+      "showLess": "Show less"
     }
   },
   "Pipelines": {
@@ -1051,7 +1058,9 @@
         "agentInstruction": "Instruction for the agent (optional)",
         "agentInstructionHint": "E.g.: start by checking the budget before booking",
         "agentHandoffHelp": "The agent receives the contact with the lead answers and opens the conversation on WhatsApp, within its working hours. Needs an active agent with this role.",
-        "leadOptOutHelp": "Contacts who opted out of automatic messages are skipped."
+        "leadOptOutHelp": "Contacts who opted out of automatic messages are skipped.",
+        "insertVariable": "Insert contact data:",
+        "insertVariableHelp": "Works with any trigger. When the contact has no value, the variable is removed without leaving a gap (\"Hi, how are you?\" instead of \"Hi , how are you?\")."
       }
     }
   },
