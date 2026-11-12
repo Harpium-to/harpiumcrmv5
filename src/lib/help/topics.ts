@@ -116,6 +116,9 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Para Zapier ou Make, abra o tutorial correspondente e use a URL de webhook mostrada na tela.",
       "Cada lead novo aparece na lista com origem, data e dados preenchidos. Abra um lead para virar contato e iniciar a conversa.",
     ],
+    tips: [
+      "Todo lead com telefone ou e-mail já cai no primeiro funil, na primeira etapa, como \"Lead <origem> · <nome>\". Quem já tem um negócio aberto não ganha outro.",
+    ],
   },
   {
     id: "funis",
@@ -130,6 +133,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Abra o negócio para marcar como Ganho ou Perdido, anotar e definir a data prevista de fechamento.",
     ],
     tips: [
+      "Ninguém precisa criar o cartão de quem chega: o primeiro contato no WhatsApp ou no Instagram e cada lead de anúncio ou formulário já entram no primeiro funil, na primeira etapa. Quem já tem um negócio aberto não ganha outro.",
       "A moeda dos valores é definida em Configurações › Negócios e moeda.",
       "Você pode ter mais de um funil, por exemplo um para vendas e outro para pós-venda.",
     ],

@@ -23,6 +23,10 @@ import { DEFAULT_PIPELINE_NAME, DEFAULT_PIPELINE_STAGES } from './default-pipeli
 // funnel, at its first stage; an account that has no funnel yet gets
 // the default one, the same the Funil page would seed on first open.
 //
+// A received lead (Meta Lead Ads, Google, any form or webhook) lands
+// the same way, through lib/leads/deal.ts: same funnel, same "one open
+// card per contact" rule, titled with where it came from.
+//
 // Service-role client (the webhooks have no session). Never throws:
 // callers run inside the webhook and a failure here must not drop the
 // message.
@@ -33,10 +37,14 @@ export interface FirstContactDealInput {
   /** NOT NULL audit column on deals / pipelines — the channel owner. */
   ownerUserId: string
   contactId: string
-  conversationId: string
+  /** The thread the card opens. Null for a lead whose contact has never
+   *  written: the card still lands, without a conversation. */
+  conversationId: string | null
   /** Overrides the contact's name as the deal title. Instagram passes
    *  one because its contacts arrive with no name. */
   title?: string
+  /** Put before the title, e.g. "Lead Meta · " for a lead's card. */
+  titlePrefix?: string
 }
 
 export type FirstContactDealOutcome =
@@ -55,7 +63,7 @@ export async function openFirstContactDeal(
     // gives us its name for the card title.
     const { data: contact, error: contactErr } = await admin
       .from('contacts')
-      .select('name, phone')
+      .select('name, phone, email')
       .eq('id', input.contactId)
       .eq('account_id', input.accountId)
       .maybeSingle()
@@ -85,10 +93,12 @@ export async function openFirstContactDeal(
       .maybeSingle()
 
     const title =
-      input.title?.trim() ||
-      String(contact.name ?? '').trim() ||
-      String(contact.phone ?? '').trim() ||
-      'Novo contato'
+      (input.titlePrefix ?? '') +
+      (input.title?.trim() ||
+        String(contact.name ?? '').trim() ||
+        String(contact.phone ?? '').trim() ||
+        String(contact.email ?? '').trim() ||
+        'Novo contato')
 
     const { error: insertErr } = await admin.from('deals').insert({
       account_id: input.accountId,
