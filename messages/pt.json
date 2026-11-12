@@ -1697,7 +1697,13 @@
         "offlineHint": "Se o celular ficar muito tempo sem internet, a conexão cai e é preciso ler o QR code de novo.",
         "noServer": "O servidor da conexão por QR code ainda não foi configurado. Fale com a agência.",
         "manualServer": "Este CRM usa um servidor próprio, configurado pela agência.",
-        "evolutionNote": "Este CRM usa uma instância Evolution configurada pela agência. Ela envia só texto; para mídia e botões, conecte por QR code aqui."
+        "evolutionNote": "Este CRM usa uma instância Evolution configurada pela agência. Ela envia só texto; para mídia e botões, conecte por QR code aqui.",
+        "importHistory": "Trazer conversas do celular",
+        "importingHistory": "Trazendo conversas… {chats} conversas, {messages} mensagens",
+        "importHistoryConfirm": "Trazer para o CRM as conversas individuais que o celular já tinha (até 90 dias)? Os contatos e as mensagens são copiados com a data original. Nenhuma automação, fluxo ou agente de IA é disparado, e nada fica como não lido. Pode repetir sem duplicar.",
+        "importHistoryDone": "{chats} conversas trazidas, {messages} mensagens e {contacts} contatos novos.",
+        "importHistoryNothing": "Nada novo para trazer: as conversas do celular já estão no CRM.",
+        "importHistoryHint": "As fotos, vídeos e áudios antigos aparecem como [foto], [vídeo] ou [áudio], com a legenda."
       }
     },
     "sections": {

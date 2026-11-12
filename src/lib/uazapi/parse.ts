@@ -34,6 +34,17 @@ export interface UazapiInboundMessage {
   mediaKind: UazapiInboundMediaKind | null
   /** The id of the button or list row the customer tapped (D1). Flows match on it. */
   interactiveReplyId: string | null
+  /** When it was sent (ISO), from `messageTimestamp`; used when importing history. */
+  sentAt: string | null
+}
+
+/** `messageTimestamp` is milliseconds; older payloads used seconds. */
+function timestampIso(v: unknown): string | null {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN
+  if (!Number.isFinite(n) || n <= 0) return null
+  const ms = n < 1e12 ? n * 1000 : n
+  const d = new Date(ms)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 /**
@@ -162,6 +173,7 @@ export function parseUazapiInbound(payload: unknown): UazapiInboundMessage[] {
       fromMe,
       mediaKind,
       interactiveReplyId,
+      sentAt: timestampIso(message.messageTimestamp),
     },
   ]
 }

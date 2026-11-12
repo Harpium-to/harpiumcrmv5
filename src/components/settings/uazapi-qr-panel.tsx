@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import { CheckCircle2, Loader2, LogOut, QrCode, Smartphone } from 'lucide-react';
+import { CheckCircle2, History, Loader2, LogOut, QrCode, Smartphone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -52,6 +52,7 @@ export function UazapiQrPanel({
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [importing, setImporting] = useState<{ chats: number; messages: number } | null>(null);
   const [polling, setPolling] = useState(false);
   const pollStartedAt = useRef<number>(0);
 
@@ -130,6 +131,44 @@ export function UazapiQrPanel({
       toast.error(t('failed', { message: err instanceof Error ? err.message : '' }));
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  /**
+   * Copy the phone's old 1:1 chats, a page per call, following the
+   * server's offset (see /api/uazapi/history).
+   */
+  const importHistory = async () => {
+    if (!window.confirm(t('importHistoryConfirm'))) return;
+    setImporting({ chats: 0, messages: 0 });
+    let chats = 0;
+    let messages = 0;
+    let contacts = 0;
+    try {
+      let offset: number | null = 0;
+      for (let guard = 0; offset !== null && guard < 200; guard++) {
+        const res: Response = await fetch('/api/uazapi/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offset }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? '');
+        chats += json.chats ?? 0;
+        messages += json.imported ?? 0;
+        contacts += json.contacts_created ?? 0;
+        setImporting({ chats, messages });
+        offset = typeof json.next_offset === 'number' ? json.next_offset : null;
+      }
+      toast.success(
+        messages > 0
+          ? t('importHistoryDone', { chats, messages, contacts })
+          : t('importHistoryNothing'),
+      );
+    } catch (err) {
+      toast.error(t('failed', { message: err instanceof Error ? err.message : '' }));
+    } finally {
+      setImporting(null);
     }
   };
 
@@ -215,6 +254,26 @@ export function UazapiQrPanel({
       )}
 
       {connected && <p className="text-xs text-muted-foreground">{t('offlineHint')}</p>}
+
+      {connected && canManage && (
+        <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            {importing
+              ? t('importingHistory', { chats: importing.chats, messages: importing.messages })
+              : t('importHistoryHint')}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={importHistory}
+            disabled={importing !== null}
+            className="shrink-0"
+          >
+            {importing ? <Loader2 className="size-4 animate-spin" /> : <History className="size-4" />}
+            {t('importHistory')}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

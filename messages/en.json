@@ -1697,7 +1697,13 @@
         "offlineHint": "If the phone stays offline for too long, the connection drops and the QR code has to be scanned again.",
         "noServer": "The QR-code connection server isn't set up yet. Talk to the agency.",
         "manualServer": "This CRM uses its own server, set up by the agency.",
-        "evolutionNote": "This CRM uses an Evolution instance set up by the agency. It sends text only; for media and buttons, connect by QR code here."
+        "evolutionNote": "This CRM uses an Evolution instance set up by the agency. It sends text only; for media and buttons, connect by QR code here.",
+        "importHistory": "Bring chats from the phone",
+        "importingHistory": "Bringing chats… {chats} chats, {messages} messages",
+        "importHistoryConfirm": "Copy into the CRM the 1:1 chats the phone already had (up to 90 days)? Contacts and messages keep their original dates. No automation, flow or AI agent runs, and nothing is marked unread. Safe to repeat without duplicates.",
+        "importHistoryDone": "{chats} chats brought, {messages} messages and {contacts} new contacts.",
+        "importHistoryNothing": "Nothing new to bring: the phone chats are already in the CRM.",
+        "importHistoryHint": "Old photos, videos and audio show as [photo], [video] or [audio], with the caption."
       }
     },
     "sections": {

@@ -78,6 +78,7 @@ const ACCOUNT = { id: 'acct-1', ownerUserId: 'owner-1' }
 const msg = (over: Partial<UazapiInboundMessage> = {}): UazapiInboundMessage => ({
   counterpartPhone: '5511888888888',
   counterpartLid: null,
+  sentAt: null,
   text: 'Oi',
   externalId: 'WA1',
   name: 'Maria',
