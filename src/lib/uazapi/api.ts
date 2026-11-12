@@ -270,3 +270,56 @@ export async function downloadUazapiMedia(
   if (!fileUrl) return null
   return { fileUrl, mimetype: typeof j?.mimetype === 'string' ? j.mimetype : null }
 }
+
+// ------------------------------------------------------------
+// History: what the phone sent to the instance when it paired (UAZAPI
+// keeps ~90 days by default). Used by the "bring the old chats" import.
+// ------------------------------------------------------------
+
+export interface UazapiChatPage {
+  chats: Record<string, unknown>[]
+  /** Offset of the next page, or null when this was the last. */
+  nextOffset: number | null
+}
+
+/** One page of 1:1 chats, most recent conversation first. */
+export async function findUazapiChats(
+  srv: UazapiServer,
+  page: { limit: number; offset: number },
+): Promise<UazapiChatPage> {
+  const res = await fetch(endpoint(srv.baseUrl, 'chat/find'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', token: srv.token },
+    body: JSON.stringify({
+      operator: 'AND',
+      sort: '-wa_lastMsgTimestamp',
+      limit: page.limit,
+      offset: page.offset,
+      compact: true,
+      wa_isGroup: false,
+    }),
+  })
+  if (!res.ok) await failure(res, 'Falha ao buscar as conversas')
+  const j = await res.json().catch(() => ({}))
+  const chats = Array.isArray(j?.chats) ? (j.chats as Record<string, unknown>[]) : []
+  const total = Number(j?.pagination?.totalRecords)
+  const next = page.offset + chats.length
+  const more = Number.isFinite(total) ? next < total : chats.length === page.limit
+  return { chats, nextOffset: more && chats.length > 0 ? next : null }
+}
+
+/** The most recent messages of one chat (newest first, as UAZAPI returns them). */
+export async function findUazapiMessages(
+  srv: UazapiServer,
+  chatid: string,
+  limit: number,
+): Promise<Record<string, unknown>[]> {
+  const res = await fetch(endpoint(srv.baseUrl, 'message/find'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', token: srv.token },
+    body: JSON.stringify({ chatid, limit, offset: 0 }),
+  })
+  if (!res.ok) await failure(res, 'Falha ao buscar as mensagens')
+  const j = await res.json().catch(() => ({}))
+  return Array.isArray(j?.messages) ? (j.messages as Record<string, unknown>[]) : []
+}

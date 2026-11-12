@@ -87,7 +87,7 @@ export async function findOrCreateContact(
   return { id: data.id, created: true }
 }
 
-async function findOrCreateConversation(
+export async function findOrCreateConversation(
   admin: SupabaseClient,
   accountId: string,
   ownerUserId: string,
@@ -135,7 +135,7 @@ export interface UazapiIngestResult {
 }
 
 /** Shown when a media file couldn't be kept, so the thread still says something arrived. */
-const MEDIA_LABEL: Record<string, string> = {
+export const MEDIA_LABEL: Record<string, string> = {
   image: '[foto]',
   video: '[vídeo]',
   audio: '[áudio]',
