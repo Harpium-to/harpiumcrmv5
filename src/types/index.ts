@@ -564,7 +564,10 @@ export type AutomationTriggerType =
   | 'interactive_reply'
   /** A sequence: started by a person on one contact, from the Chrome
    *  extension (POST /api/v1/sequences/{id}/start). Never by an event. */
-  | 'manual';
+  | 'manual'
+  /** A lead arrived at the lead URL (quiz, Google, Meta, Zapier…);
+   *  filtered by origin, route and tags (LeadReceivedTriggerConfig). */
+  | 'lead_received';
 
 export type AutomationStepType =
   | 'send_message'
@@ -579,9 +582,32 @@ export type AutomationStepType =
   | 'wait'
   | 'condition'
   | 'send_webhook'
-  | 'close_conversation';
+  | 'close_conversation'
+  /** Hand the contact to an AI agent of a role (the Agent SDR by
+   *  default), which opens the conversation on WhatsApp. */
+  | 'agent_handoff';
 
 export type AutomationLogStatus = 'success' | 'partial' | 'failed';
+
+/**
+ * `lead_received` filters. Every filter set must match; an empty one
+ * matches any lead. Origins compare as slugs ("Quiz Planejados" ==
+ * "quiz-planejados"), tags case-insensitively.
+ */
+export interface LeadReceivedTriggerConfig {
+  origens?: string[];
+  /** The lead must carry ALL of these tags (route tag included). */
+  etiquetas?: string[];
+  /** 'A' | 'B' | 'C', or empty for any route. */
+  rota?: string;
+}
+
+export interface AgentHandoffStepConfig {
+  /** Agent role to route to (`sdr` by default). */
+  role: string;
+  /** Extra direction for the agent ("comece validando o investimento"). */
+  instruction?: string;
+}
 
 export interface KeywordMatchTriggerConfig {
   keywords: string[];
@@ -610,6 +636,7 @@ export type AutomationTriggerConfig =
   | TagTriggerConfig
   | TimeBasedTriggerConfig
   | InteractiveReplyTriggerConfig
+  | LeadReceivedTriggerConfig
   | Record<string, unknown>;
 
 export interface SendMessageStepConfig {
@@ -696,6 +723,7 @@ export type AutomationStepConfig =
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
+  | AgentHandoffStepConfig
   | Record<string, never>
   | Record<string, unknown>;
 

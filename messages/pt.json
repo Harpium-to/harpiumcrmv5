@@ -857,7 +857,8 @@
         "wait": "Aguardar",
         "condition": "Condição (Se/Senão)",
         "send_webhook": "Enviar webhook",
-        "close_conversation": "Fechar conversa"
+        "close_conversation": "Fechar conversa",
+        "agent_handoff": "Passar para agente de IA"
       },
       "triggers": {
         "new_message_received": {
@@ -895,6 +896,10 @@
         "manual": {
           "label": "Sequência (disparo manual)",
           "hint": "Começa quando alguém dispara para um contato, pela extensão do Chrome. Só mensagens, esperas e ações; entre duas mensagens, espere pelo menos 1 minuto."
+        },
+        "lead_received": {
+          "label": "Lead recebido",
+          "hint": "Quando chega um lead pela URL de leads (quiz, Google, Meta, Zapier, formulário). Filtre por origem, rota e etiquetas."
         }
       },
       "trigger": "Gatilho",
@@ -998,7 +1003,21 @@
         "matchType": "Tipo de correspondência",
         "matchContains": "Contém",
         "matchExact": "Exata",
-        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária."
+        "closeConversationHint": "Define o status da conversa como \"fechada\". Nenhuma configuração necessária.",
+        "leadOrigins": "Origens",
+        "leadOriginsHint": "quiz-planejados, google",
+        "leadOriginsHelp": "Separadas por vírgula. Vazio: qualquer origem.",
+        "leadRoute": "Rota",
+        "leadRouteAny": "Qualquer rota",
+        "leadTags": "Etiquetas obrigatórias",
+        "leadTagsHint": "verba-baixa, decisor:nao",
+        "leadTagsHelp": "O lead precisa ter todas. Vazio: não filtra por etiqueta.",
+        "leadVarsHelp": "Nas mensagens você pode usar:",
+        "agentRole": "Agente",
+        "agentInstruction": "Instrução para o agente (opcional)",
+        "agentInstructionHint": "Ex.: comece validando o investimento antes de agendar",
+        "agentHandoffHelp": "O agente recebe o contato com as respostas do lead e abre a conversa no WhatsApp, no horário de trabalho dele. Precisa de um agente ativo com essa função.",
+        "leadOptOutHelp": "Contatos que pediram para não receber mensagens automáticas ficam de fora."
       }
     }
   },

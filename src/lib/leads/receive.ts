@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 
 import { checkRateLimit } from '@/lib/rate-limit'
 import { supabaseAdmin } from './admin-client'
 import { MAX_LEAD_BODY_BYTES, formPairsToPayload, parseLeadBody, type BodyError } from './body'
+import { dispatchLeadReceived } from './events'
 import { ingestLead, lacksContactKey, type IngestResult } from './ingest'
 import { loadFieldMappings } from './mappings'
 import { normalizeLead, type NormalizedLead } from './parse'
@@ -176,6 +177,18 @@ export async function handleLeadIngest(
   } catch (err) {
     console.error('[leads ingest] failed:', err)
     return fail('erro_interno')
+  }
+
+  // "Lead recebido" for webhooks, automations and the Agent SDR — after
+  // the answer is sent, and never for a repeat already handled.
+  if (!result.duplicate) {
+    const event = {
+      accountId: cfg.accountId,
+      leadId: result.leadId,
+      contactId: result.contactId,
+      lead,
+    }
+    after(() => dispatchLeadReceived(admin, event))
   }
 
   // Kept (raw payload in "Leads recebidos"), but without a phone or an

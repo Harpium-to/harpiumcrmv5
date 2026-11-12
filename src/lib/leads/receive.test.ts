@@ -9,6 +9,19 @@ vi.mock('./admin-client', () => ({
   supabaseAdmin: () => fakeDb(tables),
 }))
 
+// `after()` only exists inside a Next request: run its callback now.
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: (fn: () => unknown) => void fn(),
+}))
+
+const dispatched = vi.hoisted(() => ({ calls: [] as unknown[] }))
+vi.mock('./events', () => ({
+  dispatchLeadReceived: async (_db: unknown, event: unknown) => {
+    dispatched.calls.push(event)
+  },
+}))
+
 const { handleLeadIngest } = await import('./receive')
 
 const TOKEN = 'tok-quiz'
@@ -45,6 +58,7 @@ const quiz = JSON.stringify({
 
 beforeEach(() => {
   tables = world()
+  dispatched.calls = []
   __resetRateLimitForTests()
 })
 
@@ -59,12 +73,19 @@ describe('handleLeadIngest', () => {
     expect(body.lead_id).toBe(tables.leads[0].id)
   })
 
-  it('answers a repeat with duplicado: true', async () => {
+  it('answers a repeat with duplicado: true and fires "lead recebido" once', async () => {
     await handleLeadIngest(post(quiz), TOKEN)
     const res = await handleLeadIngest(post(quiz), TOKEN)
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ ok: true, duplicado: true, contato: 'atualizado' })
     expect(tables.leads).toHaveLength(1)
+    expect(dispatched.calls).toHaveLength(1)
+    expect(dispatched.calls[0]).toMatchObject({
+      accountId: 'acc-1',
+      leadId: tables.leads[0].id,
+      contactId: tables.contacts[0].id,
+      lead: { source: 'quiz-planejados' },
+    })
   })
 
   it('accepts the token in Authorization: Bearer', async () => {

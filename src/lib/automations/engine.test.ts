@@ -13,6 +13,8 @@ const h = vi.hoisted(() => ({
     upsertCalls: [] as { table: string; payload: unknown }[],
     logCreatedAt: "2026-11-10T10:00:00Z" as string | null,
     customerReplies: 0,
+    agent: null as { id: string } | null,
+    taskInserts: [] as Record<string, unknown>[],
   },
 }));
 
@@ -57,6 +59,11 @@ vi.mock("./admin-client", () => {
     if (table === "conversations") return { data: [{ id: "conv1" }], error: null };
     if (table === "messages") return { data: null, count: state.customerReplies, error: null };
     if (table === "automation_steps") return { data: state.steps, error: null };
+    if (table === "agents") return { data: state.agent, error: null };
+    if (table === "agent_tasks" && type === "insert") {
+      state.taskInserts.push(ops.payload as Record<string, unknown>);
+      return { data: { id: "task1", ...(ops.payload as Record<string, unknown>) }, error: null };
+    }
     return { data: null, error: null };
   }
 
@@ -120,6 +127,8 @@ beforeEach(() => {
   h.state.upsertCalls = [];
   h.state.logCreatedAt = "2026-11-10T10:00:00Z";
   h.state.customerReplies = 0;
+  h.state.agent = null;
+  h.state.taskInserts = [];
 });
 
 describe("runAutomationsForTrigger — tenant isolation", () => {
@@ -392,5 +401,95 @@ describe("sequences (manual trigger)", () => {
     h.state.customerReplies = 1;
     h.state.logCreatedAt = null;
     expect(await customerRepliedSinceStart(sequence({ stop_on_reply: true }), pending)).toBe(false);
+  });
+});
+
+describe("lead_received + agent_handoff", () => {
+  const lead = {
+    lead_id: "lead-1",
+    source: "quiz-planejados",
+    origem: "quiz-planejados",
+    rota: "A" as const,
+    etiquetas: ["quiz-planejados", "rota-a", "verba-baixa"],
+    nome: "Ana",
+    empresa: "Planejados Silva",
+    campanha: null,
+    respostas: [{ pergunta: "Maior desafio", resposta: "Só pedem preço" }],
+    nota: null,
+    consentimento: null,
+  };
+  const leadAutomation = (cfg: Record<string, unknown>) =>
+    ({
+      id: "a-lead",
+      account_id: ACCOUNT,
+      user_id: "u1",
+      name: "Quiz rota A → SDR",
+      trigger_type: "lead_received",
+      trigger_config: cfg,
+      is_active: true,
+      execution_count: 0,
+      created_at: "",
+      updated_at: "",
+    }) as unknown as Automation;
+  const handoffStep = {
+    id: "s-h",
+    automation_id: "a-lead",
+    step_type: "agent_handoff",
+    position: 0,
+    parent_step_id: null,
+    step_config: { role: "sdr", instruction: "Comece validando o investimento" },
+  };
+
+  it("matches on origin, route and every required tag", () => {
+    const a = leadAutomation({ origens: ["Quiz Planejados"], rota: "A", etiquetas: ["verba-baixa"] });
+    expect(triggerMatches(a, { lead })).toBe(true);
+    expect(triggerMatches(a, { lead: { ...lead, rota: "B" } })).toBe(false);
+    expect(triggerMatches(a, { lead: { ...lead, etiquetas: ["rota-a"] } })).toBe(false);
+    expect(triggerMatches(a, { lead: { ...lead, source: "google", origem: "google" } })).toBe(false);
+    expect(triggerMatches(a, {})).toBe(false);
+  });
+
+  it("hands the contact to the SDR with the lead's answers, once per lead", async () => {
+    h.state.owned = { id: "c1" };
+    h.state.agent = { id: "agent-sdr" };
+    h.state.automations = [leadAutomation({ rota: "A" }) as unknown as Record<string, unknown>];
+    h.state.steps = [handoffStep];
+
+    await runAutomationsForTrigger({
+      accountId: ACCOUNT,
+      triggerType: "lead_received",
+      contactId: "c1",
+      context: { conversation_id: "conv1", lead },
+    });
+
+    expect(h.state.taskInserts).toHaveLength(1);
+    const task = h.state.taskInserts[0];
+    expect(task).toMatchObject({
+      account_id: ACCOUNT,
+      target_role: "sdr",
+      kind: "outreach",
+      contact_id: "c1",
+      conversation_id: "conv1",
+      priority: 10,
+      dedupe_key: "handoff:a-lead:lead-1",
+    });
+    const input = task.input as Record<string, string>;
+    expect(input.respostas_do_lead).toBe("Maior desafio: Só pedem preço");
+    expect(input.instrucao).toBe("Comece validando o investimento");
+    expect(input.rota).toBe("A");
+  });
+
+  it("queues nothing without an active agent of the role", async () => {
+    h.state.owned = { id: "c1" };
+    h.state.agent = null;
+    h.state.automations = [leadAutomation({}) as unknown as Record<string, unknown>];
+    h.state.steps = [handoffStep];
+    await runAutomationsForTrigger({
+      accountId: ACCOUNT,
+      triggerType: "lead_received",
+      contactId: "c1",
+      context: { lead },
+    });
+    expect(h.state.taskInserts).toHaveLength(0);
   });
 });

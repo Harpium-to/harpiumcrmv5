@@ -646,6 +646,7 @@ things happen in your account. **Migration required:** apply
 | `message.received`       | An inbound message arrives from a contact         |
 | `message.status_updated` | A message you sent changed delivery status        |
 | `conversation.created`   | A new conversation is opened for a contact        |
+| `lead.received`          | A lead arrives at the lead URL or from Meta Lead Ads (not for a repeat of the same `id_externo`) |
 
 ### Managing endpoints
 
@@ -689,6 +690,8 @@ delivery uuid you can dedupe on, and `data` varies by `event`:
 { "conversation_id": "…", "contact_id": "…" }
 // message.status_updated
 { "whatsapp_message_id": "wamid.…", "conversation_id": "…", "status": "delivered" }
+// lead.received (contato_id is null when the lead had no phone and matched no contact)
+{ "lead_id": "…", "contato_id": "…", "origem": "quiz-planejados", "rota": "A", "etiquetas": ["rota-a"], "nome": "Ana", "telefone": "+5563999990000", "email": null, "campanha": "planejados-nov" }
 ```
 
 Headers: `X-Wacrm-Event`, `X-Wacrm-Webhook-Id`, and `X-Wacrm-Signature`.

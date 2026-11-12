@@ -16,12 +16,15 @@ import type {
   WaitStepConfig,
   CreateDealStepConfig,
   AssignConversationStepConfig,
+  AgentHandoffStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
 import { engineSendText, engineSendTemplate, engineSendInteractive } from './meta-send'
 import { validateInteractivePayload } from '@/lib/whatsapp/interactive'
 import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
 import { contactOptedOut } from '@/lib/contacts/opt-out'
+import { enqueueTask } from '@/lib/agents/tasks'
+import { handoffInput, leadMatchesTrigger, type LeadEventContext } from '@/lib/leads/trigger'
 
 // ------------------------------------------------------------
 // Public API
@@ -40,6 +43,8 @@ export interface AutomationContext {
   agent_id?: string
   /** Button / list-row id the customer tapped, for interactive_reply. */
   interactive_reply_id?: string
+  /** The lead that arrived, for lead_received (origin, route, tags…). */
+  lead?: LeadEventContext
 }
 
 export interface DispatchInput {
@@ -174,9 +179,10 @@ export async function resumePendingExecution(pending: {
     await finalizeLog(pending.log_id, 'partial', 'Parada: o cliente respondeu.')
     return
   }
-  // A sequence also stops when the contact opted out meanwhile (066).
+  // A sequence also stops when the contact opted out meanwhile (066) —
+  // and so does a lead nurture started by lead_received.
   if (
-    (automation as Automation).trigger_type === 'manual' &&
+    ['manual', 'lead_received'].includes((automation as Automation).trigger_type) &&
     pending.contact_id &&
     (await contactOptedOut(db, (automation as Automation).account_id, pending.contact_id))
   ) {
@@ -668,6 +674,51 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       return 'conversation closed'
     }
 
+    case 'agent_handoff': {
+      const cfg = step.step_config as AgentHandoffStepConfig
+      if (!args.contactId) throw new Error('Passar para agente de IA precisa de um contato')
+      const accountId = args.automation.account_id
+      // An AI agent writes to the customer on its own: the 066 opt-out
+      // stops it here, before anything is queued.
+      if (await contactOptedOut(db, accountId, args.contactId)) {
+        return 'o contato pediu para não receber mensagens automáticas; não foi passado ao agente'
+      }
+      const role = (cfg.role ?? '').trim() || 'sdr'
+      const { data: agent } = await db
+        .from('agents')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('role', role)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle()
+      if (!agent) throw new Error(`nenhum agente de IA ativo com a função "${role}"`)
+
+      const { data: contact } = await db
+        .from('contacts')
+        .select('name')
+        .eq('id', args.contactId)
+        .eq('account_id', accountId)
+        .maybeSingle()
+      const lead = args.context.lead
+      const who = (contact as { name?: string } | null)?.name ?? lead?.nome ?? 'contato'
+      const task = await enqueueTask(db, {
+        accountId,
+        targetRole: role,
+        kind: 'outreach',
+        title: lead
+          ? `Lead recebido (${lead.origem ?? lead.source}): ${who}`
+          : `Abordar ${who}`,
+        input: handoffInput(lead, cfg.instruction),
+        contactId: args.contactId,
+        conversationId: args.context.conversation_id ?? null,
+        // A fresh lead goes ahead of routine work in the agent's queue.
+        priority: lead ? 10 : 0,
+        dedupeKey: `handoff:${args.automation.id}:${lead?.lead_id ?? args.contactId}`,
+      })
+      return task ? `passado ao agente (${role})` : 'já estava na fila do agente'
+    }
+
     default:
       return `unknown step: ${step.step_type}`
   }
@@ -722,6 +773,11 @@ export function triggerMatches(automation: Automation, ctx: AutomationContext | 
       return false
     }
     return cfg.reply_ids.includes(replyId)
+  }
+
+  // A received lead: origin, route and tag filters (all must match).
+  if (automation.trigger_type === 'lead_received') {
+    return leadMatchesTrigger(automation.trigger_config, ctx?.lead)
   }
 
   return true
