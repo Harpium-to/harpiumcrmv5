@@ -22,10 +22,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LeadFieldMappings } from "@/components/leads/lead-field-mappings";
 import { LeadTokens } from "@/components/leads/lead-tokens";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -40,6 +42,20 @@ interface LeadRow {
   contact_id: string | null;
   created_at: string;
   raw: unknown;
+}
+
+/** A contact that may go with the leads being deleted (see lib/leads/delete). */
+interface TestContactPreview {
+  contact_id: string;
+  name: string | null;
+  lead_ids: string[];
+}
+
+/** The confirmation open for deleting `ids`. */
+interface PendingDelete {
+  ids: string[];
+  /** null while the server checks which contacts are tests. */
+  testContacts: TestContactPreview[] | null;
 }
 
 /** What the list shows that only the raw payload knows (tags, route). */
@@ -87,6 +103,10 @@ export default function LeadsPage() {
   const [canManage, setCanManage] = useState(false);
   const [viewing, setViewing] = useState<LeadView | null>(null);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [deleteContacts, setDeleteContacts] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const leadViews = useMemo<LeadView[] | null>(() => {
     if (!leads) return null;
@@ -139,7 +159,11 @@ export default function LeadsPage() {
       setLeads([]);
       return;
     }
-    setLeads(data as LeadRow[]);
+    const rows = data as LeadRow[];
+    setLeads(rows);
+    // A lead that is gone can't stay selected.
+    const present = new Set(rows.map((r) => r.id));
+    setSelected((prev) => new Set([...prev].filter((id) => present.has(id))));
   }, []);
 
   useEffect(() => {
@@ -226,6 +250,88 @@ export default function LeadsPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao reprocessar");
     } finally {
       setReprocessing(null);
+    }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allSelected =
+    leads !== null && leads.length > 0 && leads.every((l) => selected.has(l.id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleAll = () => {
+    setSelected(allSelected || !leads ? new Set() : new Set(leads.map((l) => l.id)));
+  };
+
+  /**
+   * Open the confirmation, then ask the server which of the leads'
+   * contacts are test contacts that could go with them.
+   */
+  const askDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setDeleteContacts(false);
+    setPendingDelete({ ids, testContacts: null });
+    try {
+      const res = await fetch("/api/leads/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, preview: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Falha ao preparar a exclusão");
+      setPendingDelete((cur) =>
+        cur && cur.ids === ids ? { ids, testContacts: json.test_contacts ?? [] } : cur,
+      );
+    } catch (err) {
+      // Without the check, the lead can still go; the contact stays.
+      setPendingDelete((cur) => (cur && cur.ids === ids ? { ids, testContacts: [] } : cur));
+      toast.error(err instanceof Error ? err.message : "Falha ao preparar a exclusão");
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const withContacts = deleteContacts && (pendingDelete.testContacts?.length ?? 0) > 0;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/leads/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: pendingDelete.ids, delete_contacts: withContacts }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Falha ao apagar");
+      const leadsDeleted: number = json.leads_deleted ?? 0;
+      const contactsDeleted: number = json.contacts_deleted ?? 0;
+      const contactsFailed: number = json.contacts_failed ?? 0;
+      const parts = [leadsDeleted === 1 ? "Lead apagado" : `${leadsDeleted} leads apagados`];
+      if (contactsDeleted > 0) {
+        parts.push(
+          contactsDeleted === 1
+            ? "1 contato de teste apagado"
+            : `${contactsDeleted} contatos de teste apagados`,
+        );
+      }
+      toast.success(parts.join(", "));
+      if (contactsFailed > 0) {
+        toast.error(
+          `Não deu para apagar ${contactsFailed === 1 ? "o contato de teste" : `${contactsFailed} contatos de teste`}. Apague em Contatos.`,
+        );
+      }
+      setPendingDelete(null);
+      if (viewing && pendingDelete.ids.includes(viewing.id)) setViewing(null);
+      void loadLeads();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao apagar");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -437,23 +543,37 @@ export default function LeadsPage() {
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Leads recebidos</h2>
-          {canManage && leads && leads.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={reprocessing !== null}
-              onClick={() => void reprocess()}
-              title="Lê de novo os dados guardados de cada lead e grava no contato o que antes ficava de fora (respostas, etiquetas, campos). Não apaga nem troca o que já está preenchido."
-            >
-              {reprocessing === "all" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Reprocessar leads
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {canManage && selected.size > 0 && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={pendingDelete !== null}
+                onClick={() => void askDelete([...selected])}
+              >
+                <Trash2 className="h-4 w-4" />
+                Apagar selecionados ({selected.size})
+              </Button>
+            )}
+            {canManage && leads && leads.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={reprocessing !== null}
+                onClick={() => void reprocess()}
+                title="Lê de novo os dados guardados de cada lead e grava no contato o que antes ficava de fora (respostas, etiquetas, campos). Não apaga nem troca o que já está preenchido."
+              >
+                {reprocessing === "all" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Reprocessar leads
+              </Button>
+            )}
+          </div>
         </div>
         {leadViews === null ? (
           <div className="flex justify-center py-10">
@@ -468,6 +588,16 @@ export default function LeadsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  {canManage && (
+                    <th className="w-10 py-3 pl-4">
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={someSelected}
+                        onCheckedChange={toggleAll}
+                        aria-label="Selecionar todos os leads da lista"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 font-medium">Origem</th>
                   <th className="px-4 py-3 font-medium">Nome</th>
                   <th className="px-4 py-3 font-medium">Telefone</th>
@@ -484,7 +614,16 @@ export default function LeadsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {leadViews.map((l) => (
-                  <tr key={l.id}>
+                  <tr key={l.id} className={selected.has(l.id) ? "bg-muted/40" : undefined}>
+                    {canManage && (
+                      <td className="w-10 py-3 pl-4">
+                        <Checkbox
+                          checked={selected.has(l.id)}
+                          onCheckedChange={() => toggleSelected(l.id)}
+                          aria-label={`Selecionar o lead ${l.full_name ?? l.phone ?? l.email ?? ""}`.trim()}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span className="whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
                         {SOURCE_LABEL[l.source] ?? l.source}
@@ -545,16 +684,32 @@ export default function LeadsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setViewing(l)}
-                        className="whitespace-nowrap text-muted-foreground"
-                      >
-                        <FileJson className="h-4 w-4" />
-                        Ver dados recebidos
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewing(l)}
+                          className="whitespace-nowrap text-muted-foreground"
+                        >
+                          <FileJson className="h-4 w-4" />
+                          Ver dados recebidos
+                        </Button>
+                        {canManage && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={pendingDelete !== null}
+                            onClick={() => void askDelete([l.id])}
+                            className="text-muted-foreground hover:text-destructive"
+                            aria-label="Apagar lead"
+                            title="Apagar lead"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -563,6 +718,73 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && !deleting && setPendingDelete(null)}
+      >
+        <DialogContent className="border-border bg-popover sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-popover-foreground">
+              {pendingDelete && pendingDelete.ids.length > 1
+                ? `Apagar ${pendingDelete.ids.length} leads?`
+                : "Apagar este lead?"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              O registro e os dados recebidos saem da lista, junto com a nota que o lead
+              deixou no contato. Não dá para desfazer. O contato continua no CRM.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingDelete?.testContacts === null ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Conferindo os contatos…
+            </p>
+          ) : pendingDelete && pendingDelete.testContacts.length > 0 ? (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border p-3">
+              <Checkbox
+                checked={deleteContacts}
+                onCheckedChange={(v) => setDeleteContacts(v === true)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                <span className="font-medium text-popover-foreground">
+                  {pendingDelete.testContacts.length === 1
+                    ? `Apagar também o contato de teste${
+                        pendingDelete.testContacts[0].name
+                          ? ` (${pendingDelete.testContacts[0].name})`
+                          : ""
+                      }`
+                    : `Apagar também os ${pendingDelete.testContacts.length} contatos de teste`}
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Só entra aqui contato que chegou ao CRM por este lead e nunca escreveu. Vão
+                  junto o card no funil, a conversa, as notas e as etiquetas dele.
+                </span>
+              </span>
+            </label>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setPendingDelete(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting || pendingDelete?.testContacts === null}
+              onClick={() => void confirmDelete()}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Apagar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
         <DialogContent className="border-border bg-popover sm:max-w-2xl">

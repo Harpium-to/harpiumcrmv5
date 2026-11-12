@@ -457,6 +457,9 @@ testes novos para as regras de acesso.
 
 Fases 3, 4 e 5 podem andar em paralelo depois da 2.
 
+O que fica para depois, de todos os planos, está em
+`docs/implementacoes-futuras.md`.
+
 ---
 
 ## 10. Decisões que precisam ser suas

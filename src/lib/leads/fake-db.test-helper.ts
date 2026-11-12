@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ---------------------------------------------------------------------
 // A small in-memory stand-in for the Supabase query builder: enough of
-// select / insert / update / upsert and the filters ingest uses.
+// select / insert / update / upsert / delete and the filters ingest uses.
 // ---------------------------------------------------------------------
 
 export type Row = Record<string, unknown>
@@ -34,7 +34,7 @@ export function fakeDb(tables: Record<string, Row[]>) {
   const from = (table: string) => {
     tables[table] ??= []
     const filters: ((r: Row) => boolean)[] = []
-    let op: 'select' | 'insert' | 'update' | 'upsert' = 'select'
+    let op: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select'
     let payload: Row[] = []
     let patch: Row = {}
     let conflict: string[] = []
@@ -52,6 +52,11 @@ export function fakeDb(tables: Record<string, Row[]>) {
       if (op === 'update') {
         const hit = matching()
         for (const r of hit) Object.assign(r, patch)
+        return { data: hit, error: null }
+      }
+      if (op === 'delete') {
+        const hit = matching()
+        tables[table] = tables[table].filter((r) => !hit.includes(r))
         return { data: hit, error: null }
       }
       if (op === 'upsert') {
@@ -76,6 +81,7 @@ export function fakeDb(tables: Record<string, Row[]>) {
       select: () => q,
       insert: (rows: Row | Row[]) => ((op = 'insert'), (payload = Array.isArray(rows) ? rows : [rows]), q),
       update: (values: Row) => ((op = 'update'), (patch = values), q),
+      delete: () => ((op = 'delete'), q),
       upsert: (rows: Row | Row[], opts?: { onConflict?: string; ignoreDuplicates?: boolean }) => {
         op = 'upsert'
         payload = Array.isArray(rows) ? rows : [rows]
