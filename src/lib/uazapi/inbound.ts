@@ -17,12 +17,13 @@ import type { UazapiInboundMessage } from './parse'
 // the engines need to react (`UazapiIngestResult`); the webhook route
 // decides whether they do.
 
-async function findOrCreateContact(
+export async function findOrCreateContact(
   admin: SupabaseClient,
   accountId: string,
   ownerUserId: string,
   phoneDigits: string,
   name: string | null,
+  lidDigits: string | null = null,
 ): Promise<{ id: string; created: boolean } | null> {
   const phone = `+${phoneDigits}`
   const existing = await findExistingContact(admin, accountId, phone)
@@ -34,6 +35,35 @@ async function findOrCreateContact(
         .eq('id', existing.id)
     }
     return { id: existing.id, created: false }
+  }
+
+  // Before the parser learned to skip LIDs, a chat addressed by LID
+  // created a contact whose "phone" was the LID. Give that contact its
+  // real number now (exact match only), so its conversation and
+  // history carry on and replies reach the person — instead of a second
+  // contact for the same person.
+  if (lidDigits && lidDigits !== phoneDigits) {
+    const { data: byLid } = await admin
+      .from('contacts')
+      .select('id, name')
+      .eq('account_id', accountId)
+      .eq('phone_normalized', lidDigits)
+      .limit(1)
+      .maybeSingle()
+    const row = byLid as { id: string; name: string | null } | null
+    if (row) {
+      const patch: Record<string, unknown> = { phone, updated_at: new Date().toISOString() }
+      // The old placeholder name was the LID itself.
+      const oldName = (row.name ?? '').replace(/\D/g, '')
+      if (name && (!row.name || oldName === lidDigits)) patch.name = name
+      const { error: fixErr } = await admin.from('contacts').update(patch).eq('id', row.id)
+      if (!fixErr) return { id: row.id, created: false }
+      console.error('[uazapi inbound] LID contact fix failed:', fixErr.message)
+      if (isUniqueViolation(fixErr)) {
+        const raced = await findExistingContact(admin, accountId, phone)
+        if (raced) return { id: raced.id, created: false }
+      }
+    }
   }
 
   const { data, error } = await admin
@@ -132,6 +162,7 @@ export async function ingestUazapiInbound(
     account.ownerUserId,
     msg.counterpartPhone,
     msg.name,
+    msg.counterpartLid,
   )
   if (!contact) return null
   const contactId = contact.id

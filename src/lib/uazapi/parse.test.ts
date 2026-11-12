@@ -26,6 +26,7 @@ describe('parseUazapiInbound', () => {
     expect(parseUazapiInbound(inbound)).toEqual([
       {
         counterpartPhone: '5511888888888',
+        counterpartLid: null,
         text: 'Olá, preciso de ajuda.',
         externalId: 'MSG1',
         name: 'Maria',
@@ -86,6 +87,58 @@ describe('parseUazapiInbound', () => {
     expect(out[0].counterpartPhone).toBe('5511888888888')
     expect(out[0].fromMe).toBe(true)
     expect(out[0].name).toBeNull()
+  })
+
+  it('a chat addressed by LID keeps the real number and reports the LID', () => {
+    // What reached production on 2026-11-11: `sender` was the LID, the
+    // CRM saved "+20066104033409" and replies failed ("failed to resolve LID").
+    const out = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        chatid: '5563992286787@s.whatsapp.net',
+        sender: '20066104033409@lid',
+        sender_pn: '5563992286787@s.whatsapp.net',
+        sender_lid: '20066104033409@lid',
+      },
+    })
+    expect(out).toHaveLength(1)
+    expect(out[0].counterpartPhone).toBe('5563992286787')
+    expect(out[0].counterpartLid).toBe('20066104033409')
+  })
+
+  it('falls back to sender_pn, and never takes a LID for a phone', () => {
+    const viaPn = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        chatid: '20066104033409@lid',
+        sender: '20066104033409@lid',
+        sender_pn: '5563992286787@s.whatsapp.net',
+      },
+    })
+    expect(viaPn[0]).toMatchObject({ counterpartPhone: '5563992286787', counterpartLid: '20066104033409' })
+
+    const onlyLid = parseUazapiInbound({
+      ...inbound,
+      message: { ...inbound.message, chatid: '20066104033409@lid', sender: '20066104033409@lid' },
+    })
+    expect(onlyLid).toEqual([])
+  })
+
+  it('fromMe in a LID chat still answers to the chat number', () => {
+    const out = parseUazapiInbound({
+      ...inbound,
+      message: {
+        ...inbound.message,
+        fromMe: true,
+        chatid: '5563992286787@s.whatsapp.net',
+        chatlid: '20066104033409@lid',
+        sender: '5511999999999@s.whatsapp.net',
+        text: 'Respondi pelo celular',
+      },
+    })
+    expect(out[0]).toMatchObject({ counterpartPhone: '5563992286787', counterpartLid: '20066104033409', fromMe: true })
   })
 
   it('drops our own API echo', () => {

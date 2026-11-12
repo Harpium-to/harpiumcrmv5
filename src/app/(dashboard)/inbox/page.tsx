@@ -16,6 +16,10 @@ import { ContactSidebar } from "@/components/inbox/contact-sidebar";
 import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  fetchWhatsAppPathInfo,
+  unofficialConnection,
+} from "@/lib/channels/whatsapp-connection";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
@@ -171,6 +175,14 @@ export default function InboxPage() {
       const user = session?.user;
 
       if (!user) return;
+
+      // On the unofficial path (QR code) the official-API row below
+      // doesn't exist: ask the path endpoint, which knows both sides.
+      const unofficial = unofficialConnection(await fetchWhatsAppPathInfo());
+      if (unofficial) {
+        setWhatsappConnected(unofficial.connected);
+        return;
+      }
 
       // whatsapp_config is one-row-per-account post-multi-user, so
       // the previous `.eq('user_id', user.id)` would miss the row
