@@ -13,7 +13,7 @@
 // instead of scrolling inside itself.
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { PublicQuiz as PublicQuizData } from "@/lib/quiz/public";
 
@@ -21,6 +21,12 @@ import { QuizPlayer } from "./quiz-player";
 import { createReporter, startPixel, type VisitReporter } from "./quiz-tracking";
 
 import "./quiz-player.css";
+
+/** True when the page was opened with `?embed=1` (inside an <iframe>). */
+function isFramed(): boolean {
+  return new URLSearchParams(window.location.search).get("embed") === "1";
+}
+const never = () => () => {};
 
 type State =
   | { status: "loading" }
@@ -30,12 +36,9 @@ type State =
 export function PublicQuiz({ slug }: { slug: string }) {
   const [state, setState] = useState<State>({ status: "loading" });
   const root = useRef<HTMLDivElement>(null);
-  const embed = useMemo(
-    () =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("embed") === "1",
-    [],
-  );
+  // The server cannot know it, so it renders "not framed" and the
+  // browser corrects it after hydration, without a mismatch.
+  const embed = useSyncExternalStore(never, isFramed, () => false);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,9 +52,7 @@ export function PublicQuiz({ slug }: { slug: string }) {
         setState({
           status: "ready",
           quiz,
-          reporter: createReporter(slug, {
-            embed: new URLSearchParams(window.location.search).get("embed") === "1",
-          }),
+          reporter: createReporter(slug, { embed: isFramed() }),
         });
       })
       .catch(() => {

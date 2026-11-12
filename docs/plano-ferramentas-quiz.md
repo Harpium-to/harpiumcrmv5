@@ -1,6 +1,44 @@
 # Plano: aba "Ferramentas" e a primeira ferramenta, Quiz e formulários
 
-Data: 12 de novembro de 2026. Status: **esperando aprovação da Fase 1 e das cinco decisões**. Nenhum código foi escrito.
+Data: 12 de novembro de 2026. Status: **as quatro fases estão escritas e testadas, na branch `feat/ferramentas-quiz`**. Falta aplicar a migration 072 em produção e fazer o merge; os dois esperam o OK do dono.
+
+## Andamento (12 de novembro de 2026)
+
+O dono aprovou as cinco recomendações e pediu as quatro fases de uma vez. Um commit por fase.
+
+- **Fase 1, feita:** botão Ferramentas, tabelas (migration 072), motor guiado por dados, modelo "Móveis planejados", página pública `/q/<endereço>`, lead pelo recebimento universal, Pixel, UTMs e registro de cada visita.
+  - O modelo decide as 3.600 combinações de respostas igual ao quiz do zip (teste automático).
+- **Fase 2, feita:** construtor com as abas Perguntas, Resultados e Aparência, prévia em formato de celular e rascunho separado do publicado.
+- **Fase 3, feita:** aba Relatório com números, funil, respostas, campanha, criativo, aparelho, pessoas e CSV.
+- **Fase 4, feita, com uma troca:**
+  - lead parcial, por quiz, 30 minutos depois da última resposta;
+  - API de Conversões da Meta, com o token cifrado;
+  - código para incorporar em site;
+  - domínio próprio pela variável `NEXT_PUBLIC_QUIZ_URL` (o passo a passo está em `docs/hospedagem.md`);
+  - modelos de quiz da agência, que aparecem no "Novo quiz" de todos os CRMs;
+  - no painel da agência, `/agencia/<crm>/quiz` mostra os números em qualquer nível de acesso e as pessoas só com "leitura" ou "total".
+
+### O que ficou diferente do plano
+
+- **Modelo de quiz dentro do modelo de CRM do nicho: não foi feito.** Aplicar um modelo de CRM é uma função do banco (migration 053), e incluir quizzes nela é uma mudança à parte. No lugar, os modelos de quiz da agência ficam disponíveis para todos os CRMs.
+- **Limpeza das visitas antigas: não foi feita.** As visitas ficam guardadas sem prazo. Dá para criar a rotina depois, quando houver volume.
+- **Tipos de pergunta:** texto curto, texto longo, número, nome, WhatsApp, e-mail, empresa, cidade e Instagram são campos. Uma tela pode ter um campo só ou vários.
+
+### O que foi conferido e o que não foi
+
+- **Conferido:**
+  - 2.371 testes automáticos passando, entre eles a migration 072 rodando num Postgres de teste com as regras de acesso, e uma visita completa virando contato e lead pelo código real de recebimento;
+  - build de produção;
+  - no navegador, com dados de exemplo: o quiz do início ao resultado, as abas do construtor, a prévia e o relatório.
+- **Não conferido:** o caminho inteiro contra o banco de produção, porque a migration 072 ainda não foi aplicada. Isso inclui criar um quiz pela tela, publicar, responder pelo link e ver o lead no CRM. É o primeiro teste a fazer depois de aplicar a migration.
+
+### Depois de colocar no ar
+
+1. Aplicar a migration 072 no Supabase.
+2. Em **Ferramentas › Quiz e formulários › Novo**, criar o quiz a partir do modelo "Móveis planejados".
+3. Preencher o que dependia de variável no quiz antigo: o ID do Pixel (Divulgação) e os links dos botões "Quero meu Raio-X" e "Quero o material" (Resultados).
+4. Publicar, responder uma vez de ponta a ponta e conferir o lead no CRM.
+5. Trocar o link nos anúncios. O quiz do Cloudflare pode ser desligado depois.
 
 ## O pedido
 
