@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  ChartColumn,
   Check,
   ChevronLeft,
   CircleAlert,
@@ -45,6 +46,7 @@ import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 
 import { AppearanceTab } from "./editor/appearance-tab";
 import { QuizPreview } from "./editor/preview";
+import { ReportTab } from "./editor/report-tab";
 import { ResultsTab } from "./editor/results-tab";
 import { ShareTab } from "./editor/share-tab";
 import { StepsTab } from "./editor/steps-tab";
@@ -67,13 +69,14 @@ type SaveState = "saved" | "dirty" | "saving" | "error";
 /** How long after the last change the draft is saved. */
 const AUTOSAVE_MS = 1200;
 
-type TabId = "steps" | "results" | "look" | "share";
+type TabId = "steps" | "results" | "look" | "share" | "report";
 
 const TABS: (PillItem & { value: TabId; adminOnly?: boolean })[] = [
   { value: "steps", label: "Perguntas", icon: ListChecks, adminOnly: true },
   { value: "results", label: "Resultados", icon: Trophy, adminOnly: true },
   { value: "look", label: "Aparência", icon: Palette, adminOnly: true },
   { value: "share", label: "Divulgação", icon: Share2 },
+  { value: "report", label: "Relatório", icon: ChartColumn },
 ];
 
 /** The tabs that edit what the visitor sees, and so sit beside the preview. */
@@ -100,7 +103,10 @@ export function QuizEditor({ id }: { id: string }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const { account } = useAuth();
 
-  const tabs = TABS.filter((t) => canEdit || !t.adminOnly);
+  // Who cannot edit lands on what they came for: the report.
+  const tabs = canEdit
+    ? TABS
+    : TABS.filter((t) => !t.adminOnly).reverse();
   const allowed = tabs.map((t) => t.value);
   const activeTab = allowed.includes(tab) ? tab : allowed[0];
 
@@ -436,6 +442,8 @@ export function QuizEditor({ id }: { id: string }) {
           </Dialog>
         </div>
       ) : null}
+
+      {activeTab === "report" ? <ReportTab quizId={quiz.id} /> : null}
 
       {activeTab === "share" ? (
         <ShareTab
