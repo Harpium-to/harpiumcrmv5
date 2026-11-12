@@ -6,7 +6,8 @@ import { MAX_LEAD_BODY_BYTES, formPairsToPayload, parseLeadBody, type BodyError 
 import { dispatchLeadReceived } from './events'
 import { ingestLead, lacksContactKey, type IngestResult } from './ingest'
 import { loadFieldMappings } from './mappings'
-import { normalizeLead, type NormalizedLead } from './parse'
+import { normalizeLead, slugify, type NormalizedLead } from './parse'
+import { resolveIngestToken } from './tokens'
 
 // ============================================================
 // The public lead-ingest webhook, shared by
@@ -85,26 +86,6 @@ async function readPayload(
   return parseLeadBody(contentType, body)
 }
 
-interface ResolvedToken {
-  accountId: string
-  googleKey: string | null
-}
-
-async function resolveToken(token: string): Promise<ResolvedToken | null | 'error'> {
-  const admin = supabaseAdmin()
-  const { data, error } = await admin
-    .from('lead_ingest')
-    .select('account_id, google_key')
-    .eq('token', token)
-    .maybeSingle()
-  if (error) {
-    console.error('[leads ingest] config lookup failed:', error.message)
-    return 'error'
-  }
-  if (!data) return null
-  return { accountId: data.account_id, googleKey: data.google_key ?? null }
-}
-
 export function successBody(result: IngestResult) {
   return {
     ok: true,
@@ -137,7 +118,8 @@ export async function handleLeadIngest(
   if (!body.ok) return fail(body.error)
   const payload = body.payload
 
-  const cfg = await resolveToken(token)
+  const admin = supabaseAdmin()
+  const cfg = await resolveIngestToken(admin, token)
   if (cfg === 'error') return fail('erro_interno')
   if (!cfg) return fail('token_invalido')
 
@@ -148,7 +130,6 @@ export async function handleLeadIngest(
     if (provided !== cfg.googleKey) return fail('chave_google_invalida')
   }
 
-  const admin = supabaseAdmin()
   const { data: acc, error: accErr } = await admin
     .from('accounts')
     .select('owner_user_id')
@@ -160,6 +141,12 @@ export async function handleLeadIngest(
   }
 
   const lead: NormalizedLead = normalizeLead(payload)
+  // A lead that doesn't say where it came from takes the name of the
+  // token it used ("Quiz planejados" → origin quiz-planejados).
+  if (cfg.tokenName && !lead.origin && lead.source === 'other') {
+    lead.origin = cfg.tokenName
+    lead.source = slugify(cfg.tokenName) || 'other'
+  }
   // Secrets are checked above and never stored with the lead.
   const raw = { ...payload }
   delete raw.google_key
@@ -172,7 +159,7 @@ export async function handleLeadIngest(
       { id: cfg.accountId, ownerUserId: acc.owner_user_id },
       lead,
       raw,
-      { mappings },
+      { mappings, tokenId: cfg.tokenId },
     )
   } catch (err) {
     console.error('[leads ingest] failed:', err)

@@ -20,6 +20,8 @@ import { leadTags, normalizeLead, type LeadRoute } from "@/lib/leads/parse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LeadFieldMappings } from "@/components/leads/lead-field-mappings";
+import { LeadTokens } from "@/components/leads/lead-tokens";
 import {
   Dialog,
   DialogContent,
@@ -396,6 +398,8 @@ export default function LeadsPage() {
           </div>
         </div>
 
+        <LeadTokens canManage={canManage} />
+
         <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           <TutorialButton
             id="google"
@@ -420,6 +424,14 @@ export default function LeadsPage() {
         {openTutorial === "zapier" && <ZapierTutorial />}
         {openTutorial === "v1" && <HarpiumV1Tutorial />}
       </section>
+
+      {leads && leads.length > 0 && (
+        <LeadFieldMappings
+          leads={leads}
+          canManage={canManage}
+          sourceLabel={(s) => SOURCE_LABEL[s] ?? s}
+        />
+      )}
 
       {/* ---- Leads list ---- */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">

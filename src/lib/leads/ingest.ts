@@ -524,6 +524,12 @@ export async function reprocessLead(
   mappings: FieldMappings = {},
 ): Promise<ReprocessResult> {
   const lead = normalizeLead(stored.raw)
+  // The raw payload can't tell what the token added (a named token's
+  // origin): an origin already stored is kept over "other".
+  if (lead.source === 'other' && stored.source && stored.source !== 'other') {
+    lead.source = stored.source
+    lead.origin = lead.origin ?? stored.source
+  }
 
   let contactId = stored.contact_id
   let contactStatus: ContactStatus | null = null

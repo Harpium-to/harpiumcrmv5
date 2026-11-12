@@ -152,3 +152,54 @@ describe('handleLeadIngest', () => {
     expect(res.headers.get('retry-after')).toBeTruthy()
   })
 })
+
+describe('handleLeadIngest — one URL per origin (068)', () => {
+  beforeEach(() => {
+    tables.lead_ingest_tokens = [
+      { id: 'nt-1', account_id: 'acc-1', name: 'Quiz planejados', token: 'tok-named', revoked_at: null, last_used_at: null },
+      { id: 'nt-2', account_id: 'acc-1', name: 'Zapier antigo', token: 'tok-revoked', revoked_at: '2026-11-01T00:00:00Z' },
+    ]
+  })
+
+  it('a named token gives its name as the origin and is recorded on the lead', async () => {
+    const res = await handleLeadIngest(post(JSON.stringify({ nome: 'Bia', telefone: '11988887777' })), 'tok-named')
+    expect(res.status).toBe(200)
+    expect(tables.leads[0]).toMatchObject({ source: 'quiz-planejados', ingest_token_id: 'nt-1' })
+    expect(tables.contacts[0].source).toBe('Quiz planejados')
+    expect(tables.lead_ingest_tokens[0].last_used_at).toBeTruthy()
+  })
+
+  it('a declared origin wins over the token name', async () => {
+    await handleLeadIngest(post(quiz), 'tok-named')
+    expect(tables.leads[0].source).toBe('quiz-planejados')
+    await handleLeadIngest(
+      post(JSON.stringify({ origem: 'Landing', nome: 'C', telefone: '11977776666' })),
+      'tok-named',
+    )
+    expect(tables.leads[1].source).toBe('landing')
+  })
+
+  it('a revoked token answers 401; the original URL keeps working', async () => {
+    const res = await handleLeadIngest(post(quiz), 'tok-revoked')
+    expect(res.status).toBe(401)
+    expect((await handleLeadIngest(post(quiz), TOKEN)).status).toBe(200)
+  })
+
+  it('applies the de/para of the origin', async () => {
+    tables.lead_field_mappings = [
+      { account_id: 'acc-1', source: 'quiz-planejados', field_key: 'site_da_empresa', target: 'contact:website' },
+      { account_id: 'acc-1', source: 'quiz-planejados', field_key: 'faturamento', target: 'ignore' },
+    ]
+    const body = JSON.stringify({
+      versao: '1',
+      origem: 'quiz-planejados',
+      contato: { nome: 'Ana', telefone: '+5563999990000' },
+      campos: { 'Site da empresa': 'ana.com', faturamento: '75a150', outro: 'x' },
+    })
+    expect((await handleLeadIngest(post(body), TOKEN)).status).toBe(200)
+    expect(tables.contacts[0].website).toBe('ana.com')
+    const note = String(tables.contact_notes[0].note_text)
+    expect(note).toContain('• outro: x')
+    expect(note).not.toContain('faturamento')
+  })
+})

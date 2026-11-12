@@ -63,7 +63,8 @@ export async function POST(request: Request) {
     let created = 0
     let withContact = 0
     for (const row of leads) {
-      const source = normalizeLead(row.raw).source
+      const parsed = normalizeLead(row.raw).source
+      const source = parsed === 'other' && row.source ? row.source : parsed
       let mappings = mappingCache.get(source)
       if (!mappings) {
         mappings = await loadFieldMappings(admin, ctx.accountId, source)
