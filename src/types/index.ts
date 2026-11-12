@@ -110,6 +110,14 @@ export interface Contact {
   name?: string;
   email?: string;
   company?: string;
+  /** Profile columns from migration 045, filled by leads and agents. */
+  city?: string | null;
+  instagram?: string | null;
+  job_title?: string | null;
+  segment?: string | null;
+  website?: string | null;
+  /** First origin that brought the contact in (a lead's origin, …). */
+  source?: string | null;
   avatar_url?: string;
   created_at: string;
   updated_at: string;

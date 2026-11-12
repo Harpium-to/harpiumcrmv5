@@ -466,7 +466,9 @@
       "toastCustomFieldsSaved": "Custom fields saved",
       "toastCustomFieldsFailed": "Failed to save custom fields",
       "toastTemplateSent": "Template \"{name}\" sent",
-      "toastTemplateFailed": "Failed to send template: {reason}"
+      "toastTemplateFailed": "Failed to send template: {reason}",
+      "city": "City",
+      "instagram": "Instagram"
     },
     "importModal": {
       "title": "Import Contacts",
@@ -532,9 +534,16 @@
       "fromLeadTitle": "Created automatically when a lead answered this question. You can rename it: new leads keep landing here."
     },
     "fieldsSummary": {
-      "title": "Fields",
+      "title": "Contact data",
       "showAll": "Show all ({count})",
-      "showLess": "Show less"
+      "showLess": "Show less",
+      "company": "Company",
+      "city": "City",
+      "instagram": "Instagram",
+      "jobTitle": "Job title",
+      "segment": "Segment",
+      "website": "Website",
+      "email": "E-mail"
     }
   },
   "Pipelines": {

@@ -233,6 +233,26 @@ describe('ingestLead — fields a lead creates', () => {
     return raw
   }
 
+  it("fills the account's own Empresa / Cidade fields, but never creates them", async () => {
+    const withFields = world({
+      custom_fields: [
+        { id: 'cf-emp', account_id: ACC.id, field_name: 'Empresa' },
+        { id: 'cf-cid', account_id: ACC.id, field_name: 'cidade' },
+      ],
+    })
+    const raw = quiz({ campos: {}, respostas: [] })
+    await ingestLead(fakeDb(withFields), ACC, normalizeLead(raw), raw)
+    const values = valuesOf(withFields, String(withFields.contacts[0].id))
+    expect(values).toMatchObject({ Empresa: 'Planejados Silva', cidade: 'Palmas' })
+    // The details stay on the contact as well.
+    expect(withFields.contacts[0]).toMatchObject({ company: 'Planejados Silva', city: 'Palmas' })
+
+    const without = world({ custom_fields: [] })
+    await ingestLead(fakeDb(without), ACC, normalizeLead(raw), raw)
+    expect(without.custom_fields.map((f) => f.field_name)).not.toContain('Empresa')
+    expect(without.custom_fields.map((f) => f.field_name)).not.toContain('Cidade')
+  })
+
   it('keeps filling a field a lead created after someone renamed it', async () => {
     const t = world({
       custom_fields: [

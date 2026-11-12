@@ -533,6 +533,20 @@ async function applyFields(
     else toCreate.push(entry)
   }
 
+  // The contact's own details (company, city, Instagram) live in its
+  // columns, shown with the fields. An account that also keeps them as
+  // custom fields ("Empresa", "Cidade") gets those filled too — never
+  // created, which would split one piece of data in two.
+  const details: [string, string | null][] = [
+    ['Empresa', lead.company],
+    ['Cidade', lead.city],
+    ['Instagram', lead.instagram],
+  ]
+  for (const [label, value] of details) {
+    const id = value ? byName.get(foldKey(label)) : undefined
+    if (id && value && !values.has(id) && mappings[foldKey(label)] !== 'ignore') values.set(id, value)
+  }
+
   // New fields, within the caps; the rest stays in the note.
   const room = Math.max(0, Math.min(MAX_NEW_FIELDS_PER_LEAD, MAX_LEAD_FIELDS_PER_ACCOUNT - leadMade))
   for (const [i, entry] of toCreate.entries()) {
