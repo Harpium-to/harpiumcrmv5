@@ -6,6 +6,7 @@ import {
   resolveImportTagIds,
 } from '@/lib/contacts/resolve-import-tags'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
+import { openLeadDeal } from './deal'
 import { buildLeadNote, noteMarker } from './note'
 import { foldKey, leadTags, normalizeLead, type NormalizedLead } from './parse'
 
@@ -24,6 +25,8 @@ import { foldKey, leadTags, normalizeLead, type NormalizedLead } from './parse'
 //   7. The raw payload is stored on the lead row.
 //   8. The same `id_externo` from the same origin within 24 h is not
 //      written twice.
+//   9. A lead with a contact gets a card in the funnel, unless the
+//      contact already has an open one (deal.ts).
 //
 // Must be called with the service-role client (the webhook has no session).
 // ============================================================
@@ -139,6 +142,9 @@ export async function ingestLead(
       receivedAt: new Date(leadRow.created_at ?? Date.now()),
       mappings: options.mappings ?? {},
     })
+    // Rule 9: the lead lands in the funnel (deal.ts). After the contact
+    // has the lead's name, so the card is titled with it.
+    await openLeadDeal(admin, account, contact.id, lead)
   }
 
   return {
@@ -580,6 +586,10 @@ export async function reprocessLead(
       receivedAt: new Date(stored.created_at),
       mappings,
     })
+    // A lead that only now found its contact lands in the funnel, as it
+    // would have on arrival (rule 9). One that already had a contact
+    // went through that then.
+    if (!stored.contact_id) await openLeadDeal(admin, account, contactId, lead)
   }
   return { leadId: stored.id, contactId, contactStatus }
 }

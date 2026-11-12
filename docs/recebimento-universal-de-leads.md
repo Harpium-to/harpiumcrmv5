@@ -62,10 +62,11 @@ Exemplo completo: ver "Formato Harpium Lead v1" na tela Leads, ou `src/lib/leads
 6. **Campos personalizados** com a mesma chave (sem acento/maiúsculas: "Ticket médio" = `ticket_medio`). O resto vai para a nota. O **de/para por origem** (tela Leads, migration 068) escolhe outro destino: nota, ignorar, coluna do contato ou outro campo.
 7. **Pacote bruto** guardado; botão "Ver dados recebidos" na lista.
 8. **Reenvio não duplica** (mesmo `id_externo` da mesma origem em 24 h).
+9. **Lead cai no funil.** Todo lead com contato vira um negócio na primeira etapa do funil mais antigo da conta, com o título "Lead <origem> · <nome>" (por exemplo "Lead Meta · Ana"). Se o contato já tem um negócio aberto, por exemplo porque já escreveu no WhatsApp, nenhum negócio novo é criado. Conta sem funil ganha o "Funil de vendas" padrão. É a mesma regra do primeiro contato no WhatsApp (`src/lib/deals/first-contact.ts`) e roda antes do evento "lead recebido", então uma automação "Criar negócio" nesse gatilho não duplica o cartão.
 
 Google e Meta: colunas extras do formulário do Google e perguntas personalizadas do Meta viram `respostas`.
 
-**Reprocessar** (tela Leads, administradores): passa os leads já guardados pelas regras de hoje. Só completa o contato (não sobrescreve), etiquetas e campos não duplicam, e a nota é escrita uma vez.
+**Reprocessar** (tela Leads, administradores): passa os leads já guardados pelas regras de hoje. Só completa o contato (não sobrescreve), etiquetas e campos não duplicam, e a nota é escrita uma vez. Um lead que só agora encontra o contato também cai no funil (regra 9).
 
 ## Evento "lead recebido"
 

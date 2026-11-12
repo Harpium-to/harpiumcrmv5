@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  DEFAULT_PIPELINE_NAME,
+  DEFAULT_PIPELINE_STAGES,
+} from "@/lib/deals/default-pipeline";
 import type { Pipeline, PipelineStage, Deal } from "@/types";
 import { PipelineBoard } from "@/components/pipelines/pipeline-board";
 import { PipelineSettings } from "@/components/pipelines/pipeline-settings";
@@ -35,15 +39,6 @@ import { useTranslations } from "next-intl";
 // the new RLS); deal creation is operational and only requires
 // agent+. The two CTAs gate on different `useCan` capabilities,
 // not on different copy.
-
-// Spec-defined seed — name and color per the product spec.
-const SPEC_DEFAULT_STAGES = [
-  { name: "Novo lead", color: "#3b82f6", position: 0 }, // blue
-  { name: "Qualificado", color: "#eab308", position: 1 }, // yellow
-  { name: "Proposta enviada", color: "#f97316", position: 2 }, // orange
-  { name: "Negociação", color: "#8b5cf6", position: 3 }, // purple
-  { name: "Ganho", color: "#22c55e", position: 4 }, // green
-];
 
 export default function PipelinesPage() {
   const t = useTranslations("Pipelines.page");
@@ -120,7 +115,7 @@ export default function PipelinesPage() {
 
     const { data: pipeline, error } = await supabase
       .from("pipelines")
-      .insert({ user_id: user.id, account_id: accountId, name: "Funil de vendas" })
+      .insert({ user_id: user.id, account_id: accountId, name: DEFAULT_PIPELINE_NAME })
       .select()
       .single();
 
@@ -129,7 +124,7 @@ export default function PipelinesPage() {
       return null;
     }
 
-    const stagesPayload = SPEC_DEFAULT_STAGES.map((s) => ({
+    const stagesPayload = DEFAULT_PIPELINE_STAGES.map((s) => ({
       pipeline_id: pipeline.id,
       name: s.name,
       color: s.color,
@@ -279,7 +274,7 @@ export default function PipelinesPage() {
       return;
     }
 
-    const stagesPayload = SPEC_DEFAULT_STAGES.map((s) => ({
+    const stagesPayload = DEFAULT_PIPELINE_STAGES.map((s) => ({
       pipeline_id: pipeline.id,
       name: s.name,
       color: s.color,

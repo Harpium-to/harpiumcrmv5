@@ -10,6 +10,7 @@ import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
+import { openFirstContactDeal } from '@/lib/deals/first-contact'
 import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
@@ -647,6 +648,20 @@ async function processMessage(
     await dispatchWebhookEvent(supabaseAdmin(), accountId, 'conversation.created', {
       conversation_id: conversation.id,
       contact_id: contactRecord.id,
+    })
+  }
+
+  // First contact → card in the funnel. Only the delivery that opened the
+  // thread gets here (unique conversation per contact), so two messages
+  // arriving together still make one deal. Before the automations below,
+  // so a "create deal" automation sees it and doesn't add a second one.
+  // A reaction isn't someone reaching out; skip it. Never throws.
+  if (convResult.created && message.type !== 'reaction') {
+    await openFirstContactDeal(supabaseAdmin(), {
+      accountId,
+      ownerUserId: configOwnerUserId,
+      contactId: contactRecord.id,
+      conversationId: conversation.id,
     })
   }
 

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
+import { openFirstContactDeal } from '@/lib/deals/first-contact'
 import type { EvolutionInboundMessage } from './parse'
 
 // Persist one inbound Evolution message: find-or-create the contact and
@@ -54,7 +55,7 @@ async function findOrCreateConversation(
   accountId: string,
   ownerUserId: string,
   contactId: string,
-): Promise<string | null> {
+): Promise<{ id: string; created: boolean } | null> {
   const { data: existing } = await admin
     .from('conversations')
     .select('id')
@@ -62,7 +63,7 @@ async function findOrCreateConversation(
     .eq('contact_id', contactId)
     .order('created_at', { ascending: true })
     .limit(1)
-  if (existing && existing.length > 0) return existing[0].id
+  if (existing && existing.length > 0) return { id: existing[0].id, created: false }
 
   const { data, error } = await admin
     .from('conversations')
@@ -78,12 +79,12 @@ async function findOrCreateConversation(
         .eq('contact_id', contactId)
         .order('created_at', { ascending: true })
         .limit(1)
-      return raced && raced.length > 0 ? raced[0].id : null
+      return raced && raced.length > 0 ? { id: raced[0].id, created: false } : null
     }
     console.error('[evolution inbound] conversation create failed:', error.message)
     return null
   }
-  return data.id
+  return { id: data.id, created: true }
 }
 
 export async function ingestEvolutionInbound(
@@ -100,13 +101,25 @@ export async function ingestEvolutionInbound(
   )
   if (!contactId) return
 
-  const conversationId = await findOrCreateConversation(
+  const conversation = await findOrCreateConversation(
     admin,
     account.id,
     account.ownerUserId,
     contactId,
   )
-  if (!conversationId) return
+  if (!conversation) return
+  const conversationId = conversation.id
+
+  // First message from this person opened the thread → card in the
+  // funnel. See lib/deals/first-contact.ts. Never throws.
+  if (conversation.created) {
+    await openFirstContactDeal(admin, {
+      accountId: account.id,
+      ownerUserId: account.ownerUserId,
+      contactId,
+      conversationId,
+    })
+  }
 
   const nowIso = new Date().toISOString()
   await admin.from('messages').insert({

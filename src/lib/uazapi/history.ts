@@ -121,8 +121,11 @@ export async function importHistoryChat(
     chat.lid,
   )
   if (!contact) return { imported: 0, contactCreated: false }
-  const conversationId = await findOrCreateConversation(admin, account.id, account.ownerUserId, contact.id)
-  if (!conversationId) return { imported: 0, contactCreated: contact.created }
+  // Old chats never open a deal in the funnel: only a live first
+  // message from the person does (ingestUazapiInbound, first-contact.ts).
+  const conversation = await findOrCreateConversation(admin, account.id, account.ownerUserId, contact.id)
+  if (!conversation) return { imported: 0, contactCreated: contact.created }
+  const conversationId = conversation.id
 
   // What is already in the CRM (from the webhook or an earlier run).
   const ids = rows.map((r) => r.message_id)

@@ -11,6 +11,9 @@ const h = vi.hoisted(() => ({
     fromCalls: [] as string[],
     updateCalls: [] as { table: string; filters: [string, string, unknown][] }[],
     upsertCalls: [] as { table: string; payload: unknown }[],
+    openDeals: [] as { id: string }[],
+    dealSelects: [] as [string, string, unknown][][],
+    dealInserts: [] as unknown[],
     logCreatedAt: "2026-11-10T10:00:00Z" as string | null,
     customerReplies: 0,
     agent: null as { id: string } | null,
@@ -59,6 +62,14 @@ vi.mock("./admin-client", () => {
     if (table === "conversations") return { data: [{ id: "conv1" }], error: null };
     if (table === "messages") return { data: null, count: state.customerReplies, error: null };
     if (table === "automation_steps") return { data: state.steps, error: null };
+    if (table === "deals") {
+      if (type === "insert") {
+        state.dealInserts.push(ops.payload);
+        return { data: null, error: null };
+      }
+      state.dealSelects.push(ops.filters);
+      return { data: state.openDeals, error: null };
+    }
     if (table === "agents") return { data: state.agent, error: null };
     if (table === "agent_tasks" && type === "insert") {
       state.taskInserts.push(ops.payload as Record<string, unknown>);
@@ -125,6 +136,9 @@ beforeEach(() => {
   h.state.fromCalls = [];
   h.state.updateCalls = [];
   h.state.upsertCalls = [];
+  h.state.openDeals = [];
+  h.state.dealSelects = [];
+  h.state.dealInserts = [];
   h.state.logCreatedAt = "2026-11-10T10:00:00Z";
   h.state.customerReplies = 0;
   h.state.agent = null;
@@ -272,6 +286,66 @@ describe("send_webhook — SSRF guard (GHSA-8jqh-598v-rfxc)", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("create_deal — one open card per contact per funnel", () => {
+  it("creates the deal when the contact has no open deal in that funnel", async () => {
+    h.state.owned = { id: "c1" };
+    h.state.automations = [automationWithUpdateStep()];
+    h.state.steps = [createDealStep()];
+
+    await runAutomationsForTrigger({
+      accountId: ACCOUNT,
+      triggerType: "new_message_received",
+      contactId: "c1",
+      context: {},
+    });
+
+    expect(h.state.dealInserts).toHaveLength(1);
+    expect(h.state.dealInserts[0]).toMatchObject({
+      account_id: ACCOUNT,
+      pipeline_id: "p1",
+      stage_id: "st1",
+      contact_id: "c1",
+      status: "open",
+    });
+  });
+
+  it("skips it when the first-contact deal (or any open one) is already in that funnel", async () => {
+    h.state.owned = { id: "c1" };
+    h.state.openDeals = [{ id: "d-existing" }];
+    h.state.automations = [automationWithUpdateStep()];
+    h.state.steps = [createDealStep()];
+
+    await runAutomationsForTrigger({
+      accountId: ACCOUNT,
+      triggerType: "new_message_received",
+      contactId: "c1",
+      context: {},
+    });
+
+    expect(h.state.dealInserts).toHaveLength(0);
+    // The lookup was scoped to this account, contact, funnel and open status.
+    expect(h.state.dealSelects[0]).toEqual(
+      expect.arrayContaining([
+        ["eq", "account_id", ACCOUNT],
+        ["eq", "contact_id", "c1"],
+        ["eq", "pipeline_id", "p1"],
+        ["eq", "status", "open"],
+      ]),
+    );
+  });
+});
+
+function createDealStep() {
+  return {
+    id: "s1",
+    automation_id: "a1",
+    step_type: "create_deal",
+    position: 0,
+    parent_step_id: null,
+    step_config: { pipeline_id: "p1", stage_id: "st1", title: "Novo lead" },
+  };
+}
 
 function webhookStep(url: string) {
   return {
