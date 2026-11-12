@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { deleteGoogleEvent, GoogleApiError, listOwnedCalendars, putGoogleEvent } from './calendar-api'
+import {
+  deleteGoogleEvent,
+  GoogleApiError,
+  listGoogleEvents,
+  listOwnedCalendars,
+  putGoogleEvent,
+} from './calendar-api'
 
 function respond(status: number, body?: unknown) {
   return new Response(body === undefined ? null : JSON.stringify(body), { status })
@@ -111,5 +117,72 @@ describe('deleteGoogleEvent', () => {
     await expect(deleteGoogleEvent('tok', 'primary', 'hc1', busy.fetchImpl)).rejects.toBeInstanceOf(
       GoogleApiError,
     )
+  })
+})
+
+describe('listGoogleEvents', () => {
+  it('asks for the window with recurring events expanded, never titles', async () => {
+    const { fetchImpl, calls } = scripted(respond(200, { timeZone: 'America/Sao_Paulo', items: [] }))
+    const page = await listGoogleEvents(
+      'tok',
+      'dr@clinica.com',
+      { timeMin: new Date('2030-01-06T00:00:00Z'), timeMax: new Date('2030-04-06T00:00:00Z') },
+      fetchImpl,
+    )
+    expect(page).toEqual({ events: [], timeZone: 'America/Sao_Paulo', complete: true })
+    const url = new URL(calls[0].url)
+    expect(url.pathname).toBe('/calendar/v3/calendars/dr%40clinica.com/events')
+    expect(url.searchParams.get('singleEvents')).toBe('true')
+    expect(url.searchParams.get('timeMin')).toBe('2030-01-06T00:00:00.000Z')
+    expect(url.searchParams.get('fields')).not.toContain('summary')
+  })
+
+  it('reads what decides busy: status, transparency, a declined invitation, the CRM’s mark', async () => {
+    const { fetchImpl } = scripted(
+      respond(200, {
+        items: [
+          {
+            id: 'a',
+            status: 'confirmed',
+            start: { dateTime: '2030-01-08T12:00:00-03:00' },
+            end: { dateTime: '2030-01-08T13:00:00-03:00' },
+            transparency: 'transparent',
+            attendees: [{ self: true, responseStatus: 'declined' }],
+            extendedProperties: { private: { harpium_event_id: 'crm-1' } },
+          },
+        ],
+      }),
+    )
+    const page = await listGoogleEvents('tok', 'primary', { timeMin: new Date(0), timeMax: new Date(1) }, fetchImpl)
+    expect(page.events[0]).toEqual({
+      id: 'a',
+      status: 'confirmed',
+      start: { dateTime: '2030-01-08T12:00:00-03:00' },
+      end: { dateTime: '2030-01-08T13:00:00-03:00' },
+      transparency: 'transparent',
+      declined: true,
+      harpiumEventId: 'crm-1',
+    })
+  })
+
+  it('follows the pages, and says when it stopped early', async () => {
+    const pages = scripted(
+      respond(200, { items: [{ id: '1', start: {}, end: {} }], nextPageToken: 'p2' }),
+      respond(200, { items: [{ id: '2', start: {}, end: {} }] }),
+    )
+    const all = await listGoogleEvents('tok', 'primary', { timeMin: new Date(0), timeMax: new Date(1) }, pages.fetchImpl)
+    expect(all.events.map((e) => e.id)).toEqual(['1', '2'])
+    expect(all.complete).toBe(true)
+    expect(new URL(pages.calls[1].url).searchParams.get('pageToken')).toBe('p2')
+
+    const capped = scripted(respond(200, { items: [], nextPageToken: 'more' }))
+    const partial = await listGoogleEvents(
+      'tok',
+      'primary',
+      { timeMin: new Date(0), timeMax: new Date(1) },
+      capped.fetchImpl,
+      1,
+    )
+    expect(partial.complete).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 # Plano: ligar a Agenda do CRM ao Google Agenda de cada cliente
 
-Data: 12 de novembro de 2026. Status: **G0 e G1 aprovadas em 12 de novembro, com as recomendações das cinco decisões**. G2 e G3 esperam aprovação.
+Data: 12 de novembro de 2026. Status: **G1 no ar; G2 e G3 implementadas (migration 071)**. As cinco decisões valem com as recomendações. Falta só pedir a verificação do Google (G0.8), que depende do vídeo: o roteiro está em `docs/analise-do-app/roteiro-verificacao-google.md`.
 
 ## Andamento (12 de novembro de 2026)
 
@@ -21,13 +21,26 @@ Data: 12 de novembro de 2026. Status: **G0 e G1 aprovadas em 12 de novembro, com
 - **G0.5 Branding:** página inicial `https://harpium.com.br`, política `https://harpium.com.br/privacidade/` e domínio autorizado `harpium.com.br`. O logo fica para a verificação.
 - **G0.2 Domínio:** harpium.com.br verificado no Search Console em 12 de novembro, na conta da agência, por um registro TXT `google-site-verification` na Cloudflare. **Não apague esse registro**: sem ele o domínio perde a verificação.
 - **Falta da G0:** pedir a verificação do app (vídeo e justificativas), depois que a G1 e a G2 estiverem no ar.
-- **G1 (código):** pronta no branch `feat/google-agenda-g1`, em PR.
+- **G1 (código):** no ar desde 12 de novembro: PR #35, com a migration 069 aplicada e conferida, e a correção do endereço de volta no PR #36. A primeira conexão real funcionou.
   - **Migration 069:** conexões, segredos só do servidor, pedidos de conexão, fila de remoções, gatilhos, `claim` e `finish`.
   - **Rotas:** `/api/google/oauth/start` e `/callback`, e `/api/agenda/google/{calendars,link,disconnect,sync}`.
   - **Envio:** `src/lib/agenda/google-sync.ts`, chamado pelo agendador, pela tela, pela IA, pelo link público e pelas aprovações.
   - **Tela:** o cartão "Google Agenda" na engrenagem e a situação no agendamento.
   - **Testes:** com respostas do Google simuladas e com o banco de verdade (PGlite).
-  - **Para ligar:** aplicar a 069 no Supabase e fazer o deploy. As variáveis `GOOGLE_*` já estão no Netlify.
+  - **Variáveis `GOOGLE_*`:** criadas no Netlify do CRM.
+- **G2 e G3 (código, migration 071):** o usuário pediu, em 12 de novembro, para terminar o plano sem aprovar fase por fase.
+  - **G2:**
+    - os compromissos do Google aparecem na Agenda como "Ocupado (Google)", sem o título (decisão 3);
+    - esses horários não são oferecidos pela IA nem pelo link público;
+    - marcar por cima deles pela tela dá aviso;
+    - um agendamento do CRM movido ou apagado no Google ganha um aviso e uma notificação no sino (decisão 4);
+    - cada agenda tem o liga/desliga "Mostrar os compromissos do Google nesta agenda", pedido pelo usuário, ligado por padrão.
+  - **G3:**
+    - "Enviar link para o profissional conectar" (7 dias, uma conexão, sem login no CRM);
+    - conexão caída avisa os admins no sino e mostra uma faixa na Agenda;
+    - um cartão "Google Agenda" no painel da agência, em `/agencia/[CRM]`.
+  - **Mudança no desenho da G2:** em vez das marcas de sincronização do Google (`syncToken`), o CRM relê uma janela fixa (de ontem a 90 dias à frente) a cada leitura. É uma chamada por agenda do Google, sem estado para perder. Cada agenda é relida no máximo a cada minuto: pelo agendador, ao abrir a tela da Agenda e logo antes de a IA ou o link público marcarem.
+  - **Não feito:** o aviso por push do Google (`events.watch`), que era opcional. O atraso de minutos do agendador não justificou a complexidade.
 
 ## O pedido
 
@@ -157,10 +170,10 @@ O endereço .ics continua existindo para quem usa Apple ou Outlook, ou não quer
 
 ### Fase G2: o Google bloqueia horários no CRM (código)
 
-- **Migration seguinte:** guarda os horários ocupados (agenda do Google, ID do evento, início e fim, sem título) e, por agenda do Google, a marca da última leitura (`syncToken`).
+- **Migration 071:** guarda os horários ocupados (agenda do Google, ID do evento, início e fim, sem título) e, por agenda do Google, quando ela foi lida pela última vez.
+- **Liga/desliga por agenda:** "Mostrar os compromissos do Google nesta agenda", ligado por padrão. Desligado, nada vem do Google.
 - **Leitura:**
-  - a cada ciclo do agendador, o CRM lê só o que mudou no Google desde a última vez;
-  - se o Google responder que a marca venceu (410), lê tudo de novo;
+  - o CRM relê do Google a janela de ontem a 90 dias à frente, no máximo a cada minuto por agenda: no ciclo do agendador, ao abrir a tela da Agenda e antes de a IA ou o link público marcarem;
   - os eventos que se repetem entram um a um.
   - **Ficam de fora:**
     - compromissos marcados como "Disponível", como os de dia inteiro, que o Google cria assim por padrão;

@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarCheck, Loader2, Unplug } from 'lucide-react';
+import { CalendarCheck, Copy, Loader2, MessageCircle, Send, Unplug } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { whatsappShareUrl } from '@/lib/agencia/connect-link';
 import type { GoogleCalendarEntry } from '@/lib/google/calendar-api';
-import type { GoogleResult } from '@/lib/agenda/store';
+import type { GoogleResult, WriteError } from '@/lib/agenda/store';
 import type { AgendaCalendar, GoogleConnection } from '@/types';
 
 import { OptionSelect } from './option-select';
@@ -21,7 +24,11 @@ export interface GoogleAgendaActions {
     googleCalendarId?: string,
   ) => Promise<GoogleResult<true>>;
   disconnect: (connectionId: string, deleteRemote: boolean) => Promise<GoogleResult<{ removed: number }>>;
-  /** Reload agendas and connections after a change. */
+  /** "Mostrar os compromissos do Google nesta agenda" (071). */
+  setShowBusy: (calendarId: string, show: boolean) => Promise<WriteError>;
+  /** A link the professional opens to connect their own Google (G3). */
+  connectLink: (calendarId: string) => Promise<GoogleResult<{ url: string }>>;
+  /** Reload agendas, connections and what shows from Google after a change. */
   onChanged: () => Promise<void>;
 }
 
@@ -43,6 +50,8 @@ export function GoogleCard({
 }) {
   const [busy, setBusy] = useState(false);
   const [choices, setChoices] = useState<GoogleCalendarEntry[] | null>(null);
+  const [showBusy, setShowBusyState] = useState(calendar.google_show_busy !== false);
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const connection = google.connections.find((c) => c.id === calendar.google_connection_id) ?? null;
   const others = google.connections.filter((c) => c.id !== connection?.id && c.status === 'connected');
 
@@ -94,6 +103,97 @@ export function GoogleCard({
     setChoices(null);
   }
 
+  async function toggleShowBusy(next: boolean) {
+    setShowBusyState(next);
+    setBusy(true);
+    const error = await google.setShowBusy(calendar.id, next);
+    setBusy(false);
+    if (error) {
+      setShowBusyState(!next);
+      toast.error('Não consegui mudar essa opção agora.');
+      return;
+    }
+    toast.success(
+      next
+        ? 'Os compromissos do Google aparecem nesta agenda e ficam ocupados para a IA e o link.'
+        : 'Os compromissos do Google não aparecem mais nesta agenda.',
+    );
+    await google.onChanged();
+  }
+
+  async function makeLink() {
+    setBusy(true);
+    const result = await google.connectLink(calendar.id);
+    setBusy(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    setLinkUrl(result.data.url);
+  }
+
+  async function copyLink() {
+    if (!linkUrl) return;
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      toast.success('Link copiado.');
+    } catch {
+      toast.error('Não consegui copiar. Selecione o link e copie à mão.');
+    }
+  }
+
+  const linkMessage = linkUrl
+    ? [
+        `Olá! Para os agendamentos de "${calendar.name}" aparecerem no seu Google Agenda, abra este link e entre com a sua conta Google:`,
+        linkUrl,
+        'Leva um minuto. O link vale por 7 dias.',
+      ].join('\n\n')
+    : '';
+
+  // For a professional who is not on the CRM (G3).
+  const linkBlock = linkUrl ? (
+    <div className="grid gap-2 rounded-lg border border-border bg-muted/40 p-2">
+      <div className="flex items-center gap-2">
+        <Input
+          readOnly
+          value={linkUrl}
+          aria-label="Link para o profissional conectar o Google"
+          onFocus={(e) => e.currentTarget.select()}
+          className="bg-muted border-border h-8 min-w-0 flex-1 text-xs text-foreground"
+        />
+        <Button type="button" variant="outline" size="sm" onClick={() => void copyLink()}>
+          <Copy className="size-3.5" />
+          Copiar
+        </Button>
+      </div>
+      <a
+        href={whatsappShareUrl(linkMessage)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={buttonVariants({ variant: 'outline', size: 'sm', className: 'w-fit' })}
+      >
+        <MessageCircle className="size-3.5" />
+        Mandar pelo WhatsApp
+      </a>
+      <p className="text-xs text-muted-foreground">
+        Quem abrir o link conecta a própria conta Google a esta agenda, sem precisar entrar no CRM.
+        Vale por 7 dias e uma conexão.
+      </p>
+    </div>
+  ) : (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="w-fit"
+      disabled={busy}
+      onClick={() => void makeLink()}
+    >
+      <Send className="size-3.5" />
+      Enviar link para o profissional conectar
+    </Button>
+  );
+
   const connectNote = (
     <p className="text-xs text-muted-foreground">
       Abre a página do Google para entrar na conta do profissional. Salve antes as outras mudanças
@@ -120,6 +220,7 @@ export function GoogleCard({
               Conectar de novo
             </a>
             {connectNote}
+            {linkBlock}
           </>
         ) : (
           <>
@@ -131,6 +232,21 @@ export function GoogleCard({
               </span>
               . Inclusive o que o agente de IA e o link público marcarem.
             </p>
+            <label className="flex cursor-pointer items-start gap-3 text-sm">
+              <Switch
+                checked={showBusy}
+                disabled={busy}
+                onCheckedChange={(next) => void toggleShowBusy(next)}
+                aria-label="Mostrar os compromissos do Google nesta agenda"
+              />
+              <span>
+                Mostrar os compromissos do Google nesta agenda
+                <span className="block text-xs text-muted-foreground">
+                  Aparecem como Ocupado (Google), sem o título, e esses horários não são oferecidos
+                  pelo agente de IA nem pelo link público.
+                </span>
+              </span>
+            </label>
             {choices && choices.length > 1 ? (
               <OptionSelect
                 ariaLabel="Agenda do Google onde gravar"
@@ -204,6 +320,7 @@ export function GoogleCard({
             </a>
           </div>
           {connectNote}
+            {linkBlock}
         </>
       )}
     </div>

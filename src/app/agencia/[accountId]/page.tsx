@@ -27,6 +27,8 @@ import { PeriodTabs } from '../ui'
 import { CrmManagePanel } from './manage'
 import { loadWhatsAppDetail } from '@/lib/agencia/whatsapp'
 import { WhatsAppCard } from './whatsapp-card'
+import { loadGoogleAgendaDetail } from '@/lib/agencia/google-agenda'
+import { GoogleAgendaCard } from './google-agenda-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +55,7 @@ export default async function AgenciaAccountPage({
     templates,
     applications,
     whatsapp,
+    googleAgenda,
   ] = await Promise.all([
       getAccountDetail(admin, accountId, { personal: gate.allowed }),
       getAccountMetrics(admin, accountId, windowDays),
@@ -64,6 +67,8 @@ export default async function AgenciaAccountPage({
       listTemplateApplications(admin, accountId),
       // The number and last message are personal; the status isn't (W2).
       loadWhatsAppDetail(admin, accountId, { personal: gate.allowed }),
+      // Which agendas write to Google; the account e-mail is personal (G3).
+      loadGoogleAgendaDetail(admin, accountId, { personal: gate.allowed }),
     ])
   if (!detail) notFound()
   const lifecycle = lifecycleRows[0]
@@ -180,6 +185,8 @@ export default async function AgenciaAccountPage({
         detail={whatsapp}
         canSendLink={lifecycle?.status !== 'archived'}
       />
+
+      <GoogleAgendaCard detail={googleAgenda} />
 
       {usageMap?.get(account.id) && lifecycle && (
         <HealthCard

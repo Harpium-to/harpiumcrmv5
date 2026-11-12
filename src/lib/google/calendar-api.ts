@@ -104,6 +104,80 @@ export async function listOwnedCalendars(
   return out.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name))
 }
 
+/** One event as listed by Google, the parts the CRM reads (G2). */
+export interface GoogleListedEvent {
+  id: string
+  status: string
+  /** dateTime for a timed event, date ("YYYY-MM-DD") for an all-day one. */
+  start: { dateTime?: string; date?: string }
+  end: { dateTime?: string; date?: string }
+  /** "transparent": marked "Disponível" in Google — does not block. */
+  transparency: string | null
+  /** The connected account declined this invitation. */
+  declined: boolean
+  /** Set on the events the CRM itself created (lib/agenda/google-event.ts). */
+  harpiumEventId: string | null
+}
+
+export interface GoogleEventsPage {
+  events: GoogleListedEvent[]
+  /** The calendar's own time zone, for all-day events. */
+  timeZone: string | null
+  /** False when the read stopped before the last page. */
+  complete: boolean
+}
+
+/**
+ * The events of a calendar that touch [timeMin, timeMax), recurring
+ * ones expanded into their occurrences. Only the fields the CRM uses
+ * are asked for — never the title, description or place.
+ */
+export async function listGoogleEvents(
+  token: string,
+  calendarId: string,
+  window: { timeMin: Date; timeMax: Date },
+  fetchImpl: FetchLike = fetch,
+  maxPages = 8,
+): Promise<GoogleEventsPage> {
+  const events: GoogleListedEvent[] = []
+  let timeZone: string | null = null
+  let pageToken: string | null = null
+  for (let page = 0; page < maxPages; page++) {
+    const query = new URLSearchParams({
+      timeMin: window.timeMin.toISOString(),
+      timeMax: window.timeMax.toISOString(),
+      singleEvents: 'true',
+      showDeleted: 'false',
+      maxResults: '250',
+      fields:
+        'timeZone,nextPageToken,items(id,status,start,end,transparency,attendees(self,responseStatus),extendedProperties/private)',
+    })
+    if (pageToken) query.set('pageToken', pageToken)
+    const json = await call(token, 'GET', `${eventPath(calendarId)}?${query}`, fetchImpl)
+    if (typeof json?.timeZone === 'string') timeZone = json.timeZone
+    const items = Array.isArray(json?.items) ? (json.items as Record<string, unknown>[]) : []
+    for (const item of items) {
+      if (typeof item.id !== 'string') continue
+      const attendees = Array.isArray(item.attendees) ? (item.attendees as Record<string, unknown>[]) : []
+      const self = attendees.find((a) => a.self === true)
+      const priv = ((item.extendedProperties as { private?: Record<string, unknown> } | undefined)?.private ??
+        {}) as Record<string, unknown>
+      events.push({
+        id: item.id,
+        status: typeof item.status === 'string' ? item.status : 'confirmed',
+        start: (item.start ?? {}) as GoogleListedEvent['start'],
+        end: (item.end ?? {}) as GoogleListedEvent['end'],
+        transparency: typeof item.transparency === 'string' ? item.transparency : null,
+        declined: self?.responseStatus === 'declined',
+        harpiumEventId: typeof priv.harpium_event_id === 'string' ? priv.harpium_event_id : null,
+      })
+    }
+    pageToken = typeof json?.nextPageToken === 'string' ? json.nextPageToken : null
+    if (!pageToken) return { events, timeZone, complete: true }
+  }
+  return { events, timeZone, complete: false }
+}
+
 /** The body of an event, as the CRM writes it (lib/agenda/google-event.ts). */
 export type GoogleEventBody = Record<string, unknown>
 

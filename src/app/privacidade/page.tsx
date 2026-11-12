@@ -125,9 +125,10 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong className="text-foreground">O que guardamos:</strong> a autorização do Google,
-              cifrada; o e-mail da conta; as agendas escolhidas; e o identificador de cada evento que o
-              CRM criou. Não guardamos título, descrição, local nem participantes dos compromissos do
-              Google.
+              cifrada; o e-mail da conta; as agendas escolhidas; o identificador de cada evento que o
+              CRM criou; e, quando a agenda mostra os compromissos do Google, só o início e o fim dos
+              compromissos ocupados dos próximos 90 dias. Não guardamos título, descrição, local nem
+              participantes dos compromissos do Google.
             </li>
             <li>
               <strong className="text-foreground">O que nunca fazemos:</strong> vender esses dados,

@@ -12,7 +12,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isMissingTable } from '@/lib/auth/account-context'
 import type { GoogleCalendarEntry } from '@/lib/google/calendar-api'
-import type { AgendaCalendar, AgendaEvent, AgendaHours, GoogleConnection } from '@/types'
+import type {
+  AgendaCalendar,
+  AgendaEvent,
+  AgendaHours,
+  GoogleBusyBlock,
+  GoogleConnection,
+} from '@/types'
 
 import type { HoursRow } from './slots'
 
@@ -94,6 +100,14 @@ export interface AgendaStore {
   linkGoogle(calendarId: string, connectionId: string | null, googleCalendarId?: string): Promise<GoogleResult<true>>
   /** Disconnect an account; deleteRemote also removes upcoming events from Google. */
   disconnectGoogle(connectionId: string, deleteRemote: boolean): Promise<GoogleResult<{ removed: number }>>
+  /** What is busy in Google, per agenda, touching [from, to) (071). Empty without it. */
+  loadGoogleBusy(from: Date, to: Date): Promise<GoogleBusyBlock[]>
+  /** Ask the server to read Google again now (throttled there). Resolves when done. */
+  refreshGoogle(): Promise<void>
+  /** "Mostrar os compromissos do Google nesta agenda" (071). */
+  setGoogleShowBusy(calendarId: string, show: boolean): Promise<WriteError>
+  /** A 7-day link a professional opens to connect their Google to this agenda (G3). */
+  createGoogleConnectLink(calendarId: string): Promise<GoogleResult<{ url: string }>>
 }
 
 /** What a Google action answered: the data, or why not (and whether to reconnect). */
@@ -140,33 +154,47 @@ const CALENDAR_COLUMNS =
 const HOURS_COLUMNS = 'id, calendar_id, weekday, starts, ends'
 const EVENT_COLUMNS =
   'id, calendar_id, kind, contact_id, title, notes, starts_at, ends_at, status, source, notify, confirmation_at, confirmation_error, reminder_at, reminder_error, created_at, contact:contacts(id, name, phone)'
-// The same, plus Google Agenda (069). Read first; a database without
-// 069 answers "no such column" and the plain list is used from then on.
-const CALENDAR_COLUMNS_GOOGLE = `${CALENDAR_COLUMNS}, google_connection_id, google_calendar_id, google_calendar_name`
-const EVENT_COLUMNS_GOOGLE = EVENT_COLUMNS.replace(
-  ', contact:contacts',
-  ', google_sync_state, google_sync_error, contact:contacts',
-)
+// The same, plus Google Agenda: 071 first, then 069, then the plain
+// list. A database without a migration answers "no such column" and
+// the next list is used from then on.
+const CALENDAR_COLUMN_SETS = [
+  `${CALENDAR_COLUMNS}, google_connection_id, google_calendar_id, google_calendar_name, google_show_busy`,
+  `${CALENDAR_COLUMNS}, google_connection_id, google_calendar_id, google_calendar_name`,
+  CALENDAR_COLUMNS,
+]
+const EVENT_COLUMN_SETS = [
+  EVENT_COLUMNS.replace(
+    ', contact:contacts',
+    ', google_sync_state, google_sync_error, google_remote_notice, contact:contacts',
+  ),
+  EVENT_COLUMNS.replace(', contact:contacts', ', google_sync_state, google_sync_error, contact:contacts'),
+  EVENT_COLUMNS,
+]
 
 export function createSupabaseAgendaStore(
   supabase: SupabaseClient,
   accountId: string,
   userId: string | null,
 ): AgendaStore {
-  // False once the database turned out not to have 069 yet.
+  // How far down the column lists this database turned out to be.
+  let calendarLevel = 0
+  let eventLevel = 0
+  // False once the database turned out not to have 069 at all.
   let withGoogle = true
 
-  /** Run an events read with the Google columns, falling back without them. */
+  /** Run an events read with the richest columns this database has. */
   async function readEvents(
     query: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string } | null }>,
   ): Promise<AgendaEvent[] | null> {
-    if (withGoogle) {
-      const { data, error } = await query(EVENT_COLUMNS_GOOGLE)
-      if (!isMissingColumn(error)) return error ? null : ((data ?? []) as AgendaEvent[])
-      withGoogle = false
+    for (;;) {
+      const { data, error } = await query(EVENT_COLUMN_SETS[eventLevel])
+      if (isMissingColumn(error) && eventLevel < EVENT_COLUMN_SETS.length - 1) {
+        eventLevel += 1
+        if (eventLevel === EVENT_COLUMN_SETS.length - 1) withGoogle = false
+        continue
+      }
+      return error ? null : ((data ?? []) as AgendaEvent[])
     }
-    const { data, error } = await query(EVENT_COLUMNS)
-    return error ? null : ((data ?? []) as AgendaEvent[])
   }
 
   return {
@@ -178,13 +206,14 @@ export function createSupabaseAgendaStore(
           .eq('account_id', accountId)
           .order('created_at', { ascending: true })
       const [firstRead, hours] = await Promise.all([
-        readCalendars(withGoogle ? CALENDAR_COLUMNS_GOOGLE : CALENDAR_COLUMNS),
+        readCalendars(CALENDAR_COLUMN_SETS[calendarLevel]),
         supabase.from('calendar_hours').select(HOURS_COLUMNS).eq('account_id', accountId),
       ])
       let calendars = firstRead
-      if (withGoogle && isMissingColumn(calendars.error)) {
-        withGoogle = false
-        calendars = await readCalendars(CALENDAR_COLUMNS)
+      while (isMissingColumn(calendars.error) && calendarLevel < CALENDAR_COLUMN_SETS.length - 1) {
+        calendarLevel += 1
+        if (calendarLevel === CALENDAR_COLUMN_SETS.length - 1) withGoogle = false
+        calendars = await readCalendars(CALENDAR_COLUMN_SETS[calendarLevel])
       }
       const error = calendars.error ?? hours.error
       if (error) {
@@ -347,6 +376,47 @@ export function createSupabaseAgendaStore(
         body: JSON.stringify({ connectionId, deleteRemote }),
       })
       return result.ok ? { ok: true, data: { removed: result.data.removed ?? 0 } } : result
+    },
+
+    async loadGoogleBusy(from, to) {
+      if (!withGoogle) return []
+      const { data, error } = await supabase
+        .from('calendar_google_busy')
+        .select('calendar_id, starts_at, ends_at, all_day')
+        .eq('account_id', accountId)
+        .lt('starts_at', to.toISOString())
+        .gt('ends_at', from.toISOString())
+        .order('starts_at', { ascending: true })
+      return error ? [] : ((data ?? []) as GoogleBusyBlock[])
+    },
+
+    async refreshGoogle() {
+      if (!withGoogle) return
+      try {
+        await fetch('/api/agenda/google/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        })
+      } catch {
+        // The scheduler reads Google too; the screen just waits for it.
+      }
+    },
+
+    async setGoogleShowBusy(calendarId, show) {
+      const { error } = await supabase
+        .from('calendars')
+        .update({ google_show_busy: show })
+        .eq('id', calendarId)
+      return error
+    },
+
+    async createGoogleConnectLink(calendarId) {
+      const result = await callGoogleApi<{ url?: string }>('/api/agenda/google/connect-link', {
+        method: 'POST',
+        body: JSON.stringify({ calendarId }),
+      })
+      return result.ok ? { ok: true, data: { url: result.data.url ?? '' } } : result
     },
   }
 }

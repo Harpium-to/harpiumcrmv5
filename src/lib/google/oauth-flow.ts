@@ -23,6 +23,7 @@ export type GoogleConnectResult =
   | 'config'
   | 'indisponivel'
   | 'sem-permissao'
+  | 'link-invalido'
   | 'erro'
 
 export function agendaReturnUrl(
@@ -59,10 +60,54 @@ export function googleResultMessage(result: string | null): { ok: boolean; text:
       }
     case 'sem-permissao':
       return { ok: false, text: 'Só administradores do CRM conectam o Google Agenda.' }
+    case 'link-invalido':
+      return { ok: false, text: 'Esse link de conexão já foi usado ou expirou. Gere um novo na engrenagem da Agenda.' }
     case 'erro':
       return { ok: false, text: 'Não consegui conectar ao Google agora. Tente de novo em instantes.' }
     default:
       return null
+  }
+}
+
+/**
+ * Where a sign-in started from a professional's link (G3) lands: nobody
+ * is signed in to the CRM there, so not the Agenda.
+ */
+export function professionalReturnUrl(origin: string, result: GoogleConnectResult): string {
+  const url = new URL('/conectar-google/pronto', origin)
+  url.searchParams.set('google', result)
+  return url.toString()
+}
+
+/** What the professional reads on /conectar-google/pronto. */
+export function professionalResultMessage(result: string | null): { ok: boolean; title: string; text: string } {
+  switch (result) {
+    case 'conectado':
+      return {
+        ok: true,
+        title: 'Google Agenda conectado',
+        text: 'Pronto: os agendamentos marcados para você no CRM vão aparecer no seu Google Agenda. Pode fechar esta página.',
+      }
+    case 'negado':
+      return { ok: false, title: 'Conexão cancelada', text: 'Nada foi conectado. Se quiser, abra o link de novo.' }
+    case 'permissao':
+      return {
+        ok: false,
+        title: 'Faltou uma permissão',
+        text: 'Para funcionar, o CRM precisa ver e editar os eventos da sua agenda. Abra o link de novo e deixe essa opção marcada.',
+      }
+    case 'link-invalido':
+      return {
+        ok: false,
+        title: 'Link expirado',
+        text: 'Este link já foi usado ou passou de 7 dias. Peça um link novo para quem te enviou.',
+      }
+    case 'expirado':
+      return { ok: false, title: 'O tempo acabou', text: 'A conexão demorou demais. Abra o link de novo.' }
+    case 'config':
+      return { ok: false, title: 'Indisponível', text: 'A conexão com o Google ainda não está ativada. Avise quem te enviou o link.' }
+    default:
+      return { ok: false, title: 'Não deu certo', text: 'Não consegui conectar agora. Tente abrir o link de novo em instantes.' }
   }
 }
 

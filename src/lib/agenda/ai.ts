@@ -31,6 +31,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { isMissingTable } from '@/lib/auth/account-context'
 
 import { busyOf, freeSlots, type HoursRow, type Slot } from './slots'
+import { googleBusyByCalendar } from './google-busy'
 import {
   dayKeyOf,
   formatDayShort,
@@ -160,6 +161,8 @@ export async function loadAgendaForAi(
   const hours = (hoursResult.data ?? []) as (HoursRow & { calendar_id: string })[]
   const events = (eventsResult.data ?? []) as EventRow[]
   const byId = new Map(rows.map((r) => [r.id, r]))
+  // What is busy in the professionals' Google Agenda (071), if shown.
+  const google = await googleBusyByCalendar(db, rows.map((r) => r.id), now, until)
 
   return {
     now,
@@ -175,7 +178,10 @@ export async function loadAgendaForAi(
             hours: hours.filter((h) => h.calendar_id === row.id),
             slotMinutes: row.slot_minutes,
             timezone,
-            busy: busyOf(events.filter((e) => e.calendar_id === row.id)),
+            busy: [
+              ...busyOf(events.filter((e) => e.calendar_id === row.id)),
+              ...(google.get(row.id) ?? []),
+            ],
             fromDay: dayKeyOf(now, timezone),
             days: AI_AGENDA_DAYS,
             now,

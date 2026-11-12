@@ -7,11 +7,14 @@
 //
 // It decides nothing: whether an event has to go, and where, is the
 // database's (069). With an eventId, only that event; without, the
-// removals of deleted events and a small batch of whatever waits.
+// removals of deleted events, a small batch of whatever waits, and a
+// fresh read of what this CRM's agendas show from Google (071) — what
+// the screen asks for when it opens.
 // ============================================================
 
 import { NextResponse } from 'next/server'
 
+import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
@@ -39,12 +42,16 @@ export async function POST(request: Request) {
       if (!data) return NextResponse.json({ error: 'Agendamento não encontrado' }, { status: 404 })
     }
 
-    const result = await processGoogleCalendarSync(supabaseAdmin(), {
+    const admin = supabaseAdmin()
+    const result = await processGoogleCalendarSync(admin, {
       eventId,
       limit: eventId ? 1 : 10,
       crmUrl: origin,
     })
-    return NextResponse.json({ result })
+    // Without an event (the Agenda screen opening, or a delete): also
+    // bring this CRM's Google busy times up to date (071).
+    const busy = eventId ? null : await refreshGoogleBusy(admin, { accountId: ctx.accountId })
+    return NextResponse.json({ result, busy })
   } catch (err) {
     return toErrorResponse(err)
   }

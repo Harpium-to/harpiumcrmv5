@@ -14,6 +14,7 @@
 
 import { after, NextResponse, type NextRequest } from 'next/server'
 
+import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { listOwnedCalendars } from '@/lib/google/calendar-api'
@@ -29,6 +30,7 @@ import {
 import {
   agendaReturnUrl,
   GOOGLE_STATE_COOKIE,
+  professionalReturnUrl,
   type GoogleConnectResult,
 } from '@/lib/google/oauth-flow'
 import { crmOrigin } from '@/lib/google/origin'
@@ -36,8 +38,13 @@ import { crmOrigin } from '@/lib/google/origin'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const origin = crmOrigin(request)
+  // Started from a professional's link (G3): nobody is signed in to the
+  // CRM in this browser, so the answer goes to a page of its own.
+  let viaLink = false
   const back = (result: GoogleConnectResult, calendarId?: string | null) => {
-    const res = NextResponse.redirect(agendaReturnUrl(origin, result, calendarId))
+    const res = NextResponse.redirect(
+      viaLink ? professionalReturnUrl(origin, result) : agendaReturnUrl(origin, result, calendarId),
+    )
     res.cookies.delete(GOOGLE_STATE_COOKIE)
     return res
   }
@@ -55,11 +62,18 @@ export async function GET(request: NextRequest) {
     .eq('state', state)
     .is('used_at', null)
     .gt('expires_at', now)
-    .select('account_id, calendar_id, user_id')
+    // `*`: link_id only exists from 071 on.
+    .select('*')
     .maybeSingle()
   if (pendingError) console.error('[google oauth] request lookup failed:', pendingError)
-  const req = pending as { account_id: string; calendar_id: string | null; user_id: string | null } | null
+  const req = pending as {
+    account_id: string
+    calendar_id: string | null
+    user_id: string | null
+    link_id?: string | null
+  } | null
   if (!req) return back('expirado')
+  viaLink = !!req.link_id
 
   // The person closed the window or said no.
   if (searchParams.get('error')) return back('negado', req.calendar_id)
@@ -138,6 +152,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  after(() => processGoogleCalendarSync(admin, { crmUrl: origin }))
+  // The professional's link did its job: it stops working (G3).
+  if (req.link_id) {
+    await admin.from('google_connect_links').update({ used_at: now }).eq('id', req.link_id)
+  }
+
+  after(async () => {
+    await processGoogleCalendarSync(admin, { crmUrl: origin })
+    // And what is already in Google shows in the CRM right away (071).
+    await refreshGoogleBusy(admin, { accountId: req.account_id, maxAgeMs: 0 })
+  })
   return back('conectado', req.calendar_id)
 }

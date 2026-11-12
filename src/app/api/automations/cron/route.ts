@@ -5,6 +5,7 @@ import type { AutomationContext } from '@/lib/automations/engine'
 import { emitTaskReminders } from '@/lib/tasks/reminders'
 import { processScheduledMessages } from '@/lib/scheduled/messages'
 import { processCalendarNotifications } from '@/lib/agenda/messages'
+import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { resolvePublicOrigin } from '@/lib/http/base-url'
 
@@ -23,10 +24,11 @@ import { resolvePublicOrigin } from '@/lib/http/base-url'
  * (migration 060, src/lib/tasks/reminders.ts) and the messages
  * scheduled for contacts (migration 064, src/lib/scheduled/messages.ts),
  * and the agenda's confirmations and reminders (migration 067,
- * src/lib/agenda/messages.ts), and sends the agenda to Google Agenda
- * (migration 069, src/lib/agenda/google-sync.ts), so they need no
- * scheduler job of their own. They run first and never throw: nothing
- * about them can hold the automations back.
+ * src/lib/agenda/messages.ts), and keeps the agenda and Google Agenda
+ * in step both ways (migrations 069 and 071, src/lib/agenda/google-sync.ts
+ * and google-busy.ts), so they need no scheduler job of their own.
+ * They run first and never throw: nothing about them can hold the
+ * automations back.
  */
 export async function GET(request: Request) {
   const expected = process.env.AUTOMATION_CRON_SECRET
@@ -45,6 +47,8 @@ export async function GET(request: Request) {
   const google_agenda = await processGoogleCalendarSync(admin, {
     crmUrl: resolvePublicOrigin(request, 'automations cron'),
   })
+  // And what is in Google back into the CRM (071).
+  const google_busy = await refreshGoogleBusy(admin)
 
   const { data: due, error } = await admin
     .from('automation_pending_executions')
@@ -56,7 +60,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0) {
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy })
   }
 
   let processed = 0
@@ -87,5 +91,5 @@ export async function GET(request: Request) {
     processed++
   }
 
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy })
 }

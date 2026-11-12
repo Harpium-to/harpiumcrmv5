@@ -30,6 +30,7 @@ import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { decide, toAutonomy, type ApprovalReason } from '@/lib/agents/autonomy'
 import { requestApproval } from '@/lib/agents/approvals'
+import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import {
   agendaPrompt,
@@ -414,6 +415,9 @@ export async function dispatchInboundToAiReply(
         )
         if (verdict.allowed) {
           try {
+            // What the professionals have in Google Agenda (071), read
+            // again if more than a minute old, so it is never offered.
+            await refreshGoogleBusy(db, { accountId, maxAgeMs: 60_000 })
             const agenda = await loadAgendaForAi(db, accountId, contactId, new Date())
             if (agenda) {
               scheduling = {

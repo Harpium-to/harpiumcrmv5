@@ -156,6 +156,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Para o agente de IA marcar sozinho, abra o agente em Agentes e dê a ele a ferramenta Agenda. Ele passa a ver os horários livres dos próximos 10 dias e só oferece o que está livre.",
       "Para o cliente marcar sozinho, edite a agenda na engrenagem, ligue o Link público de agendamento e envie o link. Ele escolhe um horário livre e informa nome e WhatsApp.",
       "Para os agendamentos irem direto para o Google Agenda do profissional, um administrador edita a agenda na engrenagem e clica em Conectar com o Google. O profissional entra com a conta dele e pronto: o que for marcado, remarcado ou cancelado aparece lá na hora.",
+      "Se o profissional não usa o CRM, clique em Enviar link para o profissional conectar no mesmo cartão e mande o link pelo WhatsApp. Ele abre, entra com a conta Google dele e a agenda fica ligada.",
+      "Com o Google conectado, os compromissos que o profissional já tem no Google Agenda aparecem na Agenda como Ocupado (Google). Para não mostrar, desligue Mostrar os compromissos do Google nesta agenda.",
       "Para ver a agenda no celular sem conectar uma conta, ligue Ver no Google Agenda, Apple ou Outlook na mesma tela e cole o endereço no aplicativo de agenda.",
     ],
     tips: [
@@ -169,6 +171,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       "O endereço para Google, Apple e Outlook é só de leitura e o aplicativo atualiza a cada algumas horas. Ele mostra os nomes dos clientes, então passe só para quem pode ver a agenda.",
       "Com o Google Agenda conectado, o evento no Google leva o nome e o WhatsApp do cliente, e o cliente não recebe convite do Google. Mude sempre pelo CRM: o que for alterado direto no Google não volta para o CRM.",
       "Se aparecer Precisa conectar de novo (a senha do Google mudou ou o acesso foi removido), edite a agenda e clique em Conectar de novo. Nada se perde: o que ficou para trás vai para o Google em seguida.",
+      "Os horários Ocupado (Google) não são oferecidos pelo agente de IA nem pelo link público. Pela tela dá para marcar por cima, com um aviso, como encaixe. Só aparece Ocupado: o título do compromisso fica no Google.",
+      "Se alguém mover ou apagar direto no Google um agendamento que o CRM criou, o agendamento ganha um aviso e o sino avisa a equipe. O CRM não muda nada sozinho: remarque ou cancele aqui, e o Google acompanha.",
       "Dá para marcar fora do horário de atendimento, como encaixe. A tela avisa antes de salvar.",
       "Cancelar libera o horário e guarda o registro; ligue Mostrar cancelados para vê-los.",
       "Quem tem acesso de leitura vê a agenda, mas não marca nem altera.",
