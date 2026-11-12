@@ -28,6 +28,7 @@ import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { decide, toAutonomy, type ApprovalReason } from '@/lib/agents/autonomy'
 import { requestApproval } from '@/lib/agents/approvals'
+import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import {
   agendaPrompt,
   bookForAi,
@@ -468,6 +469,11 @@ export async function dispatchInboundToAiReply(
           needsApproval: scheduling.needsApproval,
           agentName: agent.name,
         })
+        if (outcome.status === 'booked' || outcome.status === 'pending') {
+          // Into the professional's Google Agenda, if this agenda writes
+          // there (069). Never throws; the scheduler retries if it fails.
+          await processGoogleCalendarSync(db, { eventId: outcome.eventId })
+        }
         if (outcome.status === 'booked') return reply
         if (outcome.status !== 'pending') return BOOKING_FALLBACK[outcome.status]
 

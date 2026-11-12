@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 const CONTACT_EMAIL = "harpiumdigital@gmail.com";
-const UPDATED_AT = "4 de novembro de 2026";
+const UPDATED_AT = "12 de novembro de 2026";
 
 function Section({
   id,
@@ -72,8 +72,16 @@ export default function PrivacyPage() {
               conecta o Facebook Lead Ads, os dados preenchidos nos formulários dos anúncios.
             </li>
             <li>
+              <strong className="text-foreground">Google Agenda:</strong> quando um profissional
+              conecta a conta Google, os dados descritos em{" "}
+              <a href="#google" className="text-foreground underline underline-offset-2">
+                Dados do Google Agenda
+              </a>
+              .
+            </li>
+            <li>
               <strong className="text-foreground">Credenciais de integração:</strong> tokens de
-              acesso da Meta e chaves de IA, guardados cifrados.
+              acesso da Meta e do Google e chaves de IA, guardados cifrados.
             </li>
           </ul>
         </Section>
@@ -90,6 +98,10 @@ export default function PrivacyPage() {
           <p>Apenas com os serviços necessários para o CRM funcionar:</p>
           <ul className="list-disc space-y-2 pl-5">
             <li>Meta (WhatsApp e Facebook), para enviar e receber mensagens e leads;</li>
+            <li>
+              Google, quando o profissional conecta o Google Agenda, para colocar os agendamentos na
+              agenda dele;
+            </li>
             <li>Supabase, que hospeda o banco de dados;</li>
             <li>Netlify, que hospeda o aplicativo;</li>
             <li>
@@ -97,6 +109,64 @@ export default function PrivacyPage() {
               chave da própria empresa.
             </li>
           </ul>
+        </Section>
+
+        <Section id="google" title="Dados do Google Agenda">
+          <p>
+            Um profissional pode ligar uma agenda do CRM à conta Google dele. Isso só acontece quando
+            ele mesmo autoriza, na tela de permissão do Google.
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong className="text-foreground">O que acessamos:</strong> o e-mail da conta, para
+              mostrar qual está conectada; a lista de agendas da conta, para escolher onde os
+              agendamentos entram; e os eventos das agendas que a pessoa possui, para criar, mudar e
+              apagar os agendamentos que o CRM marcou.
+            </li>
+            <li>
+              <strong className="text-foreground">O que guardamos:</strong> a autorização do Google,
+              cifrada; o e-mail da conta; as agendas escolhidas; e o identificador de cada evento que o
+              CRM criou. Não guardamos título, descrição, local nem participantes dos compromissos do
+              Google.
+            </li>
+            <li>
+              <strong className="text-foreground">O que nunca fazemos:</strong> vender esses dados,
+              usá-los para publicidade ou para treinar modelos de inteligência artificial, ou
+              repassá-los a terceiros.
+            </li>
+            <li>
+              <strong className="text-foreground">Como desconectar:</strong> em Agenda › engrenagem ›
+              Desconectar, o que apaga do CRM a autorização. Também dá para remover o acesso em{" "}
+              <a
+                href="https://myaccount.google.com/connections"
+                className="text-foreground underline underline-offset-2"
+              >
+                myaccount.google.com/connections
+              </a>
+              .
+            </li>
+          </ul>
+          <p>
+            O uso e a transferência, pelo Harpium CRM, de informações recebidas das APIs do Google para
+            qualquer outro app seguem a{" "}
+            <a
+              href="https://developers.google.com/terms/api-services-user-data-policy"
+              className="text-foreground underline underline-offset-2"
+            >
+              Política de Dados do Usuário dos Serviços de API do Google
+            </a>
+            , incluindo os requisitos de Uso Limitado.
+          </p>
+          <p>
+            A versão oficial desta política, publicada para o Google, fica em{" "}
+            <a
+              href="https://harpium.com.br/privacidade/"
+              className="text-foreground underline underline-offset-2"
+            >
+              harpium.com.br/privacidade
+            </a>
+            .
+          </p>
         </Section>
 
         <Section title="Por quanto tempo guardamos">

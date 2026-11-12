@@ -130,6 +130,19 @@ Em **Site configuration › Environment variables**:
 | `META_INSTAGRAM_VERIFY_TOKEN` | invente uma frase secreta | só para Instagram (etapa final) |
 | `UAZAPI_BASE_URL` | painel da UAZAPI › endereço do servidor da Harpium, sem `/` no final | só para o WhatsApp não oficial (QR code) |
 | `UAZAPI_ADMIN_TOKEN` | painel da UAZAPI › token de administrador do servidor (secreto) | só para o WhatsApp não oficial (QR code) |
+| `GOOGLE_CLIENT_ID` | Google Cloud › projeto `harpium-crm` › Google Auth Platform › Clientes › "Harpium CRM (web)" | só para o Google Agenda |
+| `GOOGLE_CLIENT_SECRET` | o mesmo cliente › chave secreta (só aparece ao criar; dá para gerar outra) | só para o Google Agenda |
+| `GOOGLE_OAUTH_REDIRECT_URI` | `https://harpium.com.br/google/retorno` | só para o Google Agenda |
+
+**Sobre o Google Agenda:** com as três variáveis `GOOGLE_*`, cada
+agenda ganha, na engrenagem, o botão **Conectar com o Google** (migration
+069). O Google só aceita voltar para um domínio verificado, então ele
+volta para `https://harpium.com.br/google/retorno`, que repassa para
+`/api/google/oauth/callback` deste CRM (regra no `_redirects` do site
+harpium.com.br). Num servidor de teste, deixe `GOOGLE_OAUTH_REDIRECT_URI`
+vazia: o retorno vira `<endereço do CRM>/api/google/oauth/callback`, que
+também precisa estar cadastrado no cliente OAuth do Google. Ver
+`docs/plano-google-agenda.md`.
 
 **Sobre a UAZAPI:** com essas duas variáveis, um cliente que escolhe o
 WhatsApp não oficial em Configurações › WhatsApp só lê o QR code: o CRM
@@ -181,6 +194,11 @@ sair até 10 minutos depois.
 lembrete antes do horário e, como garantia, a confirmação de quem
 marcou. A confirmação sai na hora pela própria tela; o lembrete só sai
 pelo agendador, então com ele parado ninguém é lembrado.
+
+Também é ele a garantia do **Google Agenda** (migration 069): cada
+mudança vai para o Google na hora, e o que falhar (Google fora do ar,
+por exemplo) é reenviado pelo agendador, até 5 vezes, com intervalos
+crescentes.
 
 A agenda tem dois endereços que funcionam **sem login**, cada um atrás
 de um código secreto e desligado até um administrador ligar na agenda:

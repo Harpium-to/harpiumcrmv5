@@ -50,6 +50,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { AgendaCalendar } from '@/types';
 
+import { GoogleAccounts, GoogleCard, type GoogleAgendaActions } from './google-card';
 import { OptionSelect } from './option-select';
 
 interface CalendarsDialogProps {
@@ -63,6 +64,10 @@ interface CalendarsDialogProps {
   onSave: (values: CalendarWrite, hours: HoursRow[], id?: string) => Promise<WriteError>;
   onSetActive: (id: string, active: boolean) => Promise<WriteError>;
   onDelete: (id: string) => Promise<WriteError>;
+  /** Google Agenda (069); null when this server does not have it. */
+  google: GoogleAgendaActions | null;
+  /** Open straight on this agenda's form (coming back from Google). */
+  initialEditing?: string | null;
 }
 
 /** Admins create agendas and set their opening hours here. */
@@ -83,9 +88,17 @@ function Calendars({
   onSave,
   onSetActive,
   onDelete,
+  google,
+  initialEditing,
 }: Omit<CalendarsDialogProps, 'open' | 'onClose'>) {
   // null: the list. 'new' or an id: the form.
-  const [editing, setEditing] = useState<string | null>(calendars.length === 0 ? 'new' : null);
+  const [editing, setEditing] = useState<string | null>(() =>
+    initialEditing && calendars.some((c) => c.id === initialEditing)
+      ? initialEditing
+      : calendars.length === 0
+        ? 'new'
+        : null,
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
 
   if (editing) {
@@ -99,6 +112,7 @@ function Calendars({
         canGoBack={calendars.length > 0}
         onBack={() => setEditing(null)}
         onSave={onSave}
+        google={google}
       />
     );
   }
@@ -198,6 +212,8 @@ function Calendars({
         <Plus className="size-3.5" />
         Nova agenda
       </Button>
+
+      {google ? <GoogleAccounts google={google} /> : null}
     </div>
   );
 }
@@ -209,6 +225,7 @@ function CalendarForm({
   canGoBack,
   onBack,
   onSave,
+  google,
 }: {
   calendar: AgendaCalendar | undefined;
   hours: HoursRow[];
@@ -216,6 +233,7 @@ function CalendarForm({
   canGoBack: boolean;
   onBack: () => void;
   onSave: CalendarsDialogProps['onSave'];
+  google: GoogleAgendaActions | null;
 }) {
   const [name, setName] = useState(calendar?.name ?? '');
   const [color, setColor] = useState(calendar?.color ?? CALENDAR_COLORS[0]);
@@ -624,6 +642,13 @@ function CalendarForm({
           </p>
         )}
       </div>
+
+      {calendar && google ? (
+        <div className="grid gap-1.5">
+          <Label className="text-muted-foreground">Ligar ao Google Agenda</Label>
+          <GoogleCard calendar={calendar} google={google} />
+        </div>
+      ) : null}
 
       <DialogFooter className="gap-2 sm:justify-between">
         {canGoBack ? (

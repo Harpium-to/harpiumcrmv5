@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CalendarPlus, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { CalendarCheck, CalendarPlus, ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -425,9 +425,12 @@ function EventForm({
         />
       </div>
 
-      {editing && !block && !cancelled && calendar ? (
+      {editing ? <GoogleSyncLine event={editing} /> : null}
+
+      {editing && !block && !cancelled && calendar && !calendar.google_connection_id ? (
         // Google's own "new event" page, filled in: the person's
         // calendar, no access to their account (same as tasks, Fase 9).
+        // Not offered when the agenda already writes to Google (069).
         <GoogleLink
           title={[contact?.name?.trim() || contact?.phone, title.trim()].filter(Boolean).join(' — ') || calendar.name}
           start={editing.starts_at}
@@ -506,6 +509,29 @@ function GoogleLink(props: { title: string; start: string; minutes: number; deta
       <CalendarPlus className="size-3" />
       Adicionar ao meu Google Agenda
     </a>
+  );
+}
+
+/** Where this event stands in Google Agenda, when its agenda writes there (069). */
+function GoogleSyncLine({ event }: { event: AgendaEvent }) {
+  const state = event.google_sync_state;
+  if (!state) return null;
+  const line =
+    state === 'synced'
+      ? { text: 'Está no Google Agenda do profissional.', failed: false }
+      : state === 'error'
+        ? {
+            text: `Não foi para o Google Agenda: ${event.google_sync_error ?? 'erro desconhecido.'}`,
+            failed: true,
+          }
+        : { text: 'Enviando para o Google Agenda…', failed: false };
+  return (
+    <p
+      className={`inline-flex items-start gap-1.5 text-xs ${line.failed ? 'text-destructive' : 'text-muted-foreground'}`}
+    >
+      <CalendarCheck className="mt-0.5 size-3 shrink-0" />
+      {line.text}
+    </p>
   );
 }
 

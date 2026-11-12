@@ -39,11 +39,13 @@ import {
   weekdayOf,
   zonedToUtc,
 } from '@/lib/agenda/time';
-import type { AgendaCalendar, AgendaEvent } from '@/types';
+import { googleResultMessage } from '@/lib/google/oauth-flow';
+import type { AgendaCalendar, AgendaEvent, GoogleConnection } from '@/types';
 
 import { CalendarsDialog } from './calendars-dialog';
 import { EventDialog, type EventSeed } from './event-dialog';
 import { FreeSlotsDialog } from './free-slots-dialog';
+import type { GoogleAgendaActions } from './google-card';
 import { OptionSelect } from './option-select';
 import { eventLabel, TimeGrid, type GridColumn } from './time-grid';
 
@@ -121,6 +123,10 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
   const [slotsOpen, setSlotsOpen] = useState(false);
   const [calendarsOpen, setCalendarsOpen] = useState(false);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  // Google Agenda (069): null until read, or when this server lacks it.
+  const [googleConnections, setGoogleConnections] = useState<GoogleConnection[] | null>(null);
+  // The agenda to open the form on, coming back from Google's sign-in.
+  const [editingFromGoogle, setEditingFromGoogle] = useState<string | null>(null);
 
   // Only the agenda form needs the templates, so they are read when it opens.
   useEffect(() => {
@@ -165,6 +171,52 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
       cancelled = true;
     };
   }, [store]);
+
+  // Only admins manage the Google link, so only they read the accounts.
+  const reloadGoogle = useCallback(async () => {
+    if (!canManage) return;
+    setGoogleConnections(await store.loadGoogleConnections());
+  }, [canManage, store]);
+
+  useEffect(() => {
+    void reloadGoogle();
+  }, [reloadGoogle]);
+
+  // Back from "Conectar com o Google": say how it went, reopen the
+  // agenda's form, and clean the address so a reload does not repeat it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = googleResultMessage(params.get('google'));
+    if (!message) return;
+    if (message.ok) toast.success(message.text);
+    else toast.error(message.text);
+    const agenda = params.get('agenda');
+    if (agenda && canManage) {
+      setEditingFromGoogle(agenda);
+      setCalendarsOpen(true);
+    }
+    params.delete('google');
+    params.delete('agenda');
+    const rest = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+  }, [canManage]);
+
+  const googleActions = useMemo<GoogleAgendaActions | null>(
+    () =>
+      googleConnections === null
+        ? null
+        : {
+            connections: googleConnections,
+            list: (connectionId) => store.listGoogleCalendars(connectionId),
+            link: (calendarId, connectionId, googleCalendarId) =>
+              store.linkGoogle(calendarId, connectionId, googleCalendarId),
+            disconnect: (connectionId, deleteRemote) => store.disconnectGoogle(connectionId, deleteRemote),
+            onChanged: async () => {
+              await Promise.all([reloadCalendars(), reloadGoogle()]);
+            },
+          },
+    [googleConnections, reloadCalendars, reloadGoogle, store],
+  );
 
   // What the grid shows, and the window of events that feeds it.
   const zone = calendar?.timezone ?? DEFAULT_TIMEZONE;
@@ -351,8 +403,13 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
   const calendarsDialog = (
     <CalendarsDialog
       open={calendarsOpen}
-      onClose={() => setCalendarsOpen(false)}
+      onClose={() => {
+        setCalendarsOpen(false);
+        setEditingFromGoogle(null);
+      }}
       calendars={allCalendars}
+      google={googleActions}
+      initialEditing={editingFromGoogle}
       hoursByCalendar={hoursByCalendar}
       templates={templates}
       onSave={async (values, hours, id) => {

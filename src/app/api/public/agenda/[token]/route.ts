@@ -10,8 +10,9 @@
 // off (both are 404).
 // ============================================================
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
+import { processGoogleCalendarSync } from "@/lib/agenda/google-sync";
 import { processCalendarNotifications } from "@/lib/agenda/messages";
 import {
   bookPublic,
@@ -93,6 +94,12 @@ export async function POST(
   }
 
   const outcome = await bookPublic(admin, calendar, parsed.input, new Date());
+  if (outcome.status === "booked" || outcome.status === "pending") {
+    // Into the professional's Google Agenda, if this agenda writes there
+    // (069) — after answering, so the customer does not wait on Google.
+    const eventId = outcome.eventId;
+    after(() => processGoogleCalendarSync(admin, { eventId }));
+  }
   switch (outcome.status) {
     case "booked":
       // The agenda's own confirmation, if it has one turned on — now
