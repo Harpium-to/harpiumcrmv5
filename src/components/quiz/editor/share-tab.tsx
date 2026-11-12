@@ -10,16 +10,17 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Copy, ExternalLink, Loader2 } from "lucide-react";
 
-import { publicQuizUrl, slugProblem } from "@/lib/quiz/slug";
+import { embedQuizUrl, publicQuizUrl, slugProblem } from "@/lib/quiz/slug";
 import type { QuizStatus } from "@/lib/quiz/types";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 import { Field, Section, TagsInput, type TabProps } from "./ui";
 
 export interface ShareTabProps extends TabProps {
-  quiz: { id: string; slug: string; status: QuizStatus; hasCapiToken: boolean };
+  quiz: { id: string; name: string; slug: string; status: QuizStatus; hasCapiToken: boolean };
   /** Change the public address. Rejects with the reason in words. */
   onSaveSlug: (slug: string) => Promise<void>;
   /** Save (or, empty, remove) the Conversions API token. */
@@ -44,7 +45,36 @@ const UTM_FIELDS = [
   ["utm_content", "Criativo", "ex.: video-depoimento"],
 ] as const;
 
-export function ShareTab({ draft, update, canEdit, quiz, onSaveSlug }: ShareTabProps) {
+/** What a client pastes into their site: the quiz in a frame that grows with it. */
+function embedSnippet(url: string, slug: string): string {
+  const id = `harpium-quiz-${slug}`;
+  return [
+    `<iframe id="${id}" title="Quiz" style="width:100%;border:0;min-height:640px" loading="lazy"></iframe>`,
+    "<script>",
+    "(function () {",
+    `  var frame = document.getElementById(${JSON.stringify(id)});`,
+    "  // Passa adiante as UTMs da página, para a campanha chegar ao lead.",
+    `  frame.src = ${JSON.stringify(url)} + (location.search ? "&" + location.search.slice(1) : "");`,
+    '  window.addEventListener("message", function (event) {',
+    "    var data = event.data || {};",
+    `    if (data.type === "harpium-quiz:height" && data.slug === ${JSON.stringify(slug)}) {`,
+    '      frame.style.height = data.height + "px";',
+    "    }",
+    "  });",
+    "})();",
+    "</script>",
+  ].join("\n");
+}
+
+export function ShareTab({
+  draft,
+  update,
+  canEdit,
+  quiz,
+  onSaveSlug,
+  onSaveCapiToken,
+  isAgencia,
+}: ShareTabProps) {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const url = publicQuizUrl(origin, quiz.slug);
   const live = quiz.status === "published";
@@ -63,6 +93,44 @@ export function ShareTab({ draft, update, canEdit, quiz, onSaveSlug }: ShareTabP
     const query = params.toString();
     return query ? `${url}?${query}` : url;
   }, [url, utms]);
+
+  const snippet = embedSnippet(embedQuizUrl(origin, quiz.slug), quiz.slug);
+
+  const [capi, setCapi] = useState("");
+  const [savingCapi, setSavingCapi] = useState(false);
+  const saveCapi = async (token: string) => {
+    setSavingCapi(true);
+    try {
+      await onSaveCapiToken(token);
+      setCapi("");
+      toast.success(token ? "Token salvo" : "Token removido");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não consegui salvar o token");
+    } finally {
+      setSavingCapi(false);
+    }
+  };
+
+  const [modelName, setModelName] = useState(quiz.name);
+  const [modelNote, setModelNote] = useState("");
+  const [savingModel, setSavingModel] = useState(false);
+  const saveModel = async () => {
+    setSavingModel(true);
+    try {
+      const res = await fetch("/api/agencia/quiz-modelos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizId: quiz.id, name: modelName, description: modelNote }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Não consegui salvar o modelo");
+      toast.success(`Modelo "${modelName.trim()}" salvo. Já aparece no "Novo quiz" de todos os CRMs.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não consegui salvar o modelo");
+    } finally {
+      setSavingModel(false);
+    }
+  };
 
   const saveSlug = async () => {
     setSavingSlug(true);
@@ -227,6 +295,141 @@ export function ShareTab({ draft, update, canEdit, quiz, onSaveSlug }: ShareTabP
           />
         </div>
       </Section>
+
+      <Section
+        title="Quem parou no meio"
+        hint="Por padrão, só vira lead quem conclui o quiz. Com esta opção, quem deixou WhatsApp ou e-mail e parou também vai para o CRM."
+      >
+        <label className="flex max-w-2xl items-start gap-3 text-sm text-foreground">
+          <Switch
+            className="mt-0.5"
+            checked={draft.settings.partialLead === true}
+            disabled={!canEdit}
+            onCheckedChange={(on) =>
+              update((d) => ({ ...d, settings: { ...d.settings, partialLead: on ? true : undefined } }))
+            }
+          />
+          <span>
+            Enviar como lead parcial
+            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+              O lead chega 30 minutos depois da última resposta, com a etiqueta{" "}
+              <code className="font-mono">quiz-incompleto</code>, as respostas dadas até ali e sem
+              rota. Só funciona se o contato for pedido antes do fim do quiz. Vale a partir da
+              próxima publicação.
+            </span>
+          </span>
+        </label>
+      </Section>
+
+      {canEdit ? (
+        <Section
+          title="API de Conversões da Meta"
+          hint="Envia o evento do resultado também pelo servidor, com o mesmo ID do Pixel, para a Meta contar uma vez só e receber o evento mesmo quando o navegador bloqueia o Pixel. Precisa do ID do Pixel acima."
+        >
+          <div className="max-w-xl">
+            <Field
+              label="Token de acesso"
+              htmlFor="quiz-capi"
+              hint={
+                quiz.hasCapiToken
+                  ? "Há um token salvo. Ele fica cifrado e não é mostrado de novo; cole outro para trocar."
+                  : "Gerado no Gerenciador de Eventos da Meta, em Configurações › API de Conversões. Fica cifrado e nunca vai ao navegador do visitante."
+              }
+            >
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  id="quiz-capi"
+                  type="password"
+                  autoComplete="off"
+                  value={capi}
+                  maxLength={600}
+                  placeholder={quiz.hasCapiToken ? "•••••••• (salvo)" : "Cole o token aqui"}
+                  onChange={(e) => setCapi(e.target.value)}
+                  className="min-w-0 flex-1 basis-56"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!capi.trim() || savingCapi}
+                  onClick={() => void saveCapi(capi)}
+                >
+                  {savingCapi ? <Loader2 className="animate-spin" /> : null}
+                  Salvar token
+                </Button>
+                {quiz.hasCapiToken ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={savingCapi}
+                    onClick={() => {
+                      if (window.confirm("Remover o token? Os eventos voltam a sair só pelo Pixel.")) {
+                        void saveCapi("");
+                      }
+                    }}
+                  >
+                    Remover
+                  </Button>
+                ) : null}
+              </div>
+            </Field>
+          </div>
+        </Section>
+      ) : null}
+
+      <Section
+        title="Incorporar em um site"
+        hint="Cole este código na página do site onde o quiz deve aparecer. O quadro cresce junto com cada tela, e as UTMs da página vão junto para o lead."
+      >
+        <pre className="max-h-56 overflow-auto rounded-lg bg-foreground/6 p-3 font-mono text-xs leading-relaxed text-foreground">
+          {snippet}
+        </pre>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3"
+          onClick={() => void copyText(snippet, "Código copiado")}
+        >
+          <Copy />
+          Copiar código
+        </Button>
+      </Section>
+
+      {isAgencia && canEdit ? (
+        <Section
+          title="Modelo da agência"
+          hint="Salva este quiz como modelo. Ele passa a aparecer no “Novo quiz” de todos os CRMs. Vão as telas, as regras e os textos; não vão as visitas, os leads, o Pixel nem o logo."
+        >
+          <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
+            <Field label="Nome do modelo" htmlFor="quiz-model-name">
+              <Input
+                id="quiz-model-name"
+                value={modelName}
+                maxLength={120}
+                onChange={(e) => setModelName(e.target.value)}
+              />
+            </Field>
+            <Field label="Descrição (opcional)" htmlFor="quiz-model-note">
+              <Input
+                id="quiz-model-note"
+                value={modelNote}
+                maxLength={300}
+                placeholder="ex.: Qualificação para clínicas de estética"
+                onChange={(e) => setModelNote(e.target.value)}
+              />
+            </Field>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3"
+            disabled={!modelName.trim() || savingModel}
+            onClick={() => void saveModel()}
+          >
+            {savingModel ? <Loader2 className="animate-spin" /> : null}
+            Salvar como modelo da agência
+          </Button>
+        </Section>
+      ) : null}
     </div>
   );
 }

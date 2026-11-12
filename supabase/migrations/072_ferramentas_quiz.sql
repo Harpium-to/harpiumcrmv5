@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
   -- The definition the public link serves. NULL until first published.
   published    JSONB,
   published_at TIMESTAMPTZ,
+  -- Copied from the live definition on Publicar, so the scheduler finds
+  -- the quizzes that send partial leads without opening every one.
+  partial_lead BOOLEAN NOT NULL DEFAULT FALSE,
   created_by   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -56,6 +59,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
 
 CREATE INDEX IF NOT EXISTS idx_quizzes_account
   ON quizzes (account_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_quizzes_partial_lead
+  ON quizzes (id) WHERE partial_lead;
 
 DROP TRIGGER IF EXISTS set_updated_at ON quizzes;
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON quizzes

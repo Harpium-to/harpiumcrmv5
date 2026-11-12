@@ -251,6 +251,14 @@ export default async function AgenciaAccountPage({
         )}
       </Section>
 
+      {/* Quiz e formulários (072): the numbers show at every consent level. */}
+      <Section
+        title="Quiz e formulários"
+        action={{ href: `/agencia/${account.id}/quiz`, label: 'Ver relatórios →' }}
+      >
+        <Empty>Visitas, conclusão e leads de cada quiz deste CRM.</Empty>
+      </Section>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent contacts */}
         <Section

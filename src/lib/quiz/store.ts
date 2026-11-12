@@ -187,6 +187,7 @@ export async function updateQuiz(
     row.published = patch.draft
     row.published_at = new Date().toISOString()
     row.status = 'published'
+    row.partial_lead = patch.draft.settings.partialLead === true
   }
   if (Object.keys(row).length === 0) return getQuiz(admin, accountId, id)
 

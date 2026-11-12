@@ -1,6 +1,18 @@
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { isValidSlug, proposeSlug, publicQuizUrl, quizHostUrl, slugFromName, slugProblem } from './slug'
+import {
+  embedQuizUrl,
+  isValidSlug,
+  proposeSlug,
+  publicQuizUrl,
+  quizHostUrl,
+  RESERVED_SLUGS,
+  slugFromName,
+  slugProblem,
+} from './slug'
 
 describe('slugs', () => {
   it('turns a name into an address', () => {
@@ -33,6 +45,21 @@ describe('slugs', () => {
     expect(slugProblem('api')).toBe('Esse endereço é reservado. Escolha outro.')
   })
 
+  it('reserves every top-level route of the app', () => {
+    // On the quizzes' own domain a quiz answers at /<slug>. A new page
+    // added to the app must be reserved here, or a quiz could take its
+    // name and the two would fight for the address.
+    const app = join(__dirname, '..', '..', 'app')
+    const dirs = (path: string) =>
+      readdirSync(path, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+    const routes = dirs(app).flatMap((name) =>
+      name.startsWith('(') ? dirs(join(app, name)) : [name],
+    )
+    const free = routes.filter((name) => isValidSlug(name) && !RESERVED_SLUGS.has(name))
+    expect(free).toEqual([])
+    expect(routes).toContain('ferramentas')
+  })
+
   it('says what is wrong in words', () => {
     expect(slugProblem('ab')).toContain('pelo menos 3')
     expect(slugProblem('Com Espaço')).toContain('letras minúsculas')
@@ -52,6 +79,15 @@ describe('the public link', () => {
   it('moves to the quizzes\' own domain, short, when one is set', () => {
     vi.stubEnv('NEXT_PUBLIC_QUIZ_URL', 'https://quiz.harpium.com.br/')
     expect(publicQuizUrl('https://crm.test', 'diagnostico')).toBe('https://quiz.harpium.com.br/diagnostico')
+  })
+
+  it('embeds through /q/ on either host, where the page may be framed', () => {
+    vi.stubEnv('NEXT_PUBLIC_QUIZ_URL', '')
+    expect(embedQuizUrl('https://crm.test', 'diagnostico')).toBe('https://crm.test/q/diagnostico?embed=1')
+    vi.stubEnv('NEXT_PUBLIC_QUIZ_URL', 'https://quiz.harpium.com.br')
+    expect(embedQuizUrl('https://crm.test', 'diagnostico')).toBe(
+      'https://quiz.harpium.com.br/q/diagnostico?embed=1',
+    )
   })
 
   it('ignores a value that is not a plain origin', () => {

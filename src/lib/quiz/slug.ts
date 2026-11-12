@@ -17,7 +17,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   'login', 'signup', 'forgot-password', 'reset-password', 'join', 'marcar', 'privacidade',
   'dashboard', 'inbox', 'contacts', 'leads', 'canais', 'pipelines', 'agenda', 'broadcasts',
   'automations', 'flows', 'agents', 'relatorios', 'ferramentas', 'notifications', 'settings',
-  'agencia', 'aguardando', 'ajuda',
+  'agencia', 'aguardando', 'ajuda', 'conectar-google',
 ])
 const RESERVED = RESERVED_SLUGS
 
@@ -73,4 +73,14 @@ export function publicQuizUrl(origin: string, slug: string): string {
   const host = quizHostUrl()
   if (host) return `${host}/${slug}`
   return `${origin.replace(/\/+$/, '')}/q/${slug}`
+}
+
+/**
+ * The address an <iframe> on someone's site loads. Always the /q/ form,
+ * on whichever host: that is the path the app serves without the
+ * headers that forbid embedding (next.config.ts).
+ */
+export function embedQuizUrl(origin: string, slug: string): string {
+  const host = quizHostUrl() ?? origin.replace(/\/+$/, '')
+  return `${host}/q/${slug}?embed=1`
 }
