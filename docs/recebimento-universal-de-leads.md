@@ -1,6 +1,6 @@
 # Recebimento universal de leads
 
-Uma URL recebe lead de qualquer origem (quiz, Google, Meta, Zapier, Make, formulários do site), traduz para o formato padrão da Harpium e **nunca descarta informação**: o que não tem campo próprio vira nota no contato, e o pacote original fica guardado.
+Uma URL recebe lead de qualquer origem (quiz, Google, Meta, Zapier, Make, formulários do site), traduz para o formato padrão da Harpium e **nunca descarta informação**: cada resposta e cada dado extra vira um **campo personalizado** do contato (criado se não existir), uma nota guarda o histórico de cada lead, e o pacote original fica guardado.
 
 Código: `src/lib/leads/` (`parse.ts` lê os formatos, `ingest.ts` grava, `receive.ts` é a URL, `events.ts` dispara o evento "lead recebido").
 
@@ -41,12 +41,12 @@ Quem integra do zero (como o quiz) manda direto neste formato. Google, Meta e JS
 | `contato.telefone` | telefone ou e-mail | Telefone, normalizado para +55DDD9XXXXXXXX (chave de duplicidade) |
 | `contato.email` | telefone ou e-mail | E-mail |
 | `contato.empresa`, `contato.cidade`, `contato.instagram` | não | colunas do contato |
-| `contato.uf` | não | campo personalizado "UF", senão nota |
-| `campanha` (objeto: `nome`, `conjunto`, `anuncio`, `utm_*`, `fbclid`, `gclid`) | não | Campanha do lead + nota |
+| `contato.uf` | não | campo personalizado "UF" |
+| `campanha` (objeto: `nome`, `conjunto`, `anuncio`, `utm_*`, `fbclid`, `gclid`) | não | Campanha do lead + campos "Campanha", "Conjunto", "Anúncio" + nota (UTMs e ids de clique só na nota) |
 | `etiquetas` | não | Etiquetas (criadas se não existirem) |
-| `qualificacao` (`rota` A/B/C, `qualificado`, `pontuacao`, `motivos`) | não | etiqueta `rota-a`/`rota-b`/`rota-c` + nota |
-| `respostas` (lista de `{pergunta, resposta}`) | não | nota |
-| `campos` (chave → valor) | não | campo personalizado de mesmo nome (ou o de/para), senão nota |
+| `qualificacao` (`rota` A/B/C, `qualificado`, `pontuacao`, `motivos`) | não | etiqueta `rota-a`/`rota-b`/`rota-c` + campos "Rota" e "Pontuação" + nota |
+| `respostas` (lista de `{pergunta, resposta}`) | não | campo personalizado com o nome da pergunta (ou o de/para) + nota |
+| `campos` (chave → valor) | não | campo personalizado de mesmo nome (ou o de/para) |
 | `nota` | não | nota |
 | `consentimento` (`aceito`, `texto`, `em`) | recomendado | nota (LGPD); `aceito: false` não dispara fluxos |
 
@@ -57,9 +57,10 @@ Exemplo completo: ver "Formato Harpium Lead v1" na tela Leads, ou `src/lib/leads
 1. **Duplicidade.** Contato pelo telefone normalizado; sem telefone, pelo e-mail (sem telefone e sem contato com o mesmo e-mail, o lead fica sem contato, porque todo contato precisa de telefone).
 2. **Nunca apagar com vazio.** Valor novo preenchido troca o antigo (e-mail, empresa, cidade, Instagram); vazio não apaga nada. O nome digitado no CRM nunca é trocado; a primeira origem do contato fica.
 3. **Cada envio é um registro de lead** no histórico, mesmo com o contato já existente.
-4. **Respostas viram nota**, com origem e data no topo e o id do lead no fim.
+4. **Nota como histórico.** Cada lead deixa uma nota com origem e data no topo, as respostas, a campanha, a rota e o consentimento, e o id do lead no fim. O campo guarda o último valor; a nota guarda o que veio em cada lead.
 5. **Etiquetas** e a etiqueta da rota são aplicadas e criadas na hora.
-6. **Campos personalizados** com a mesma chave (sem acento/maiúsculas: "Ticket médio" = `ticket_medio`). O resto vai para a nota. O **de/para por origem** (tela Leads, migration 068) escolhe outro destino: nota, ignorar, coluna do contato ou outro campo.
+6. **Campos personalizados** (`src/lib/leads/fields.ts`). Cada campo extra, resposta, UF, campanha/conjunto/anúncio, rota e pontuação preenche o campo de mesmo nome (sem acento/maiúsculas: "Ticket médio" = `ticket_medio`). Se a conta não tem esse campo, ele é **criado** com o nome da pergunta (até 60 caracteres), marcado "criado por lead". Lead novo troca o valor; Reprocessar só preenche campo vazio. Campo criado por lead e depois renomeado continua recebendo (migration 070, `custom_fields.field_key`). Limites: 40 campos novos por lead e 200 criados por leads na conta; o que passar disso vai para a nota. O **de/para por origem** (tela Leads, migration 068) escolhe outro destino, também para perguntas: só a nota, ignorar, coluna do contato ou outro campo.
+   Os campos preenchidos aparecem no contato (aba Campos), no painel do contato na conversa e na janela do negócio no funil.
 7. **Pacote bruto** guardado; botão "Ver dados recebidos" na lista.
 8. **Reenvio não duplica** (mesmo `id_externo` da mesma origem em 24 h).
 9. **Lead cai no funil.** Todo lead com contato vira um negócio na primeira etapa do funil mais antigo da conta, com o título "Lead <origem> · <nome>" (por exemplo "Lead Meta · Ana"). Se o contato já tem um negócio aberto, por exemplo porque já escreveu no WhatsApp, nenhum negócio novo é criado. Conta sem funil ganha o "Funil de vendas" padrão. É a mesma regra do primeiro contato no WhatsApp (`src/lib/deals/first-contact.ts`) e roda antes do evento "lead recebido", então uma automação "Criar negócio" nesse gatilho não duplica o cartão.
@@ -81,8 +82,8 @@ Na lista de Leads (administradores): a lixeira em cada linha, ou marcar vários 
 Depois de gravar (nunca num reenvio):
 
 - **Webhook de saída** `lead.received` (ver `docs/public-api.md`).
-- **Automações** com o gatilho "Lead recebido", filtrando por origem, rota e etiquetas obrigatórias. As mensagens podem usar `{{ vars.primeiro_nome }}`, `{{ vars.nome }}`, `{{ vars.empresa }}`, `{{ vars.origem }}`, `{{ vars.rota }}`. A conversa é aberta pelo telefone só quando alguma automação quer o lead.
-- Passo **"Passar para agente de IA"**: entrega o contato ao Agent SDR (ou outra função) com as respostas do lead como briefing e uma instrução opcional. O agente abre a conversa no WhatsApp dentro do horário de trabalho dele.
+- **Automações** com o gatilho "Lead recebido", filtrando por origem, rota e etiquetas obrigatórias. As mensagens podem usar `{{ vars.primeiro_nome }}`, `{{ vars.nome }}`, `{{ vars.empresa }}`, `{{ vars.origem }}`, `{{ vars.rota }}`, e, como em qualquer gatilho, os dados do contato: `{{ contato.primeiro_nome }}`, `{{ contato.empresa }}`, `{{ contato.cidade }}`… e `{{ campo.<nome_do_campo> }}` (por exemplo `{{ campo.faturamento }}`). Variável vazia some sem deixar buraco. A conversa é aberta pelo telefone só quando alguma automação quer o lead.
+- Passo **"Passar para agente de IA"**: entrega o contato ao Agent SDR (ou outra função) com as respostas do lead como briefing e uma instrução opcional. O agente abre a conversa no WhatsApp dentro do horário de trabalho dele. Ele lê o perfil do contato (detalhes, etiquetas, negócio aberto e todos os campos preenchidos, `src/lib/contacts/profile.ts`) e o histórico da conversa, inclusive mensagens de modelo e de botões: se uma automação já cumprimentou o lead, ele continua dali sem cumprimentar de novo (`src/lib/ai/greeting.ts`). O agente que responde e o "Sugerir resposta" seguem a mesma regra.
 
 Tudo respeita o "Pediu para não receber mensagens automáticas" (066) e o consentimento recusado.
 

@@ -25,6 +25,8 @@ import { isDeliverableUrl } from '@/lib/webhooks/ssrf'
 import { contactOptedOut } from '@/lib/contacts/opt-out'
 import { enqueueTask } from '@/lib/agents/tasks'
 import { handoffInput, leadMatchesTrigger, type LeadEventContext } from '@/lib/leads/trigger'
+import { contactVariables, loadContactProfile } from '@/lib/contacts/profile'
+import { renderTemplate, usesContactVariables } from './variables'
 
 // ------------------------------------------------------------
 // Public API
@@ -439,7 +441,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
     case 'send_message': {
       const cfg = step.step_config as SendMessageStepConfig
       if (!args.contactId) throw new Error('Enviar mensagem precisa de um contato')
-      const text = interpolate(cfg.text, args)
+      const text = await interpolate(cfg.text, args, { closeGaps: true })
       if (!text.trim()) throw new Error('Enviar mensagem está sem texto')
       const conversationId = await resolveConversationId(args)
       const { whatsapp_message_id } = await engineSendText({
@@ -564,7 +566,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!args.contactId) throw new Error('Atualizar campo precisa de um contato')
       // Resolve workflow variables ({{ vars.* }}, {{ message.text }}) so custom
       // values can be populated dynamically from the triggering context.
-      const value = interpolate(cfg.value, args)
+      const value = await interpolate(cfg.value, args)
 
       // Custom fields are encoded as `custom:<custom_field_id>`; anything else
       // is a built-in contact column.
@@ -648,7 +650,7 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
         pipeline_id: cfg.pipeline_id,
         stage_id: cfg.stage_id,
         contact_id: args.contactId,
-        title: interpolate(cfg.title, args),
+        title: await interpolate(cfg.title, args, { closeGaps: true }),
         value: cfg.value ?? 0,
         currency: acct?.default_currency ?? 'USD',
         status: 'open',
@@ -666,7 +668,9 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       if (!(await isDeliverableUrl(cfg.url))) {
         throw new Error('Enviar webhook: destino não permitido')
       }
-      const body = cfg.body_template ? interpolate(cfg.body_template, args) : JSON.stringify(args.context)
+      const body = cfg.body_template
+        ? await interpolate(cfg.body_template, args)
+        : JSON.stringify(args.context)
       const res = await fetch(cfg.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...(cfg.headers ?? {}) },
@@ -857,13 +861,35 @@ function waitMs(cfg: WaitStepConfig): number {
   return Math.max(1_000, cfg.amount * unitMs)
 }
 
-function interpolate(s: string, args: ExecuteArgs): string {
-  return s.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key) => {
-    const [ns, prop] = String(key).split('.')
-    if (ns === 'message' && prop === 'text') return String(args.context.message_text ?? '')
-    if (ns === 'vars' && prop) return String(args.context.vars?.[prop] ?? '')
-    return ''
-  })
+/**
+ * Fill `{{ message.text }}`, `{{ vars.* }}`, `{{ contato.* }}` and
+ * `{{ campo.* }}` (lib/automations/variables.ts). The contact is read
+ * only when the text uses it, and fresh each time: an earlier step may
+ * have just filled a field.
+ */
+async function interpolate(
+  s: string,
+  args: ExecuteArgs,
+  options: { closeGaps?: boolean } = {},
+): Promise<string> {
+  let contact: Record<string, string> = {}
+  if (args.contactId && usesContactVariables(s)) {
+    try {
+      const profile = await loadContactProfile(
+        supabaseAdmin(),
+        args.automation.account_id,
+        args.contactId,
+      )
+      contact = contactVariables(profile)
+    } catch (err) {
+      console.error('[automations] could not read the contact for variables:', err)
+    }
+  }
+  return renderTemplate(
+    s,
+    { messageText: String(args.context.message_text ?? ''), vars: args.context.vars, contact },
+    options,
+  )
 }
 
 async function appendResults(

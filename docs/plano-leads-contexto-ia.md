@@ -47,7 +47,7 @@ Cada fase vira um PR para `main`, com testes, `tsc`, `eslint` e
 - Junto vai o documento de implementações futuras (Fase 5), que é só
   texto.
 
-### Fase 2. "Dados recebidos" em campos de verdade (migration 070)
+### Fase 2. "Dados recebidos" em campos de verdade (migration 070) · feita
 
 - Cada **resposta do formulário** vira um **campo personalizado**. O
   nome do campo é a pergunta (até 60 caracteres). Se já existe um
@@ -82,7 +82,7 @@ Editor:
 - `custom_fields.created_from`: marca os campos criados por lead, para a
   tela de campos mostrar "criado por lead".
 
-### Fase 3. Agente de IA e automações com o contexto inteiro do cliente
+### Fase 3. Agente de IA e automações com o contexto inteiro do cliente · feita
 
 - Um "perfil do cliente" montado do CRM: nome, empresa, cidade,
   e-mail, Instagram, origem, etiquetas, **todos os campos
@@ -104,7 +104,7 @@ Editor:
     nas respostas rápidas.
   - `{{ vars.* }}` continua funcionando.
 
-### Fase 4. Não cumprimentar de novo
+### Fase 4. Não cumprimentar de novo · feita
 
 - Mensagens de **modelo** e de **botões/lista** entram no histórico que
   a IA lê, com o texto que o cliente viu.

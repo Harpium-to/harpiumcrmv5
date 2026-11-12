@@ -1058,7 +1058,9 @@
         "agentInstruction": "Instrução para o agente (opcional)",
         "agentInstructionHint": "Ex.: comece validando o investimento antes de agendar",
         "agentHandoffHelp": "O agente recebe o contato com as respostas do lead e abre a conversa no WhatsApp, no horário de trabalho dele. Precisa de um agente ativo com essa função.",
-        "leadOptOutHelp": "Contatos que pediram para não receber mensagens automáticas ficam de fora."
+        "leadOptOutHelp": "Contatos que pediram para não receber mensagens automáticas ficam de fora.",
+        "insertVariable": "Inserir dado do contato:",
+        "insertVariableHelp": "Vale em qualquer gatilho. Se o contato não tiver o dado, a variável some sem deixar buraco (\"Olá, tudo bem?\" em vez de \"Olá , tudo bem?\")."
       }
     }
   },
