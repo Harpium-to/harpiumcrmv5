@@ -9,6 +9,8 @@ import { PageTransition } from "@/components/layout/page-transition";
 import { Glow } from "@/components/ui/glow";
 import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 import { CrmContextBanner } from "@/components/layout/crm-context-banner";
+import { WaitingConversationsProvider } from "@/hooks/use-waiting-conversations";
+import { WaitingAlert } from "@/components/inbox/waiting-alert";
 
 // Auth-gated dashboard shell. Extracted from the layout so the layout
 // itself can stay a server component and export metadata (noindex) —
@@ -51,10 +53,14 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
   if (!user || noCrm) return null;
 
   return (
-    // One scroll container for the whole workspace. The rail floats
-    // over it and the top bar sticks to it, so there is no nested
-    // scroll region and no bordered frame — just the warm plane with
-    // the chrome resting on top.
+    // Conversations waiting for a person, for every screen below (menu
+    // badge, floating alert, tab title). Keyed by CRM so switching CRMs
+    // starts from that CRM's list instead of the previous one's.
+    <WaitingConversationsProvider key={profile?.account_id ?? "none"}>
+    {/* One scroll container for the whole workspace. The rail floats
+        over it and the top bar sticks to it, so there is no nested
+        scroll region and no bordered frame — just the warm plane with
+        the chrome resting on top. */}
     <div className="relative isolate h-screen overflow-y-auto bg-background">
       {/* Reports this tab's online/away presence once we know a user is
           signed in. Headless — renders nothing. */}
@@ -91,7 +97,9 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
+      <WaitingAlert />
     </div>
+    </WaitingConversationsProvider>
   );
 }
 

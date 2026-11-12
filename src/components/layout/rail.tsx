@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { NAV_GROUPS, NAV_ITEMS, type NavItem } from "@/lib/nav";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
+import { useWaitingConversations } from "@/hooks/use-waiting-conversations";
 
 interface RailProps {
   /** Mobile drawer state, owned by the shell and opened from the top bar. */
@@ -48,6 +49,17 @@ export function Rail({ open = false, onClose }: RailProps) {
   const pathname = usePathname();
   const totalUnread = useTotalUnread();
   const unreadNotifications = useUnreadNotifications();
+  // Conversations the AI handed off that nobody answered: louder than
+  // unread (amber, red once late) and shown even on the inbox itself.
+  const { items: waiting, lateCount } = useWaitingConversations();
+  const waitingFor = (item: NavItem) =>
+    item.href === "/inbox" ? waiting.length : 0;
+  const waitingPill = cn(
+      "rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+      lateCount > 0
+        ? "animate-pulse bg-red-600 text-white"
+        : "bg-amber-400 text-amber-950",
+    );
 
   // Opened to go somewhere — once they pick, get out of the way.
   useEffect(() => {
@@ -116,11 +128,16 @@ export function Rail({ open = false, onClose }: RailProps) {
                 {items.map((item) => {
                   const active = isActive(item);
                   const badge = badgeFor(item);
+                  const waitingCount = waitingFor(item);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      aria-label={t(item.labelKey)}
+                      aria-label={
+                        waitingCount > 0
+                          ? `${t(item.labelKey)} · ${t("waitingBadge", { count: waitingCount })}`
+                          : t(item.labelKey)
+                      }
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "flex h-11 shrink-0 items-center rounded-full transition-colors",
@@ -133,7 +150,19 @@ export function Rail({ open = false, onClose }: RailProps) {
                           the rail's width animates around it. */}
                       <span className="relative flex size-11 shrink-0 items-center justify-center">
                         <item.icon className="size-[1.15rem]" />
-                        {badge > 0 && !active ? (
+                        {waitingCount > 0 ? (
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center ring-2 ring-background transition-opacity",
+                              waitingPill,
+                              "px-1 text-[10px]",
+                              RAIL_OPEN_HIDE,
+                            )}
+                          >
+                            {waitingCount > 9 ? "9+" : waitingCount}
+                          </span>
+                        ) : badge > 0 && !active ? (
                           <span
                             aria-hidden
                             className={cn(
@@ -155,6 +184,14 @@ export function Rail({ open = false, onClose }: RailProps) {
                         {item.beta ? (
                           <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
                             {t("beta")}
+                          </span>
+                        ) : null}
+                        {waitingCount > 0 ? (
+                          <span
+                            title={t("waitingBadge", { count: waitingCount })}
+                            className={waitingPill}
+                          >
+                            {waitingCount > 99 ? "99+" : waitingCount}
                           </span>
                         ) : null}
                         {badge > 0 ? (
@@ -231,6 +268,14 @@ export function Rail({ open = false, onClose }: RailProps) {
                   {item.beta ? (
                     <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
                       {t("beta")}
+                    </span>
+                  ) : null}
+                  {waitingFor(item) > 0 ? (
+                    <span
+                      title={t("waitingBadge", { count: waitingFor(item) })}
+                      className={waitingPill}
+                    >
+                      {waitingFor(item) > 99 ? "99+" : waitingFor(item)}
                     </span>
                   ) : null}
                   {badge > 0 ? (

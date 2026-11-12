@@ -43,7 +43,8 @@
     "menuSettings": "Configurações",
     "menuSignOut": "Sair",
     "reports": "Relatórios",
-    "help": "Ajuda"
+    "help": "Ajuda",
+    "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}"
   },
   "TopBar": {
     "openMenu": "Abrir menu",
@@ -150,7 +151,15 @@
       "clearAll": "Limpar tudo",
       "noConversations": "Nenhuma conversa encontrada",
       "noMessagesYet": "Nenhuma mensagem ainda",
-      "unknown": "Desconhecido"
+      "unknown": "Desconhecido",
+      "filterWaiting": "Aguardando atendente",
+      "waitingStrip": "{count, plural, one {# conversa aguardando atendente} other {# conversas aguardando atendente}}",
+      "waitingLate": "{count, plural, one {# atrasada} other {# atrasadas}}",
+      "waitingShow": "Ver",
+      "waitingShowAll": "Ver todas",
+      "waitingNobody": "Ninguém assumiu",
+      "waitingMine": "Com você, sem resposta",
+      "waitingAssigned": "Atribuída, sem resposta"
     },
     "messageThread": {
       "backToConversations": "Voltar para conversas",
@@ -291,7 +300,32 @@
         "unknown": "O cliente ficou sem resposta. Responda manualmente; o detalhe técnico também está no monitor dos agentes.",
         "detail": "Detalhe técnico: {detail}",
         "dismiss": "Dispensar aviso"
+      },
+      "waiting": {
+        "nobodyTitle": "A IA passou esta conversa para a equipe. Alguém precisa assumir.",
+        "assignedTitle": "Atribuída a alguém da equipe, mas o cliente ainda não teve resposta",
+        "mineTitle": "Você assumiu esta conversa. Responda o cliente.",
+        "since": "Esperando resposta há {time}",
+        "justNow": "Acabou de ser passada para a equipe",
+        "late": "atrasada",
+        "takeOver": "Assumir conversa"
       }
+    },
+    "newDeal": {
+      "button": "Novo",
+      "choosePipeline": "Em qual funil?",
+      "pipeline": "Funil: {name}",
+      "duplicate": "{count, plural, one {Este contato já tem # negócio aberto} other {Este contato já tem # negócios abertos}}",
+      "aiLoading": "A IA está lendo a conversa para preencher o negócio...",
+      "aiDone": "Preenchido pela IA a partir da conversa. Confira antes de criar.",
+      "aiRefill": "Preencher de novo",
+      "aiRetry": "Tentar de novo",
+      "aiOff": "Com a IA ativada em Agentes de IA, o formulário vem preenchido com o resumo da conversa.",
+      "aiNoMessages": "Ainda não há mensagens de texto para resumir.",
+      "aiNoConversation": "Abra a conversa para a IA preencher o negócio.",
+      "aiError": "Não foi possível preencher com a IA. Preencha à mão ou tente de novo.",
+      "noPipelines": "Crie um funil em Funis antes de criar negócios.",
+      "noStages": "Esse funil não tem etapas. Crie as etapas em Funis."
     }
   },
   "Contacts": {
@@ -2197,5 +2231,16 @@
     "suggestForecast": "O que está travado na previsão?",
     "customFrom": "De",
     "customTo": "até"
+  },
+  "Handoff": {
+    "toastTitle": "{name} precisa de um atendente",
+    "toastBody": "A IA passou a conversa para a equipe. Alguém precisa responder o cliente.",
+    "someone": "Um cliente",
+    "open": "Abrir conversa",
+    "alertTitle": "{count, plural, one {# conversa esperando atendente} other {# conversas esperando atendente}}",
+    "alertOldest": "{name} espera há {time}",
+    "alertOldestNow": "{name} acabou de ser passado para a equipe",
+    "late": "atrasada",
+    "answer": "Atender"
   }
 }
