@@ -1,22 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   BookOpen,
   Copy,
+  FileJson,
   Loader2,
   Magnet,
   Megaphone,
   Plug,
+  RefreshCw,
   Save,
   Trash2,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
+import { leadTags, normalizeLead, type LeadRoute } from "@/lib/leads/parse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface LeadRow {
   id: string;
@@ -27,7 +37,20 @@ interface LeadRow {
   campaign: string | null;
   contact_id: string | null;
   created_at: string;
+  raw: unknown;
 }
+
+/** What the list shows that only the raw payload knows (tags, route). */
+interface LeadView extends LeadRow {
+  tags: string[];
+  route: LeadRoute | null;
+}
+
+const ROUTE_CLASS: Record<LeadRoute, string> = {
+  A: "bg-emerald-500/10 text-emerald-500",
+  B: "bg-amber-500/10 text-amber-500",
+  C: "bg-slate-500/10 text-muted-foreground",
+};
 
 interface MetaPage {
   id: string;
@@ -59,6 +82,17 @@ export default function LeadsPage() {
   const [metaPages, setMetaPages] = useState<MetaPage[]>([]);
   const [metaConfigured, setMetaConfigured] = useState(false);
   const [openTutorial, setOpenTutorial] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [viewing, setViewing] = useState<LeadView | null>(null);
+  const [reprocessing, setReprocessing] = useState<string | null>(null);
+
+  const leadViews = useMemo<LeadView[] | null>(() => {
+    if (!leads) return null;
+    return leads.map((l) => {
+      const n = normalizeLead(l.raw);
+      return { ...l, tags: leadTags(n), route: n.route };
+    });
+  }, [leads]);
 
   const ingestUrl =
     token && typeof window !== "undefined"
@@ -72,6 +106,7 @@ export default function LeadsPage() {
       if (!res.ok) throw new Error(json.error ?? "Falha ao carregar config");
       setToken(json.token);
       setGoogleKey(json.googleKey ?? "");
+      setCanManage(Boolean(json.canManage));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao carregar config");
     }
@@ -94,7 +129,7 @@ export default function LeadsPage() {
     const db = createClient();
     const { data, error } = await db
       .from("leads")
-      .select("id, source, full_name, email, phone, campaign, contact_id, created_at")
+      .select("id, source, full_name, email, phone, campaign, contact_id, created_at, raw")
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) {
@@ -151,6 +186,44 @@ export default function LeadsPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao salvar");
     } finally {
       setSavingKey(false);
+    }
+  };
+
+  /**
+   * Run leads through today's rules again. One lead (`ids`) or every
+   * stored lead, a batch at a time, following the server's cursor.
+   */
+  const reprocess = async (ids?: string[]) => {
+    const key = ids ? ids.join(",") : "all";
+    setReprocessing(key);
+    let processed = 0;
+    let created = 0;
+    try {
+      let cursor: string | null = null;
+      for (let guard = 0; guard < 200; guard++) {
+        const res: Response = await fetch("/api/leads/reprocess", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(ids ? { ids } : { cursor }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Falha ao reprocessar");
+        processed += json.processed ?? 0;
+        created += json.contacts_created ?? 0;
+        cursor = json.next_cursor ?? null;
+        if (!cursor) break;
+      }
+      toast.success(
+        ids
+          ? "Lead reprocessado"
+          : `${processed} lead(s) reprocessado(s)${created ? `, ${created} contato(s) criado(s)` : ""}`,
+      );
+      setViewing(null);
+      void loadLeads();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao reprocessar");
+    } finally {
+      setReprocessing(null);
     }
   };
 
@@ -336,21 +409,45 @@ export default function LeadsPage() {
             open={openTutorial}
             onToggle={setOpenTutorial}
           />
+          <TutorialButton
+            id="v1"
+            label="Formato Harpium Lead v1"
+            open={openTutorial}
+            onToggle={setOpenTutorial}
+          />
         </div>
         {openTutorial === "google" && <GoogleTutorial />}
         {openTutorial === "zapier" && <ZapierTutorial />}
+        {openTutorial === "v1" && <HarpiumV1Tutorial />}
       </section>
 
       {/* ---- Leads list ---- */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">
-          Leads recebidos
-        </h2>
-        {leads === null ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold">Leads recebidos</h2>
+          {canManage && leads && leads.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={reprocessing !== null}
+              onClick={() => void reprocess()}
+              title="Lê de novo os dados guardados de cada lead e grava no contato o que antes ficava de fora (respostas, etiquetas, campos). Não apaga nem troca o que já está preenchido."
+            >
+              {reprocessing === "all" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Reprocessar leads
+            </Button>
+          )}
+        </div>
+        {leadViews === null ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : leads.length === 0 ? (
+        ) : leadViews.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted-foreground">
             Nenhum lead recebido ainda.
           </p>
@@ -364,20 +461,25 @@ export default function LeadsPage() {
                   <th className="px-4 py-3 font-medium">Telefone</th>
                   <th className="px-4 py-3 font-medium">E-mail</th>
                   <th className="px-4 py-3 font-medium">Campanha</th>
+                  <th className="px-4 py-3 font-medium">Etiquetas</th>
+                  <th className="px-4 py-3 font-medium">Rota</th>
                   <th className="px-4 py-3 font-medium">Recebido</th>
                   <th className="px-4 py-3 font-medium">Contato</th>
+                  <th className="px-4 py-3 font-medium">
+                    <span className="sr-only">Dados recebidos</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {leads.map((l) => (
+                {leadViews.map((l) => (
                   <tr key={l.id}>
                     <td className="px-4 py-3">
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                      <span className="whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
                         {SOURCE_LABEL[l.source] ?? l.source}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-medium">{l.full_name ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {l.phone ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
@@ -386,17 +488,61 @@ export default function LeadsPage() {
                     <td className="px-4 py-3 text-muted-foreground">
                       {l.campaign ?? "—"}
                     </td>
+                    <td className="px-4 py-3">
+                      {l.tags.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex max-w-[16rem] flex-wrap gap-1">
+                          {l.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {l.route ? (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROUTE_CLASS[l.route]}`}
+                        >
+                          {l.route}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {formatWhen(l.created_at)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="whitespace-nowrap px-4 py-3">
                       {l.contact_id ? (
-                        <span className="text-xs text-emerald-500">criado</span>
+                        <a
+                          href={`/contacts?contact=${l.contact_id}`}
+                          className="text-xs text-emerald-500 hover:underline"
+                        >
+                          ver contato
+                        </a>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          sem telefone
+                          {l.phone || l.email ? "sem contato" : "sem telefone"}
                         </span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewing(l)}
+                        className="whitespace-nowrap text-muted-foreground"
+                      >
+                        <FileJson className="h-4 w-4" />
+                        Ver dados recebidos
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -405,8 +551,66 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
+        <DialogContent className="border-border bg-popover sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-popover-foreground">Dados recebidos</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Exatamente o que chegou na URL
+              {viewing ? ` em ${formatWhen(viewing.created_at)}` : ""}. Se um dado
+              está aqui, ele chegou ao CRM.
+            </DialogDescription>
+          </DialogHeader>
+          {viewing && (
+            <>
+              <pre className="max-h-[55vh] overflow-auto rounded-lg border border-border bg-muted/40 p-3 font-mono text-xs leading-relaxed text-foreground">
+                {viewing.raw == null
+                  ? "Nenhum dado guardado para este lead."
+                  : JSON.stringify(viewing.raw, null, 2)}
+              </pre>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void copyRaw(viewing.raw)}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar
+                </Button>
+                {canManage && viewing.raw != null && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={reprocessing !== null}
+                    onClick={() => void reprocess([viewing.id])}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {reprocessing === viewing.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Reprocessar este lead
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+async function copyRaw(raw: unknown) {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(raw, null, 2));
+    toast.success("Dados copiados");
+  } catch {
+    toast.error("Não foi possível copiar");
+  }
 }
 
 function TutorialButton({
@@ -534,14 +738,99 @@ function ZapierTutorial() {
           Ação: <em>Webhooks → POST</em> para a URL de recebimento acima.
         </Step>
         <Step n={3}>
-          No corpo (JSON), envie <code className="font-mono">nome</code>,{" "}
+          No corpo (JSON ou formulário), envie <code className="font-mono">nome</code>,{" "}
           <code className="font-mono">telefone</code>,{" "}
           <code className="font-mono">email</code> e, se quiser,{" "}
-          <code className="font-mono">source</code>/
-          <code className="font-mono">campanha</code>.
+          <code className="font-mono">origem</code>,{" "}
+          <code className="font-mono">campanha</code>,{" "}
+          <code className="font-mono">etiquetas</code> e as{" "}
+          <code className="font-mono">utm_*</code>. Qualquer outro campo também
+          entra: vai para o campo personalizado de mesmo nome ou para uma nota no
+          contato.
         </Step>
-        <Step n={4}>Teste — o lead aparece aqui na lista.</Step>
+        <Step n={4}>
+          Teste — o lead aparece aqui na lista. Em <em>Ver dados recebidos</em>{" "}
+          você vê exatamente o que chegou.
+        </Step>
       </ol>
+    </TutorialBox>
+  );
+}
+
+const V1_EXAMPLE = `{
+  "versao": "1",
+  "origem": "quiz-planejados",
+  "id_externo": "sessao-7f3c",
+  "contato": {
+    "nome": "Ana",
+    "telefone": "+5563999990000",
+    "empresa": "Planejados Silva",
+    "cidade": "Palmas",
+    "uf": "TO",
+    "instagram": "@planejadossilva"
+  },
+  "campanha": { "utm_source": "meta", "utm_campaign": "planejados-nov" },
+  "qualificacao": { "rota": "A", "qualificado": true, "motivos": ["perfil completo"] },
+  "etiquetas": ["quiz-planejados", "verba-baixa"],
+  "respostas": [
+    { "pergunta": "Faturamento mensal", "resposta": "De R$ 75 mil a R$ 150 mil" }
+  ],
+  "campos": { "faturamento": "75a150" },
+  "consentimento": { "aceito": true, "texto": "Aceito ser contatado", "em": "2026-11-11" }
+}`;
+
+function HarpiumV1Tutorial() {
+  return (
+    <TutorialBox>
+      <p className="font-medium text-foreground">
+        Formato Harpium Lead v1 (quiz e integrações novas)
+      </p>
+      <p className="mt-1">
+        Quem integra do zero manda direto neste formato, com{" "}
+        <code className="font-mono">&quot;versao&quot;: &quot;1&quot;</code>. Precisa de
+        telefone ou e-mail; o resto é opcional e nada é descartado.
+      </p>
+      <ul className="mt-2 space-y-1">
+        <li>
+          <code className="font-mono">respostas</code> e{" "}
+          <code className="font-mono">nota</code> viram uma nota no contato.
+        </li>
+        <li>
+          <code className="font-mono">etiquetas</code> e a rota (
+          <code className="font-mono">rota-a</code>,{" "}
+          <code className="font-mono">rota-b</code>,{" "}
+          <code className="font-mono">rota-c</code>) viram etiquetas, criadas se
+          não existirem.
+        </li>
+        <li>
+          Cada chave de <code className="font-mono">campos</code> preenche o campo
+          personalizado de mesmo nome; o que não existir vai para a nota.
+        </li>
+        <li>
+          O mesmo <code className="font-mono">id_externo</code> da mesma origem em
+          até 24 horas não cria outro registro.
+        </li>
+      </ul>
+      <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground">
+        {V1_EXAMPLE}
+      </pre>
+      <p className="mt-3 font-medium text-foreground">Respostas da URL</p>
+      <ul className="mt-1 space-y-1">
+        <li>
+          <strong>200</strong> lead gravado (
+          <code className="font-mono">&quot;duplicado&quot;: true</code> se já tinha
+          chegado)
+        </li>
+        <li>
+          <strong>422</strong> faltou telefone e e-mail (o lead fica guardado aqui
+          mesmo assim)
+        </li>
+        <li>
+          <strong>400</strong> formato ilegível · <strong>401</strong> token errado ·{" "}
+          <strong>413</strong> mais de 100 KB · <strong>429</strong> mais de 60
+          envios por minuto
+        </li>
+      </ul>
     </TutorialBox>
   );
 }
