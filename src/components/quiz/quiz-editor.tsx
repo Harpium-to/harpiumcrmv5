@@ -22,23 +22,33 @@ import {
   ChevronLeft,
   CircleAlert,
   ExternalLink,
+  ListChecks,
   Loader2,
+  Palette,
   Pause,
   Play,
   Rocket,
   Share2,
+  Smartphone,
+  Trophy,
 } from "lucide-react";
 
+import { useAuth } from "@/hooks/use-auth";
 import { useCan } from "@/hooks/use-can";
 import { publicQuizUrl } from "@/lib/quiz/slug";
 import type { QuizDefinition, QuizStatus } from "@/lib/quiz/types";
 import type { DefinitionCheck } from "@/lib/quiz/validate";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 
+import { AppearanceTab } from "./editor/appearance-tab";
+import { QuizPreview } from "./editor/preview";
+import { ResultsTab } from "./editor/results-tab";
 import { ShareTab } from "./editor/share-tab";
-import type { DraftUpdater } from "./editor/ui";
+import { StepsTab } from "./editor/steps-tab";
+import type { DraftUpdater, PreviewTarget } from "./editor/ui";
 import { StatusBadge } from "./quiz-list";
 
 interface EditorQuiz {
@@ -57,11 +67,17 @@ type SaveState = "saved" | "dirty" | "saving" | "error";
 /** How long after the last change the draft is saved. */
 const AUTOSAVE_MS = 1200;
 
-type TabId = "share";
+type TabId = "steps" | "results" | "look" | "share";
 
 const TABS: (PillItem & { value: TabId; adminOnly?: boolean })[] = [
+  { value: "steps", label: "Perguntas", icon: ListChecks, adminOnly: true },
+  { value: "results", label: "Resultados", icon: Trophy, adminOnly: true },
+  { value: "look", label: "Aparência", icon: Palette, adminOnly: true },
   { value: "share", label: "Divulgação", icon: Share2 },
 ];
+
+/** The tabs that edit what the visitor sees, and so sit beside the preview. */
+const WITH_PREVIEW: TabId[] = ["steps", "results", "look"];
 
 function tabFromUrl(allowed: TabId[]): TabId {
   if (typeof window === "undefined") return allowed[0];
@@ -79,7 +95,10 @@ export function QuizEditor({ id }: { id: string }) {
   const [problems, setProblems] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [isAgencia, setIsAgencia] = useState(false);
-  const [tab, setTab] = useState<TabId>("share");
+  const [tab, setTab] = useState<TabId>("steps");
+  const [preview, setPreview] = useState<PreviewTarget>({ kind: "intro" });
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const { account } = useAuth();
 
   const tabs = TABS.filter((t) => canEdit || !t.adminOnly);
   const allowed = tabs.map((t) => t.value);
@@ -130,6 +149,15 @@ export function QuizEditor({ id }: { id: string }) {
 
   const selectTab = (value: string) => {
     setTab(value as TabId);
+    // The preview follows the tab: a result screen on Resultados, a
+    // question (or the entry) everywhere else. A test run is left alone.
+    setPreview((now) => {
+      if (now.kind === "run" || !draft) return now;
+      if (value === "results") {
+        return now.kind === "result" ? now : { kind: "result", id: draft.defaultResultId };
+      }
+      return now.kind === "result" ? { kind: "intro" } : now;
+    });
     const url = new URL(window.location.href);
     url.searchParams.set("tab", value);
     window.history.replaceState(null, "", url);
@@ -360,6 +388,53 @@ export function QuizEditor({ id }: { id: string }) {
           ariaLabel="Partes do quiz"
           className="max-w-full overflow-x-auto"
         />
+      ) : null}
+
+      {WITH_PREVIEW.includes(activeTab) ? (
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <div className="min-w-0">
+            {activeTab === "steps" ? (
+              <StepsTab draft={draft} update={update} canEdit={canEdit} onFocus={setPreview} />
+            ) : activeTab === "results" ? (
+              <ResultsTab draft={draft} update={update} canEdit={canEdit} onFocus={setPreview} />
+            ) : (
+              <AppearanceTab draft={draft} update={update} canEdit={canEdit} />
+            )}
+          </div>
+          {/* Beside the editor on a wide screen; behind a button on a narrow one. */}
+          <div className="sticky top-24 hidden xl:block">
+            <QuizPreview
+              definition={draft}
+              business={account?.name ?? ""}
+              target={preview}
+              onTarget={setPreview}
+            />
+          </div>
+          <Button
+            type="button"
+            size="lg"
+            onClick={() => setPreviewOpen(true)}
+            className="fixed right-4 bottom-4 z-30 shadow-lg xl:hidden"
+          >
+            <Smartphone />
+            Ver prévia
+          </Button>
+          <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+            <DialogContent className="max-h-[94vh] overflow-y-auto sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Prévia</DialogTitle>
+              </DialogHeader>
+              {previewOpen ? (
+                <QuizPreview
+                  definition={draft}
+                  business={account?.name ?? ""}
+                  target={preview}
+                  onTarget={setPreview}
+                />
+              ) : null}
+            </DialogContent>
+          </Dialog>
+        </div>
       ) : null}
 
       {activeTab === "share" ? (

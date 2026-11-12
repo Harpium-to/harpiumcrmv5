@@ -180,14 +180,23 @@ export function BackButton({ onClick }: { onClick: () => void }) {
 // Entry
 // ------------------------------------------------------------
 
-export function IntroScreen({ intro, onStart }: { intro: QuizIntro; onStart: () => void }) {
+export function IntroScreen({
+  intro,
+  onStart,
+  autoFocus = true,
+}: {
+  intro: QuizIntro;
+  onStart: () => void;
+  /** Off in the builder's preview, which must not take the focus from the editor. */
+  autoFocus?: boolean;
+}) {
   return (
     <div>
       {intro.tag ? <p className="qz-hud qz-tag qz-in">{intro.tag}</p> : null}
       <h1 className="qz-headline qz-in qz-in-2">{intro.headline}</h1>
       {intro.sub ? <p className="qz-sub qz-in qz-in-2">{intro.sub}</p> : null}
       <div className="qz-intro-cta qz-in qz-in-3">
-        <Pill type="button" onClick={onStart} autoFocus>
+        <Pill type="button" onClick={onStart} autoFocus={autoFocus}>
           {intro.cta}
         </Pill>
       </div>
@@ -335,12 +344,14 @@ export function FieldsScreen({
   initial,
   sending = false,
   extras,
+  autoFocus = true,
   onSubmit,
 }: {
   step: FieldsStep;
   vars: Partial<QuizVars>;
   initial: QuizAnswers;
   sending?: boolean;
+  autoFocus?: boolean;
   /** Only the quiz's last screen carries the privacy lines. */
   extras?: FieldsExtras;
   onSubmit: (values: Record<string, string>, trap: string) => void;
@@ -389,7 +400,7 @@ export function FieldsScreen({
             placeholder: field.placeholder,
             "aria-invalid": error ? true : undefined,
             "aria-describedby": error ? `${id}-erro` : undefined,
-            autoFocus: i === 0,
+            autoFocus: autoFocus && i === 0,
           };
           const change = (raw: string) =>
             setValues((now) => ({
@@ -469,10 +480,12 @@ export function FieldsScreen({
 export function MessageScreen({
   step,
   vars,
+  autoFocus = true,
   onContinue,
 }: {
   step: MessageStep;
   vars: Partial<QuizVars>;
+  autoFocus?: boolean;
   onContinue: () => void;
 }) {
   return (
@@ -480,7 +493,7 @@ export function MessageScreen({
       <h2 className="qz-title qz-in">{interpolate(step.title, vars)}</h2>
       {step.text ? <p className="qz-text qz-in qz-in-2">{rich(interpolate(step.text, vars))}</p> : null}
       <div className="qz-actions qz-in qz-in-3">
-        <Pill type="button" onClick={onContinue} autoFocus>
+        <Pill type="button" onClick={onContinue} autoFocus={autoFocus}>
           {step.cta}
         </Pill>
       </div>

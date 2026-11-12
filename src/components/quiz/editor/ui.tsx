@@ -14,6 +14,14 @@ import { Input } from "@/components/ui/input";
 /** How a tab changes the draft: hand back the next definition. */
 export type DraftUpdater = (change: (draft: QuizDefinition) => QuizDefinition) => void;
 
+/** What the phone preview beside the editor is showing. */
+export type PreviewTarget =
+  | { kind: "intro" }
+  | { kind: "step"; id: string }
+  | { kind: "result"; id: string }
+  /** The whole quiz, played from the start (nothing is sent). */
+  | { kind: "run" };
+
 export interface TabProps {
   draft: QuizDefinition;
   update: DraftUpdater;
