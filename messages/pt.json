@@ -466,7 +466,9 @@
       "toastCustomFieldsSaved": "Campos personalizados salvos",
       "toastCustomFieldsFailed": "Falha ao salvar campos personalizados",
       "toastTemplateSent": "Modelo \"{name}\" enviado",
-      "toastTemplateFailed": "Falha ao enviar modelo: {reason}"
+      "toastTemplateFailed": "Falha ao enviar modelo: {reason}",
+      "city": "Cidade",
+      "instagram": "Instagram"
     },
     "importModal": {
       "title": "Importar contatos",
@@ -532,9 +534,16 @@
       "fromLeadTitle": "Criado automaticamente quando um lead respondeu esta pergunta. Pode renomear: os próximos leads continuam caindo aqui."
     },
     "fieldsSummary": {
-      "title": "Campos",
+      "title": "Dados do contato",
       "showAll": "Mostrar todos ({count})",
-      "showLess": "Mostrar menos"
+      "showLess": "Mostrar menos",
+      "company": "Empresa",
+      "city": "Cidade",
+      "instagram": "Instagram",
+      "jobTitle": "Cargo",
+      "segment": "Segmento",
+      "website": "Site",
+      "email": "E-mail"
     }
   },
   "Pipelines": {

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 /** Filled fields shown before "show all". */
-const COLLAPSED = 6;
+const COLLAPSED = 8;
 
 interface FilledField {
   id: string;
@@ -16,12 +16,23 @@ interface FilledField {
   value: string;
 }
 
+/** Contact columns shown before the custom fields, in this order. */
+const DETAIL_COLUMNS = [
+  ["company", "company"],
+  ["city", "city"],
+  ["instagram", "instagram"],
+  ["job_title", "jobTitle"],
+  ["segment", "segment"],
+  ["website", "website"],
+] as const;
+
 /**
- * The contact's filled custom fields, read-only: what a lead answered
- * (lib/leads/fields.ts) and what the team typed. Shown next to the
- * conversation and on the deal, so whoever picks the contact up sees it
- * without opening the contact. Editing stays on the contact's "Campos"
- * tab. Renders nothing while loading or when no field is filled.
+ * What the CRM knows about the contact, read-only: the details a lead
+ * fills (company, city, Instagram…) and every filled custom field —
+ * what a lead answered (lib/leads/fields.ts) and what the team typed.
+ * Shown next to the conversation and on the deal, so whoever picks the
+ * contact up sees it without opening the contact. Editing stays on the
+ * contact. Renders nothing while loading or when nothing is filled.
  */
 export function ContactFieldsSummary({
   contactId,
@@ -41,7 +52,8 @@ export function ContactFieldsSummary({
     if (!contactId) return;
     void (async () => {
       const supabase = createClient();
-      const [defsRes, valuesRes] = await Promise.all([
+      const [contactRes, defsRes, valuesRes] = await Promise.all([
+        supabase.from("contacts").select("*").eq("id", contactId).maybeSingle(),
         supabase
           .from("custom_fields")
           .select("id, field_name")
@@ -57,17 +69,28 @@ export function ContactFieldsSummary({
         const text = (v.value ?? "").trim();
         if (text) value.set(v.custom_field_id, text);
       }
+      const contact = (contactRes.data ?? {}) as Record<string, unknown>;
+      const details: FilledField[] = [];
+      for (const [column, label] of DETAIL_COLUMNS) {
+        const v = contact[column];
+        if (typeof v === "string" && v.trim()) {
+          details.push({ id: `detail:${column}`, name: t(label), value: v.trim() });
+        }
+      }
       setLoaded({
         contactId,
-        fields: ((defsRes.data ?? []) as { id: string; field_name: string }[])
-          .filter((f) => value.has(f.id))
-          .map((f) => ({ id: f.id, name: f.field_name, value: value.get(f.id)! })),
+        fields: [
+          ...details,
+          ...((defsRes.data ?? []) as { id: string; field_name: string }[])
+            .filter((f) => value.has(f.id))
+            .map((f) => ({ id: f.id, name: f.field_name, value: value.get(f.id)! })),
+        ],
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, [contactId]);
+  }, [contactId, t]);
 
   const fields = contactId && loaded?.contactId === contactId ? loaded.fields : null;
   if (!fields || fields.length === 0) return null;
