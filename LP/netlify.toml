@@ -1,0 +1,19 @@
+# ============================================================
+# Harpium CRM — landing page.
+#
+# Site estático, sem build: o Netlify só publica os arquivos desta
+# pasta. No painel do Netlify, este site usa "Base directory" = LP.
+# Com isso ele lê este arquivo (e não o netlify.toml da raiz, que é
+# do CRM) e só publica de novo quando algo dentro de LP muda.
+# ============================================================
+
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
