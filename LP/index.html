@@ -91,6 +91,36 @@ section{position:relative;padding:78px 0}
 .sec-head{display:grid;gap:18px;max-width:47rem;margin-bottom:40px}
 @media(min-width:900px){section{padding:132px 0}.sec-head{margin-bottom:68px}}
 
+/* ---------- divisões claras: branco descendo para cinza ----------
+   Dentro delas as cores se invertem: o que está ligado fica escuro e
+   sólido. As telas do produto (cenas e celular) continuam escuras. */
+.lite{
+  --fg:#1d1813;--muted:#5d5751;--dim:#8b857e;--line:#d8d4ce;
+  --edge:rgba(29,24,19,.09);--glass:rgba(255,255,255,.8);--well:rgba(29,24,19,.05);
+  --cream:#201910;--cream-hi:#38302a;--ink:#f6f1e8;
+  --c14:rgba(32,25,16,.07);--c26:rgba(32,25,16,.16);--card-3:#d9d5cf;
+  color:var(--fg);margin-inline:8px;border-radius:32px;
+  background:linear-gradient(180deg,#fff 0%,#f3f2ef 42%,#dfddd9 100%)
+}
+.lite ::selection{background:#201910;color:#f6f1e8}
+@media(min-width:900px){.lite{margin-inline:16px;border-radius:48px}}
+.lite .scene{
+  --fg:#f5efe8;--muted:#a49d96;--dim:#777069;--line:#38332e;
+  --edge:rgba(255,255,255,.07);--glass:rgba(34,29,24,.72);--well:rgba(20,16,11,.5);
+  --cream:#f2e7ce;--cream-hi:#fef5df;--ink:#201910;
+  --c14:rgba(242,231,206,.14);--c26:rgba(242,231,206,.26);--card-3:#2f2a25;
+  background:#1b1611;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 44px 80px -44px rgba(20,16,11,.6)
+}
+.lite .scene--in{background:#1b1611;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.lite .btn--on{box-shadow:0 20px 40px -22px rgba(20,16,11,.6)}
+.lite .btn--on:hover{box-shadow:0 26px 48px -22px rgba(20,16,11,.7)}
+.lite .btn--ghost{background:#fff;box-shadow:inset 0 0 0 1px rgba(29,24,19,.14)}
+.lite .btn--ghost:hover{box-shadow:inset 0 0 0 1px rgba(29,24,19,.3)}
+.lite .plan__i{border-color:rgba(29,24,19,.12)}
+.lite .plan--on{box-shadow:0 50px 90px -50px rgba(20,16,11,.75)}
+.lite .plan--on .plan__i{border-color:rgba(246,241,232,.16)}
+.lite .wc:hover{box-shadow:inset 0 0 0 1px var(--c26),0 24px 44px -26px rgba(20,16,11,.35)}
+
 /* ---------- entrada ao rolar ---------- */
 .js [data-reveal]{opacity:0}
 .js [data-reveal="shown"]{animation:rise .75s var(--ease) both;animation-delay:var(--d,0ms)}
@@ -130,15 +160,11 @@ section{position:relative;padding:78px 0}
 @media(min-width:900px){.nav{top:16px;padding:8px 8px 8px 22px}.nav__l{display:flex}}
 
 /* ---------- hero ---------- */
-.hero{padding:118px 0 60px;isolation:isolate;overflow-x:hidden;overflow-x:clip}
-.hero .wrap{display:flex;flex-direction:column}
+.hero{padding:112px 0 56px;isolation:isolate;overflow-x:hidden;overflow-x:clip}
+.hero__t{display:flex;flex-direction:column}
 .hero .chip{align-self:flex-start}
-.hero .stage{order:2}
-.hero .proof{order:3}
-.hero__bird{position:absolute;z-index:-1;top:-8px;right:-52%;width:128vw;max-width:none;fill:none;stroke:url(#hm-metal);stroke-width:1.3;opacity:.24;pointer-events:none}
-.js .hero__bird path{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 2.8s cubic-bezier(.65,0,.35,1) .25s forwards}
 @keyframes draw{to{stroke-dashoffset:0}}
-.hero h1{margin:22px 0 26px}
+.hero h1{margin:22px 0 24px}
 .cut{display:block;overflow:hidden;padding-bottom:.14em;margin-bottom:-.14em}
 .cut>span{display:block}
 .js .cut>span{transform:translateY(114%);animation:cut 1.05s var(--ease) both;animation-delay:var(--d,0ms)}
@@ -149,14 +175,78 @@ section{position:relative;padding:78px 0}
 .proof li{display:inline-flex;align-items:center;gap:.5rem;border-radius:999px;padding:.45rem .85rem .45rem .6rem;font-family:var(--ui);font-size:.82rem;color:var(--muted);background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
 .proof .ic{width:15px;height:15px;color:var(--cream)}
 @media(min-width:640px){.hero__cta,.how__a{justify-items:start}}
-@media(min-width:900px){
-  .hero{padding:184px 0 90px}
-  .hero__bird{top:34px;right:-7%;width:min(60vw,860px);opacity:.26}
-  .hero h1{margin:26px 0 40px}
-  .hero__row{grid-template-columns:minmax(0,35rem) auto;justify-content:space-between;align-items:end}
-  .hero__cta{justify-items:end;text-align:right}
-  .hero .proof{order:2}
-  .hero .stage{order:3}
+@media(min-width:1000px){
+  .hero{padding:136px 0 84px}
+  .hero__g{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:40px;align-items:center}
+  .hero .display{font-size:clamp(3.4rem,5.4vw,5.5rem)}
+  .hero h1{margin:24px 0 30px}
+}
+
+/* ---------- hero: o celular que responde sozinho ----------
+   O visitante é o cliente: toca numa resposta e a IA responde.
+   Ao lado, o que essa conversa vira dentro do CRM. */
+.demo{position:relative;display:grid;justify-items:center;margin-top:54px}
+.demo__p{display:grid;justify-items:center}
+.demo__hint{display:inline-flex;align-items:center;gap:9px;margin-bottom:14px;border-radius:999px;padding:.45rem .95rem .45rem .85rem;font-family:var(--ui);font-size:.8rem;background:var(--glass);box-shadow:inset 0 0 0 1px var(--c26)}
+.demo__tap{position:relative;width:8px;height:8px;border-radius:50%;background:var(--cream)}
+.demo__tap::after{content:"";position:absolute;inset:-6px;border-radius:50%;box-shadow:0 0 0 1px var(--cream);animation:ping 1.8s var(--ease) infinite}
+@keyframes ping{from{transform:scale(.4);opacity:1}to{transform:scale(1.5);opacity:0}}
+html:not(.js) .demo__hint{display:none}
+.phone{position:relative;width:min(86vw,330px);aspect-ratio:9/15.6;border-radius:48px;padding:9px;background:linear-gradient(150deg,#4a443d,#1a1612 34%,#0d0a08 70%,#3a342e);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 0 0 3px #0d0a08,0 70px 120px -60px #000,0 30px 70px -40px rgba(242,231,206,.2)}
+.phone::before{content:"";position:absolute;z-index:3;top:19px;left:50%;width:86px;height:25px;margin-left:-43px;border-radius:999px;background:#000}
+.phone__s{position:relative;display:flex;flex-direction:column;height:100%;overflow:hidden;border-radius:40px;background:#0b141a;font-family:var(--ui);color:#e9edef}
+.wa-h{display:flex;align-items:center;gap:10px;padding:52px 14px 10px;background:#1f2c34}
+.wa-h__av{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:50%;background:var(--cream);color:var(--ink);font-size:.78rem;font-weight:600}
+.wa-h strong{display:block;font-size:.92rem;font-weight:600;line-height:1.2}
+.wa-h small{display:block;font-size:.7rem;color:#8696a0}
+.wa-h small.is-typing{color:#00a884}
+.wa-b{flex:1;display:flex;flex-direction:column;gap:5px;padding:12px 10px 8px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;background:radial-gradient(120% 60% at 50% 0%,#101c23,#0b141a)}
+.wa-b::-webkit-scrollbar{display:none}
+.wa-day{align-self:center;margin-bottom:6px;border-radius:8px;padding:3px 10px;font-size:.64rem;color:#8696a0;background:#182229}
+.wm{max-width:84%;border-radius:10px;padding:6px 9px 5px;font-size:.83rem;line-height:1.38}
+.js .wm{animation:pop .4s var(--ease) both}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.wm--in{align-self:flex-start;background:#202c33;border-top-left-radius:3px}
+.wm--out{align-self:flex-end;background:#005c4b;border-top-right-radius:3px}
+.wm time{float:right;margin:7px 0 -3px 10px;font-size:.6rem;color:rgba(233,237,239,.55)}
+.wm--out time::after{content:" ✓✓";letter-spacing:-.18em;color:#53bdeb}
+.wm--dots{display:inline-flex;gap:4px;padding:11px 12px}
+.wm--dots i{width:6px;height:6px;border-radius:50%;background:#8696a0;animation:blink 1.2s ease-in-out infinite}
+.wm--dots i:nth-child(2){animation-delay:.15s}
+.wm--dots i:nth-child(3){animation-delay:.3s}
+.wa-q{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;padding:2px 10px 8px}
+.wa-q:empty{display:none}
+.wa-q button,.wa-q a{display:inline-flex;align-items:center;gap:6px;min-height:34px;border-radius:999px;padding:0 13px;font-family:var(--ui);font-size:.78rem;font-weight:500;color:#e9edef;background:#1f2c34;box-shadow:inset 0 0 0 1px rgba(242,231,206,.42);transition:background .2s,transform .2s var(--ease),box-shadow .2s}
+.js .wa-q>*{animation:pop .4s var(--ease) both;animation-delay:calc(var(--i,0)*70ms)}
+.wa-q button:hover{background:#2a3942;box-shadow:inset 0 0 0 1px var(--cream)}
+.wa-q .is-tap{transform:scale(.93);background:#005c4b}
+.wa-q a{background:var(--cream);color:var(--ink);font-weight:600;box-shadow:none}
+.wa-q .ic{width:14px;height:14px}
+.wa-f{display:flex;align-items:center;gap:8px;padding:6px 10px 16px}
+.wa-f span{flex:1;border-radius:999px;padding:9px 14px;font-size:.8rem;color:#8696a0;background:#1f2c34}
+.wa-f i{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:50%;background:#00a884;color:#0b141a}
+.wa-f .ic{width:16px;height:16px}
+.crm{position:relative;z-index:2;width:min(86vw,330px);margin-top:-10px;border-radius:20px;padding:13px;font-family:var(--ui);font-size:.76rem;background:rgba(27,22,17,.9);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:inset 0 0 0 1px var(--c26),0 34px 60px -30px #000}
+.crm__h{display:flex;align-items:center;gap:7px;margin-bottom:11px;font-size:.6rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.crm__h .mark{width:16px}
+.crm__live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;color:var(--cream)}
+.crm__live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cream);animation:blink 1.4s ease-in-out infinite}
+.crm__lead{display:grid;grid-template-columns:30px minmax(0,1fr);gap:4px 9px;align-items:center;padding-bottom:11px;border-bottom:1px solid rgba(255,255,255,.07)}
+.crm__lead .av{width:30px;height:30px;font-size:.6rem}
+.crm__lead strong{display:block;font-size:.84rem;font-weight:600}
+.crm__lead small{display:block;font-size:.66rem;color:var(--muted)}
+.crm__st{grid-column:2;justify-self:start;border-radius:999px;padding:3px 9px;font-size:.64rem;font-weight:600;white-space:nowrap;background:var(--cream);color:var(--ink)}
+.crm__st.is-new{animation:flash .9s var(--ease)}
+@keyframes flash{from{box-shadow:0 0 0 0 rgba(242,231,206,.5)}to{box-shadow:0 0 0 12px rgba(242,231,206,0)}}
+.crm__log{display:grid;gap:7px;min-height:104px;padding-top:11px;align-content:start}
+.crm__log li{display:grid;grid-template-columns:36px minmax(0,1fr);gap:6px;color:var(--muted);line-height:1.35}
+.js .crm__log li{animation:pop .45s var(--ease) both}
+.crm__log li:last-child{color:var(--fg)}
+.crm__log time{padding-top:1px;font-family:var(--mono);font-size:.6rem;color:var(--dim)}
+@media(min-width:1000px){
+  .demo{display:flex;align-items:flex-end;justify-content:flex-end;margin-top:0}
+  .phone{width:clamp(280px,calc((100vh - 230px)*9/17.6),330px);aspect-ratio:9/17.6}
+  .crm{order:-1;width:232px;margin:0 -22px 104px 0}
 }
 
 /* =====================================================================
@@ -195,66 +285,11 @@ html:not(.js) [data-until]{display:none}
 .typing i:nth-child(3){animation-delay:.36s}
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
 
-/* --- cena do hero --- */
-.stage{margin-top:46px}
-.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.steps li{display:grid;gap:1px;border-radius:14px;padding:10px 12px;background:rgba(41,36,31,.55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);color:var(--dim);transition:background .6s var(--ease),color .6s var(--ease),box-shadow .6s var(--ease)}
-.steps time{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em}
-.steps b{font-weight:500;font-size:.84rem}
-.steps li.on{background:var(--cream);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 16px 36px -18px rgba(242,231,206,.75)}
-.stage__g{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
 .scene :where(div,ul,ol,li,p){min-width:0}
-.il{display:none}
-.il li{display:flex;gap:10px;align-items:center;padding:9px 8px;border-radius:14px}
-.il li>div{min-width:0}
-.il strong{display:block;font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.il div span{display:block;font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.il .cur{opacity:0;transform:translateY(-8px);transition:opacity .5s var(--ease),transform .5s var(--ease),background .5s}
-.il .cur.on{opacity:1;transform:none;background:var(--c14);box-shadow:inset 0 0 0 1px var(--c26)}
-.il .cur::after{content:"";margin-left:auto;width:8px;height:8px;flex:none;border-radius:50%;background:var(--cream)}
-.chat__h{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06)}
-.chat__h>div{min-width:0}
-.chat__h strong{display:block;font-weight:600;font-size:.86rem}
-.chat__h small{display:block;color:var(--muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chat__h .tag{margin-left:auto}
-.chat__b{display:flex;flex-direction:column;gap:8px;padding:12px 0 2px}
-.side{display:grid;gap:10px}
-.side .pane{padding:11px;min-width:0}
-.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.slots li{display:grid;gap:4px}
-.slots time{font-family:var(--mono);font-size:.6rem;color:var(--dim)}
-.slot{position:relative;display:block;min-height:28px;border-radius:9px;padding:6px 8px;font-size:.7rem;background:#29241f;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.slot--free{background:none;box-shadow:inset 0 0 0 1px rgba(242,231,206,.22);color:var(--dim)}
 .slot__on{position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;border-radius:9px;background:var(--cream);color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;opacity:0;transform:scale(.9);transition:opacity .5s var(--ease),transform .5s var(--ease)}
 .slot__on.on{opacity:1;transform:none}
 .slot__on em{font-style:normal}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.cols>div{min-width:0}
-.cols h5{font-size:.62rem;font-weight:500;color:var(--muted);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dl{position:relative;min-height:28px;margin-bottom:5px;border-radius:9px;background:#29241f;padding:6px 8px 6px 11px;font-size:.7rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cream)}
-.dl--g{background:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
-.dl--g::before{display:none}
-.dl--s{font-weight:500;color:var(--muted)}
-.dl--s::before{background:var(--dim)}
-.dl--a{opacity:0;transform:translateX(14px);transition:opacity .45s var(--ease),transform .55s var(--ease)}
-.dl--b{opacity:0;transform:translateX(-14px);transition:opacity .5s var(--ease),transform .6s var(--ease)}
-.dl--a.on,.dl--b.on{opacity:1;transform:none}
-.dl--b.on{box-shadow:inset 0 0 0 1px var(--c26)}
-@media(min-width:1000px){
-  .scene{padding:16px}
-  .steps{grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
-  .steps li{padding:12px 16px}
-  .stage{margin-top:72px}
-  .stage__g{grid-template-columns:236px minmax(0,1fr) 296px;gap:12px}
-  .il{display:block}
-  .side{align-content:start}
-  .slots{grid-template-columns:minmax(0,1fr)}
-  .slots li{grid-template-columns:32px minmax(0,1fr);align-items:center;gap:6px}
-  .chat__b{padding:18px 6px 6px;gap:12px}
-  .stage .bub{font-size:.94rem;padding:10px 14px;max-width:74%}
-  .stage .typing{height:38px}
-}
+@media(min-width:1000px){.scene{padding:16px}}
 
 /* ---------- faixa de origens ---------- */
 .band{padding:8px 0 30px}
@@ -282,7 +317,8 @@ html:not(.js) [data-until]{display:none}
 .pains span{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .pains p{font-size:1.14rem;line-height:1.35;letter-spacing:-.01em}
 .turn{margin-top:44px;max-width:44rem;color:var(--muted)}
-@media(min-width:900px){.pain__g{grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:84px;align-items:start}.dead{position:sticky;top:110px;padding:22px}.pains p{font-size:1.3rem}.turn{margin-top:72px}}
+.dead__sem,.dead__com{display:grid;gap:10px}
+@media(min-width:900px){.pain__g{grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:84px;align-items:start}.pain__l{position:sticky;top:110px}.dead{padding:22px}.pains p{font-size:1.3rem}.turn{margin-top:72px}}
 
 /* ---------- quem faz ---------- */
 .who{padding-top:20px}
@@ -555,13 +591,47 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
 .sticky .btn{width:100%;min-height:52px}
 @media(min-width:900px){.sticky{display:none}}
 
+/* ---------- cenas que respondem ao toque ---------- */
+.try{display:inline-flex;align-items:center;gap:10px;font-family:var(--ui);font-size:.86rem;color:var(--muted)}
+html:not(.js) .try{display:none}
+.js [data-int] [data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.js [data-int] [data-act]:hover{filter:brightness(1.2)}
+.card--in{animation:cardin .55s var(--ease) both}
+@keyframes cardin{from{opacity:0;transform:translateY(-10px) scale(.97)}to{opacity:1;transform:none}}
+.row[hidden]{display:none}
+.qrm{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);z-index:2;display:grid;gap:2px;border-radius:12px;padding:5px;background:var(--card-2);box-shadow:inset 0 0 0 1px var(--c26),0 18px 30px -14px #000}
+.qrm span{border-radius:8px;padding:8px 9px;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qrm b{margin-right:8px;font-family:var(--mono);font-weight:400;color:var(--cream)}
+.tg{transition:background .3s}
+.tg::after{transition:transform .3s var(--ease),background .3s}
+.tg.off{background:var(--card-3)}
+.tg.off::after{transform:translateX(-16px);background:var(--muted)}
+.face.off{background:var(--card-3);color:var(--muted);animation:none}
+.lv li{transition:background .3s,color .3s}
+.agw{display:grid;gap:10px}
+.acts{display:grid;gap:6px}
+.acts li{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:12px;padding:9px 11px;font-size:.76rem;background:rgba(41,36,31,.6)}
+.acts em{flex:none;border-radius:999px;padding:2px 8px;font-style:normal;font-size:.62rem;font-weight:600;background:var(--c14);color:var(--cream)}
+.run{display:inline-flex;align-items:center;gap:7px;margin-top:12px;border-radius:999px;padding:8px 14px;font-size:.74rem;font-weight:600;background:var(--cream);color:var(--ink)}
+.run .ic{width:13px;height:13px}
+.qs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.qs span{border-radius:999px;padding:6px 10px;font-size:.68rem;color:var(--muted);background:rgba(41,36,31,.7);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);transition:background .3s,color .3s}
+.qs span.on{background:var(--cream);color:var(--ink);font-weight:600}
+.seg{display:inline-flex;gap:4px;margin-bottom:12px;padding:4px;border-radius:999px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge);font-family:var(--ui)}
+.seg button{min-height:40px;padding:0 1rem;border-radius:999px;font-size:.86rem;color:var(--muted);transition:background .3s var(--ease),color .3s}
+.seg button[aria-pressed="true"]{background:var(--cream);color:var(--ink);font-weight:600}
+html:not(.js) .seg,html:not(.js) .run,html:not(.js) .qs{display:none}
+.dead [hidden]{display:none}
+.dead__com .dmsg p{background:#29241f;color:var(--fg)}
+.dead__com .dmsg--out p{background:var(--cream);color:var(--ink)}
+.dead__com .dmsg{animation:rise .5s var(--ease) both;animation-delay:var(--d,0ms)}
+
 /* ---------- quem prefere menos movimento ---------- */
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation:none!important;transition:none!important}
   .js [data-reveal]{opacity:1}
   .js .cut>span{transform:none}
-  .js .hero__bird path{stroke-dashoffset:0}
   .js .mark-xl path{stroke-dashoffset:0;fill-opacity:1}
   .marq{-webkit-mask-image:none;mask-image:none}
   .marq__t{width:auto;flex-wrap:wrap;justify-content:center}
@@ -581,6 +651,9 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
   </defs>
   <symbol id="harpia" viewBox="236 266 570 489"><path fill-rule="evenodd" d="M256 414 L344 356 C390 375 430 390 466 396 C428 386 388 366 362 338 C352 322 344 304 347 285 C372 312 420 306 470 302 C560 296 660 296 705 330 C735 352 752 392 762 428 C776 440 786 456 786 474 C760 462 730 458 700 462 C600 480 500 560 455 735 C440 560 380 450 256 414 Z M640 386 C662 378 722 392 758 428 C720 418 668 412 646 404 C634 400 632 390 640 386 Z"/></symbol>
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
   <symbol id="i-go" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -614,71 +687,54 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
 
 <!-- ============================ HERO ============================ -->
 <section class="hero">
-  <div class="wrap">
-    <svg class="hero__bird" viewBox="226 256 590 509" aria-hidden="true"><path pathLength="1" d="M256 414 L344 356 C390 375 430 390 466 396 C428 386 388 366 362 338 C352 322 344 304 347 285 C372 312 420 306 470 302 C560 296 660 296 705 330 C735 352 752 392 762 428 C776 440 786 456 786 474 C760 462 730 458 700 462 C600 480 500 560 455 735 C440 560 380 450 256 414 Z M640 386 C662 378 722 392 758 428 C720 418 668 412 646 404 C634 400 632 390 640 386 Z"/></svg>
-
-    <p class="chip" data-reveal><span class="dot"></span>CRM de WhatsApp com implantação</p>
-    <h1 class="display"><span class="cut"><span style="--d:120ms">Nenhum lead</span></span><span class="cut"><span style="--d:240ms">sem resposta.</span></span></h1>
-
-    <div class="hero__row">
-      <p class="lead" data-reveal style="--d:420ms">O Harpium CRM coloca WhatsApp, Instagram, funil, agenda e agentes de IA na mesma tela. E a nossa equipe entrega tudo configurado: número conectado, funil montado e time treinado.</p>
-      <div class="hero__cta" data-reveal style="--d:540ms">
-        <a class="btn btn--on" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="hero" target="_blank" rel="noopener">Quero ver funcionando<svg class="ic ic--go" aria-hidden="true"><use href="#i-go"/></svg></a>
-        <p class="micro">Demonstração pelo WhatsApp, com o cenário da sua empresa.</p>
+  <div class="wrap hero__g">
+    <div class="hero__t">
+      <p class="chip" data-reveal><span class="dot"></span>CRM de WhatsApp com implantação</p>
+      <h1 class="display"><span class="cut"><span style="--d:120ms">Nenhum lead</span></span><span class="cut"><span style="--d:240ms">sem resposta.</span></span></h1>
+      <div class="hero__row">
+        <p class="lead" data-reveal style="--d:420ms">O Harpium CRM coloca WhatsApp, Instagram, funil, agenda e agentes de IA na mesma tela. E a nossa equipe entrega tudo configurado: número conectado, funil montado e time treinado.</p>
+        <div class="hero__cta" data-reveal style="--d:540ms">
+          <a class="btn btn--on" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="hero" target="_blank" rel="noopener">Quero ver funcionando<svg class="ic ic--go" aria-hidden="true"><use href="#i-go"/></svg></a>
+          <p class="micro">Demonstração pelo WhatsApp, com o cenário da sua empresa.</p>
+        </div>
       </div>
+      <ul class="proof" data-reveal style="--d:660ms">
+        <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Preço por empresa, não por usuário</li>
+        <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>WhatsApp oficial da Meta ou QR code</li>
+        <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Implantação feita pela nossa equipe</li>
+      </ul>
     </div>
 
-    <ul class="proof" data-reveal style="--d:660ms">
-      <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Preço por empresa, não por usuário</li>
-      <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>WhatsApp oficial da Meta ou QR code</li>
-      <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Implantação feita pela nossa equipe</li>
-    </ul>
-
-    <!-- a cena: o mesmo lead, respondido em segundos -->
-    <div class="scene stage" data-reveal style="--d:780ms" data-scene data-steps="900,1100,1300,2100,1500,1100,1700,1500,4400" role="img" aria-label="Demonstração do Harpium CRM: às 21h04 chega um lead vindo de um anúncio. O agente de IA responde na hora, oferece dois horários, marca a avaliação na agenda e o cartão da cliente avança no funil.">
-      <ol class="steps">
-        <li data-at="1"><time>21:04</time><b>Lead chegou</b></li>
-        <li data-at="4"><time>21:04</time><b>IA respondeu</b></li>
-        <li data-at="7"><time>21:05</time><b>Horário marcado</b></li>
-        <li data-at="8"><time>21:05</time><b>Cartão no funil</b></li>
-      </ol>
-      <div class="stage__g">
-        <ul class="il pane">
-          <li class="cur" data-at="1"><span class="av">MS</span><div><strong>Marina Souza</strong><span>Oi! Vi o anúncio de vocês…</span></div></li>
-          <li><span class="av">CM</span><div><strong>Carlos Mendes</strong><span>Obrigado, até quinta!</span></div></li>
-          <li><span class="av">BN</span><div><strong>Bia Nunes</strong><span>Vou ver com meu marido e te falo</span></div></li>
-          <li><span class="av">SV</span><div><strong>Studio Vila</strong><span>Qual o valor do pacote?</span></div></li>
-        </ul>
-        <div class="chat pane">
-          <div class="chat__h">
-            <span class="av">MS</span>
-            <div><strong>Marina Souza</strong><small>WhatsApp · veio do anúncio no Instagram</small></div>
-            <span class="tag rv" data-at="4">IA atendendo</span>
-          </div>
-          <div class="chat__b">
-            <div class="msg msg--in"><p class="bub rv" data-at="2">Oi! Vi o anúncio de vocês. Tem horário essa semana?</p></div>
-            <div class="msg msg--out"><span class="typing rv" data-at="3" data-until="4"><i></i><i></i><i></i></span><p class="bub rv" data-at="4"><span class="ai">IA</span>Oi, Marina! Tenho quinta às 14h ou sexta às 10h. Qual fica melhor?</p></div>
-            <div class="msg msg--in"><p class="bub rv" data-at="5">Quinta às 14h</p></div>
-            <div class="msg msg--out"><span class="typing rv" data-at="6" data-until="7"><i></i><i></i><i></i></span><p class="bub rv" data-at="7"><span class="ai">IA</span>Marcado: quinta, 14h. Um dia antes eu te mando um lembrete.</p></div>
-          </div>
-        </div>
-        <div class="side">
-          <div class="pane">
-            <p class="mini__t">Agenda · Dra. Paula</p>
-            <ul class="slots">
-              <li><time>13h</time><span class="slot">Carlos M.</span></li>
-              <li><time>14h</time><span class="slot slot--free">livre<span class="slot__on" data-at="7">Marina S.</span></span></li>
-              <li><time>15h</time><span class="slot">Retorno</span></li>
-            </ul>
-          </div>
-          <div class="pane">
-            <p class="mini__t">Funil · Pacientes</p>
-            <div class="cols">
-              <div><h5>Novo contato</h5><div class="dl dl--a" data-at="1" data-until="8">Marina S.</div><div class="dl dl--g"></div></div>
-              <div><h5>Agendamento</h5><div class="dl dl--s">Carlos M.</div><div class="dl dl--b" data-at="8">Marina S.</div></div>
+    <!-- a demonstração: o visitante é o cliente e a IA responde sozinha (roteiro no script, em PhoneDemo) -->
+    <div class="demo" id="demo" data-reveal style="--d:300ms">
+      <div class="demo__p">
+        <p class="demo__hint"><span class="demo__tap" aria-hidden="true"></span>Teste agora: você é o cliente</p>
+        <div class="phone" role="group" aria-label="Demonstração: uma conversa de WhatsApp com a assistente de IA de uma clínica. Toque nas respostas para conversar.">
+          <div class="phone__s">
+            <div class="wa-h">
+              <span class="wa-h__av" aria-hidden="true">A</span>
+              <div><strong>Clínica Aura</strong><small id="wa-st">online</small></div>
             </div>
+            <div class="wa-b" id="wa-b" aria-live="polite">
+              <p class="wa-day">Hoje</p>
+              <p class="wm wm--out">Oi! Vi o anúncio de vocês<time>21:04</time></p>
+              <p class="wm wm--in">Oi! Aqui é a Lia, assistente virtual da Clínica Aura. Tenho quinta às 14h ou sexta às 10h. Qual fica melhor?<time>21:04</time></p>
+              <p class="wm wm--out">Quinta, 14h<time>21:05</time></p>
+              <p class="wm wm--in">Marcado! Quinta, às 14h, com a Dra. Paula. Um dia antes eu te mando um lembrete por aqui.<time>21:05</time></p>
+            </div>
+            <div class="wa-q" id="wa-q"></div>
+            <div class="wa-f" aria-hidden="true"><span>Mensagem</span><i><svg class="ic"><use href="#i-mic"/></svg></i></div>
           </div>
         </div>
+      </div>
+      <div class="crm" aria-live="polite">
+        <p class="crm__h"><svg class="mark" viewBox="0 0 570 489" aria-hidden="true"><use href="#harpia"/></svg>No seu CRM<span class="crm__live">ao vivo</span></p>
+        <div class="crm__lead"><span class="av">VC</span><div><strong>Você</strong><small>Instagram · anúncio</small></div><span class="crm__st" id="crm-st">Agendamento</span></div>
+        <ol class="crm__log" id="crm-log">
+          <li><time>21:04</time>Novo lead no funil</li>
+          <li><time>21:04</time>Lia respondeu em 3 segundos</li>
+          <li><time>21:05</time>Avaliação marcada: qui, 14h</li>
+        </ol>
       </div>
     </div>
   </div>
@@ -707,11 +763,25 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
       <h2 class="h2">Parece o seu dia?</h2>
     </div>
     <div class="pain__g">
-      <div class="dead" data-reveal role="img" aria-label="Uma conversa sem resposta: a cliente escreve às 21h04, a empresa só responde às 9h12 do dia seguinte e ela já fechou com outra clínica.">
-        <div class="dmsg"><time>21:04</time><p>Oi! Vi o anúncio de vocês. Tem horário essa semana?</p></div>
-        <div class="dgap"><span>12 horas depois</span></div>
-        <div class="dmsg dmsg--out"><time>09:12</time><p>Bom dia! Temos sim. Ainda tem interesse?</p></div>
-        <div class="dmsg"><time>09:40</time><p>Já fechei com outra clínica, obrigada.</p></div>
+      <div class="pain__l" data-reveal>
+        <div class="seg" role="group" aria-label="Compare a mesma conversa">
+          <button type="button" data-v="sem" aria-pressed="true">Sem CRM</button>
+          <button type="button" data-v="com" aria-pressed="false">Com o Harpium</button>
+        </div>
+        <div class="dead" aria-live="polite">
+          <div class="dead__sem" role="img" aria-label="Uma conversa sem resposta: a cliente escreve às 21h04, a empresa só responde às 9h12 do dia seguinte e ela já fechou com outra clínica.">
+            <div class="dmsg"><time>21:04</time><p>Oi! Vi o anúncio de vocês. Tem horário essa semana?</p></div>
+            <div class="dgap"><span>12 horas depois</span></div>
+            <div class="dmsg dmsg--out"><time>09:12</time><p>Bom dia! Temos sim. Ainda tem interesse?</p></div>
+            <div class="dmsg"><time>09:40</time><p>Já fechei com outra clínica, obrigada.</p></div>
+          </div>
+          <div class="dead__com" role="img" aria-label="A mesma conversa com o Harpium: a cliente escreve às 21h04, a IA responde no mesmo minuto com dois horários e às 21h05 a avaliação está marcada." hidden>
+            <div class="dmsg"><time>21:04</time><p>Oi! Vi o anúncio de vocês. Tem horário essa semana?</p></div>
+            <div class="dmsg dmsg--out" style="--d:150ms"><time>21:04 · IA</time><p>Oi! Tenho quinta às 14h ou sexta às 10h. Qual fica melhor?</p></div>
+            <div class="dmsg" style="--d:300ms"><time>21:05</time><p>Quinta às 14h</p></div>
+            <div class="dmsg dmsg--out" style="--d:450ms"><time>21:05 · IA</time><p>Marcado! Um dia antes eu te mando um lembrete.</p></div>
+          </div>
+        </div>
       </div>
       <ul class="pains">
         <li data-reveal><span>3 pessoas, 1 número</span><p>Todo mundo atende no mesmo WhatsApp e ninguém sabe quem respondeu o quê.</p></li>
@@ -750,7 +820,7 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
 -->
 
 <!-- ============================ FUNCIONALIDADES ============================ -->
-<section class="feats" id="funcionalidades">
+<section class="feats lite" id="funcionalidades">
   <div class="wrap">
     <div class="sec-head" data-reveal>
       <p class="eyebrow"><span class="sw"></span>O sistema</p>
@@ -769,14 +839,15 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Quiz e formulários próprios, com as respostas de cada pessoa</li>
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Você vê de qual origem veio cada lead</li>
         </ul>
+        <p class="try"><span class="demo__tap" aria-hidden="true"></span>Toque numa origem para chegar um lead, e num cartão para ele avançar.</p>
       </div>
-      <div class="scene" data-reveal data-scene data-steps="700,700,700,700,700,700,700,900,1300,3600" role="img" aria-label="Leads chegando de quatro origens, Meta Lead Ads, Google Ads, formulário do site e quiz, e virando cartões na coluna Novo lead do funil. O lead que saiu qualificado do quiz avança sozinho para a etapa Qualificado.">
+      <div class="scene" data-reveal data-scene data-int="funil" data-steps="700,700,700,700,700,700,700,900,1300,3600" role="img" aria-label="Leads chegando de quatro origens, Meta Lead Ads, Google Ads, formulário do site e quiz, e virando cartões na coluna Novo lead do funil. O lead que saiu qualificado do quiz avança sozinho para a etapa Qualificado.">
         <div>
           <ul class="srcs">
-            <li data-at="1" data-until="3">Meta Lead Ads</li>
-            <li data-at="3" data-until="5">Google Ads</li>
-            <li data-at="5" data-until="7">Formulário do site</li>
-            <li data-at="7" data-until="10">Quiz</li>
+            <li data-at="1" data-until="3" data-act="lead">Meta Lead Ads</li>
+            <li data-at="3" data-until="5" data-act="lead">Google Ads</li>
+            <li data-at="5" data-until="7" data-act="lead">Formulário do site</li>
+            <li data-at="7" data-until="10" data-act="lead">Quiz</li>
           </ul>
           <div class="board">
             <div class="bcol">
@@ -812,15 +883,16 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Respostas rápidas com texto, foto, áudio e documento</li>
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Aviso quando um cliente está esperando por uma pessoa</li>
         </ul>
+        <p class="try"><span class="demo__tap" aria-hidden="true"></span>Toque no campo de mensagem para usar uma resposta rápida, ou nos filtros.</p>
       </div>
-      <div class="scene" data-reveal data-scene data-steps="900,1600,1500,1400,1900,3600" role="img" aria-label="Caixa de entrada: chega uma mensagem nova, o sistema avisa que há um cliente aguardando, a atendente Ana assume a conversa, usa uma resposta rápida e a conversa fica como pendente.">
+      <div class="scene" data-reveal data-scene data-int="inbox" data-steps="900,1600,1500,1400,1900,3600" role="img" aria-label="Caixa de entrada: chega uma mensagem nova, o sistema avisa que há um cliente aguardando, a atendente Ana assume a conversa, usa uma resposta rápida e a conversa fica como pendente.">
         <div>
           <div class="bar2">
-            <span class="pl pl--on">Todas</span><span class="pl">Não lidas</span><span class="pl md">Abertas</span>
+            <span class="pl pl--on" data-act="filtro" data-f="todas">Todas</span><span class="pl" data-act="filtro" data-f="naolidas">Não lidas</span><span class="pl md" data-act="filtro" data-f="abertas">Abertas</span>
             <span class="wait rv" data-at="1" data-until="2"><i></i>1 aguardando<span class="md">&nbsp;atendente</span></span>
           </div>
           <ul class="rows">
-            <li class="row row--new" data-at="1">
+            <li class="row row--new" data-at="1" data-lida="1" data-st="pendente">
               <span class="av">LC</span>
               <div>
                 <strong>Lucas Carvalho</strong>
@@ -837,11 +909,11 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
                 </div>
               </div>
             </li>
-            <li class="row"><span class="av">BN</span><div><strong>Beatriz Nunes</strong><p>Pode ser sexta às 9h?</p></div><div class="row__m"><time>14:02</time><span class="st"><b class="who2">BR</b>Aberta</span></div></li>
-            <li class="row"><span class="av">SV</span><div><strong>@studio.vila</strong><p>Instagram · Vocês atendem sábado?</p></div><div class="row__m"><time>13:47</time><span class="st"><b class="who2">IA</b>Aberta</span></div></li>
-            <li class="row"><span class="av">CM</span><div><strong>Carla Menezes</strong><p>Obrigada, deu tudo certo!</p></div><div class="row__m"><time>11:20</time><span class="st st--n">Fechada</span></div></li>
+            <li class="row" data-lida="0" data-st="aberta"><span class="av">BN</span><div><strong>Beatriz Nunes</strong><p>Pode ser sexta às 9h?</p></div><div class="row__m"><time>14:02</time><span class="st"><b class="who2">BR</b>Aberta</span></div></li>
+            <li class="row" data-lida="1" data-st="aberta"><span class="av">SV</span><div><strong>@studio.vila</strong><p>Instagram · Vocês atendem sábado?</p></div><div class="row__m"><time>13:47</time><span class="st"><b class="who2">IA</b>Aberta</span></div></li>
+            <li class="row" data-lida="1" data-st="fechada"><span class="av">CM</span><div><strong>Carla Menezes</strong><p>Obrigada, deu tudo certo!</p></div><div class="row__m"><time>11:20</time><span class="st st--n">Fechada</span></div></li>
           </ul>
-          <div class="cmp">
+          <div class="cmp" data-act="cmp">
             <span class="qr rv" data-at="3" data-until="4"><b>/valores</b>Valores e planos</span>
             <div class="swap">
               <p class="cmp__ph">Digite / para usar uma resposta rápida</p>
@@ -863,8 +935,9 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Desconto e fechamento sempre pedem a sua aprovação</li>
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Quando não sabe, avisa o cliente e passa para uma pessoa</li>
         </ul>
+        <p class="try"><span class="demo__tap" aria-hidden="true"></span>Toque nos níveis de autonomia, inclusive no Avançada, e no botão de ligar.</p>
       </div>
-      <div class="scene" data-reveal data-scene data-steps="1200,2200,900,2200,4200" role="img" aria-label="Agente de IA chamado Lia, com autonomia no nível 2 de 4. Ele pede aprovação antes de oferecer um desconto, o dono aprova, a mensagem é enviada e, quando o cliente pede uma pessoa, o agente avisa e passa a conversa para a atendente.">
+      <div class="scene" data-reveal data-scene data-int="agente" data-steps="1200,2200,900,2200,4200" role="img" aria-label="Agente de IA chamado Lia, com autonomia no nível 2 de 4. Ele pede aprovação antes de oferecer um desconto, o dono aprova, a mensagem é enviada e, quando o cliente pede uma pessoa, o agente avisa e passa a conversa para a atendente.">
         <div class="sc--agent">
           <div class="pane agent">
             <span class="face"><svg class="ic" aria-hidden="true"><use href="#i-bot"/></svg></span>
@@ -877,23 +950,23 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
                 <span class="rv" data-at="4">conversa passada para Ana</span>
               </div>
             </div>
-            <span class="tg"></span>
+            <span class="tg" data-act="liga" aria-label="Ligar ou desligar o agente"></span>
           </div>
           <div class="pane">
             <p class="mini__t">Autonomia</p>
-            <ol class="lv"><li><b>1</b>Assistido</li><li class="sel"><b>2</b>Semiautônomo</li><li><b>3</b>Autônomo</li><li><b>4</b>Avançada</li></ol>
+            <ol class="lv"><li data-act="nivel" data-n="1"><b>1</b>Assistido</li><li class="sel" data-act="nivel" data-n="2"><b>2</b>Semiautônomo</li><li data-act="nivel" data-n="3"><b>3</b>Autônomo</li><li data-act="nivel" data-n="4"><b>4</b>Avançada</li></ol>
             <p class="lv__d">Mantém o CRM em dia sozinha. O que o cliente vê pede aprovação.</p>
           </div>
-          <div class="apv rv" data-at="1">
+          <div class="agw"><div class="apv rv" data-at="1">
             <p class="mini__t">Aprovação pendente</p>
             <q>Consigo 10% de desconto no plano anual, válido até sexta.</q>
             <small>Desconto sempre pede a sua aprovação.</small>
             <div class="swap apv__w">
-              <div class="apv__b rv" data-at="1" data-until="3"><span class="bt">Recusar</span><span class="bt" data-at="2">Aprovar</span></div>
+              <div class="apv__b rv" data-at="1" data-until="3"><span class="bt" data-act="recusar">Recusar</span><span class="bt" data-at="2" data-act="aprovar">Aprovar</span></div>
               <p class="apv__ok rv" data-at="3"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Aprovado por você. Mensagem enviada.</p>
             </div>
           </div>
-          <p class="log rv" data-at="4">O cliente pediu para falar com uma pessoa. Lia avisou e passou a conversa para Ana.</p>
+          <p class="log rv" data-at="4">O cliente pediu para falar com uma pessoa. Lia avisou e passou a conversa para Ana.</p></div>
         </div>
       </div>
     </article>
@@ -909,8 +982,9 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>O agente de IA só oferece horário que está livre</li>
           <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Aparece no Google Agenda de cada profissional</li>
         </ul>
+        <p class="try"><span class="demo__tap" aria-hidden="true"></span>Toque num horário livre para marcar o seu.</p>
       </div>
-      <div class="scene" data-reveal data-scene data-steps="1000,1300,1500,1900,1500,3800" role="img" aria-label="Agenda da semana: a cliente escolhe a quinta-feira às 14h pelo link público, o horário fica marcado, o lembrete sai sozinho pelo WhatsApp e, quando ela responde, o agendamento passa para confirmado.">
+      <div class="scene" data-reveal data-scene data-int="agenda" data-steps="1000,1300,1500,1900,1500,3800" role="img" aria-label="Agenda da semana: a cliente escolhe a quinta-feira às 14h pelo link público, o horário fica marcado, o lembrete sai sozinho pelo WhatsApp e, quando ela responde, o agendamento passa para confirmado.">
         <div>
           <div class="bar2">
             <span class="pl pl--on">Semana</span><span class="pl">Dia</span>
@@ -944,13 +1018,14 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           <h4>O follow-up que ninguém lembrava agora sai sozinho.</h4>
           <p>Boas-vindas, lembretes e mudança de etapa rodam sem ninguém apertar botão.</p>
         </div>
-        <div class="scene scene--in" data-scene data-steps="800,1100,1100,1100,3200" role="img" aria-label="Automação em quatro passos: quando o cliente não responde em 24 horas, o sistema envia uma mensagem, espera dois dias e então marca o contato como morno e cria uma tarefa para a atendente.">
+        <div class="scene scene--in" data-scene data-int="auto" data-steps="800,1100,1100,1100,3200" role="img" aria-label="Automação em quatro passos: quando o cliente não responde em 24 horas, o sistema envia uma mensagem, espera dois dias e então marca o contato como morno e cria uma tarefa para a atendente.">
           <ol class="flow">
             <li data-at="1"><span class="k">Gatilho</span>Cliente não respondeu em 24 h</li>
             <li data-at="2"><span class="k">Ação</span>Enviar “Ainda posso te ajudar?”</li>
             <li data-at="3"><span class="k">Esperar</span>2 dias</li>
             <li data-at="4"><span class="k">Ação</span>Etiqueta Morno e tarefa para Ana</li>
           </ol>
+          <button class="run" type="button" data-act="rodar"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg>Testar a automação</button>
         </div>
       </article>
 
@@ -958,16 +1033,17 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
         <div>
           <h4>Para quem não larga o WhatsApp Web.</h4>
           <p>A extensão do Chrome põe a ficha do cliente, o funil e as respostas rápidas ao lado da conversa.</p>
+          <p class="try" style="margin-top:12px"><span class="demo__tap" aria-hidden="true"></span>Toque na temperatura, na etapa e na tarefa.</p>
         </div>
-        <div class="scene scene--in" data-scene data-steps="900,1200,1300,1400,3400" role="img" aria-label="Extensão do Chrome: o painel do Harpium CRM abre ao lado da conversa no WhatsApp Web. A atendente marca o contato como quente, muda a etapa do negócio para Proposta enviada e cria uma tarefa.">
+        <div class="scene scene--in" data-scene data-int="ext" data-steps="900,1200,1300,1400,3400" role="img" aria-label="Extensão do Chrome: o painel do Harpium CRM abre ao lado da conversa no WhatsApp Web. A atendente marca o contato como quente, muda a etapa do negócio para Proposta enviada e cria uma tarefa.">
           <div class="wa">
             <div class="wa__chat"><span class="ln"></span><span class="ln ln--r"></span><span class="ln ln--s"></span><span class="ln ln--r ln--s"></span><span class="ln"></span></div>
             <div class="ext" data-at="1">
               <p class="ext__h"><svg class="mark" viewBox="0 0 570 489" aria-hidden="true"><use href="#harpia"/></svg>Harpium CRM</p>
               <strong>Lucas Carvalho</strong>
-              <div class="temp"><span>Frio</span><span>Morno</span><span data-at="2">Quente</span></div>
-              <p class="ext__r"><small>Etapa do negócio</small><span class="swap"><b class="rv" data-at="0" data-until="3">Qualificado</b><b class="rv" data-at="3">Proposta enviada</b></span></p>
-              <p class="ext__k rv" data-at="4">Tarefa: ligar amanhã, 10h</p>
+              <div class="temp"><span data-act="temp">Frio</span><span data-act="temp">Morno</span><span data-at="2" data-act="temp">Quente</span></div>
+              <p class="ext__r" data-act="etapa"><small>Etapa do negócio</small><span class="swap"><b class="rv" data-at="0" data-until="3">Qualificado</b><b class="rv" data-at="3">Proposta enviada</b></span></p>
+              <p class="ext__k rv" data-at="4" data-act="tarefa">Tarefa: ligar amanhã, 10h</p>
             </div>
           </div>
         </div>
@@ -978,7 +1054,7 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           <h4>Pergunte aos seus números.</h4>
           <p>Leads por origem, tempo de primeira resposta, ganhos por pessoa. E um analista de IA que responde em português.</p>
         </div>
-        <div class="scene scene--in" data-scene data-steps="700,1600,2100,4000" role="img" aria-label="Relatório de leads por origem em barras, e o analista de IA respondendo à pergunta: qual origem trouxe mais resultado?">
+        <div class="scene scene--in" data-scene data-int="rel" data-steps="700,1600,2100,4000" role="img" aria-label="Relatório de leads por origem em barras, e o analista de IA respondendo à pergunta: qual origem trouxe mais resultado?">
           <div>
             <p class="mini__t">Leads por origem · exemplo</p>
             <ul class="bars">
@@ -989,6 +1065,7 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
             </ul>
             <p class="ask"><span class="ai ai--c">Analista</span><span data-at="2" data-type>Qual origem trouxe mais resultado?</span></p>
             <p class="ans rv" data-at="3">Instagram trouxe mais leads. Indicação fechou mais: 5 de 9.</p>
+            <div class="qs"><span data-act="pergunta" data-q="0">Melhor origem</span><span data-act="pergunta" data-q="1">Mais rápido</span><span data-act="pergunta" data-q="2">Total do mês</span></div>
           </div>
         </div>
       </article>
@@ -997,15 +1074,16 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
         <div>
           <h4>Um quiz que entrega o lead já qualificado.</h4>
           <p>Uma pergunta por tela. Quem conclui vira contato e cartão no funil, com as respostas junto.</p>
+          <p class="try" style="margin-top:12px"><span class="demo__tap" aria-hidden="true"></span>Toque numa resposta do quiz.</p>
         </div>
-        <div class="scene scene--in" data-scene data-steps="1200,1100,1300,3600" role="img" aria-label="Quiz: a pessoa responde qual é o objetivo dela, o resultado sai como qualificado e o contato e o cartão são criados no funil.">
+        <div class="scene scene--in" data-scene data-int="quiz" data-steps="1200,1100,1300,3600" role="img" aria-label="Quiz: a pessoa responde qual é o objetivo dela, o resultado sai como qualificado e o contato e o cartão são criados no funil.">
           <div class="qz">
             <div class="qz__p"><i></i></div>
             <p class="mini__t">Pergunta 2 de 3</p>
             <p class="qz__q">Qual é o seu objetivo agora?</p>
-            <span class="opt">Emagrecer</span>
-            <span class="opt">Ganhar massa</span>
-            <span class="opt" data-at="1">Voltar a treinar</span>
+            <span class="opt" data-act="opt">Emagrecer</span>
+            <span class="opt" data-act="opt">Ganhar massa</span>
+            <span class="opt" data-at="1" data-act="opt">Voltar a treinar</span>
             <div class="res"><span class="tag rv" data-at="2">Resultado: qualificado</span><span class="tag rv" data-at="3">Cartão criado no funil</span></div>
           </div>
         </div>
@@ -1038,17 +1116,18 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
           </li>
         </ol>
       </div>
-      <div class="scene" data-reveal data-scene data-steps="700,800,800,800,800,900,3800" role="img" aria-label="Lista da implantação sendo ligada item por item: WhatsApp conectado, funil do seu ramo montado, respostas rápidas cadastradas, agente de IA treinado e equipe treinada. No fim, o aviso: pronto para atender.">
+      <div class="scene" data-reveal data-scene data-int="impl" data-steps="700,800,800,800,800,900,3800" role="img" aria-label="Lista da implantação sendo ligada item por item: WhatsApp conectado, funil do seu ramo montado, respostas rápidas cadastradas, agente de IA treinado e equipe treinada. No fim, o aviso: pronto para atender.">
         <div>
           <p class="mini__t" style="padding:6px 4px 0">Implantação · sua empresa</p>
           <ul class="sws">
-            <li data-at="1">WhatsApp conectado<span class="sw2"></span></li>
-            <li data-at="2">Funil do seu ramo montado<span class="sw2"></span></li>
-            <li data-at="3">Respostas rápidas cadastradas<span class="sw2"></span></li>
-            <li data-at="4">Agente de IA treinado<span class="sw2"></span></li>
-            <li data-at="5">Equipe treinada<span class="sw2"></span></li>
+            <li data-at="1" data-act="sw">WhatsApp conectado<span class="sw2"></span></li>
+            <li data-at="2" data-act="sw">Funil do seu ramo montado<span class="sw2"></span></li>
+            <li data-at="3" data-act="sw">Respostas rápidas cadastradas<span class="sw2"></span></li>
+            <li data-at="4" data-act="sw">Agente de IA treinado<span class="sw2"></span></li>
+            <li data-at="5" data-act="sw">Equipe treinada<span class="sw2"></span></li>
           </ul>
           <p class="ready rv" data-at="6"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Pronto para atender</p>
+          <p class="try" style="margin:14px 4px 2px"><span class="demo__tap" aria-hidden="true"></span>Toque nos itens para ligar e desligar.</p>
         </div>
       </div>
       <div class="how__a" data-reveal>
@@ -1060,7 +1139,7 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
 </section>
 
 <!-- ============================ POR QUE ============================ -->
-<section class="why">
+<section class="why lite">
   <div class="wrap">
     <div class="sec-head" data-reveal>
       <p class="eyebrow"><span class="sw"></span>Por que o Harpium</p>
@@ -1151,7 +1230,7 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
 </section>
 
 <!-- ============================ PLANOS ============================ -->
-<section class="plans" id="planos" data-precos>
+<section class="plans lite" id="planos" data-precos>
   <div class="wrap">
     <div class="sec-head" data-reveal>
       <p class="eyebrow"><span class="sw"></span>Planos</p>
@@ -1318,11 +1397,11 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
   function $$(sel, el) { return Array.prototype.slice.call((el || doc).querySelectorAll(sel)); }
 
   /* ---------- botões de WhatsApp ---------- */
-  $$('[data-wa]').forEach(function (a) {
-    var msg = CONFIG.mensagens[a.dataset.wa] || CONFIG.mensagens.demo;
-    msg = msg.replace('{plano}', a.dataset.plano || '');
-    a.href = 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(msg);
-  });
+  function waLink(kind, plano) {
+    var msg = (CONFIG.mensagens[kind] || CONFIG.mensagens.demo).replace('{plano}', plano || '');
+    return 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(msg);
+  }
+  $$('[data-wa]').forEach(function (a) { a.href = waLink(a.dataset.wa, a.dataset.plano); });
 
   /* ---------- planos ---------- */
   if (!CONFIG.mostrarPrecos) $$('[data-precos]').forEach(function (el) { el.hidden = true; });
@@ -1354,7 +1433,7 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
   function Scene(el) {
     var durs = el.dataset.steps.split(',').map(Number);
     var last = durs.length - 1;
-    var step = 0, timer = null, running = false;
+    var step = 0, timer = null, running = false, held = false;
     var items = $$('[data-at]', el).map(function (n) {
       var typed = n.hasAttribute('data-type') ? n.textContent : null;
       if (typed !== null && !reduce) n.textContent = '';
@@ -1402,7 +1481,23 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
       }, 480);
     }
 
-    this.play = function () { if (running) return; running = true; tick(); };
+    this.play = function () { if (running || held) return; running = true; tick(); };
+    // o visitante tocou: a cena para no quadro final e não recomeça mais
+    this.hold = function () {
+      if (held) return;
+      held = true;
+      running = false;
+      clearTimeout(timer);
+      el.classList.remove('is-reset');
+      step = last;
+      apply();
+      // texto que estava sendo digitado aparece inteiro, sem disputar com o toque
+      items.forEach(function (it) {
+        if (it.typed === null) return;
+        clearInterval(it.tick);
+        it.n.textContent = it.on ? it.typed : '';
+      });
+    };
     this.pause = function () {
       running = false;
       clearTimeout(timer);
@@ -1433,6 +1528,544 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
     });
   }
 
+  /* ------------------------------------------------------------------
+     HERO — a conversa no celular.
+     O visitante é o cliente: cada nó tem o botão que ele toca (q), a
+     resposta da IA (ia), o que acontece no CRM (crm: texto e, se mudar,
+     a etapa) e as próximas opções. Sem toque, a página conversa sozinha
+     pelo caminho AUTO e recomeça; o primeiro toque desliga isso.
+     ------------------------------------------------------------------ */
+  var ROTEIRO = {
+    inicio: { ia: 'Oi! Aqui é a Lia, assistente virtual da Clínica Aura. Posso te ajudar com horários, valores ou endereço. O que você precisa?',
+      crm: [['Novo lead no funil', 'Novo contato'], ['Lia respondeu em 3 segundos']], opcoes: ['horario', 'valor', 'endereco'] },
+    horario: { q: 'Tem horário essa semana?', ia: 'Tenho quinta às 14h ou sexta às 10h, com a Dra. Paula. Qual fica melhor?',
+      crm: [['Lia consultou a agenda']], opcoes: ['qui', 'sex', 'outro'] },
+    marcar: { q: 'Quero marcar', ia: 'Tenho quinta às 14h ou sexta às 10h, com a Dra. Paula. Qual fica melhor?',
+      crm: [['Lia consultou a agenda', 'Qualificado']], opcoes: ['qui', 'sex', 'outro'] },
+    valor: { q: 'Quanto custa a avaliação?', ia: 'A avaliação custa R$ 120 e leva 40 minutos. Quer que eu veja um horário pra você?',
+      crm: [['Etiqueta: interesse em avaliação', 'Qualificado']], opcoes: ['marcar', 'endereco'] },
+    endereco: { q: 'Onde vocês ficam?', ia: 'Rua das Acácias, 120, no Centro. Tem estacionamento na frente. Quer marcar uma avaliação?',
+      crm: [['Lia enviou o endereço']], opcoes: ['marcar', 'valor'] },
+    outro: { q: 'Outro dia', ia: 'Sem problema! Também tenho segunda às 9h ou terça às 16h.',
+      crm: [['Lia consultou a agenda']], opcoes: ['seg', 'ter'] },
+    qui: { q: 'Quinta, 14h', dia: 'Quinta, às 14h', curto: 'qui, 14h' },
+    sex: { q: 'Sexta, 10h', dia: 'Sexta, às 10h', curto: 'sex, 10h' },
+    seg: { q: 'Segunda, 9h', dia: 'Segunda, às 9h', curto: 'seg, 9h' },
+    ter: { q: 'Terça, 16h', dia: 'Terça, às 16h', curto: 'ter, 16h' },
+    obrigado: { q: 'Obrigado!', ia: 'Eu que agradeço! Até lá. 😊', crm: [['Atendimento concluído pela IA']], fim: true },
+    pessoa: { q: 'Quero falar com uma pessoa', ia: 'Claro! Já chamei a Ana, da recepção. Ela te responde por aqui em instantes.',
+      crm: [['Conversa passada para a Ana', 'Com a Ana']], fim: true }
+  };
+  ['qui', 'sex', 'seg', 'ter'].forEach(function (k) {
+    var n = ROTEIRO[k];
+    n.ia = 'Marcado! ' + n.dia + ', com a Dra. Paula. Um dia antes eu te mando um lembrete por aqui.';
+    n.crm = [['Avaliação marcada: ' + n.curto, 'Agendamento'], ['Lembrete programado para a véspera']];
+    n.opcoes = ['obrigado', 'pessoa'];
+  });
+  var AUTO = ['horario', 'qui', 'obrigado'];
+
+  function PhoneDemo(box) {
+    var chat = doc.getElementById('wa-b'), quick = doc.getElementById('wa-q');
+    var status = doc.getElementById('wa-st'), stage = doc.getElementById('crm-st'), log = doc.getElementById('crm-log');
+    var timers = [], minute = 0, auto = !reduce, autoStep = 0, visible = false, started = false, waiting = false;
+
+    function later(fn, ms) { timers.push(setTimeout(fn, reduce ? Math.min(ms, 120) : ms)); }
+    function clear() { timers.forEach(clearTimeout); timers = []; }
+    function el(tag, cls, text) {
+      var n = doc.createElement(tag);
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    }
+    function hora() { var m = 4 + minute; return '21:' + (m < 10 ? '0' : '') + m; }
+    function scroll() { chat.scrollTop = chat.scrollHeight; }
+    function say(who, text) {
+      var p = el('p', 'wm wm--' + who, text);
+      p.appendChild(el('time', null, hora()));
+      chat.appendChild(p);
+      scroll();
+    }
+    function toCrm(events) {
+      events.forEach(function (ev) {
+        var li = el('li');
+        li.appendChild(el('time', null, hora()));
+        li.appendChild(doc.createTextNode(ev[0]));
+        log.appendChild(li);
+        while (log.children.length > 4) log.removeChild(log.firstChild);
+        if (!ev[1]) return;
+        stage.textContent = ev[1];
+        stage.classList.remove('is-new');
+        void stage.offsetWidth;
+        stage.classList.add('is-new');
+      });
+    }
+    function reply(key) {
+      var node = ROTEIRO[key];
+      var dots = el('p', 'wm wm--in wm--dots');
+      dots.innerHTML = '<i></i><i></i><i></i>';
+      dots.setAttribute('aria-label', 'Lia está digitando');
+      status.textContent = 'digitando…';
+      status.classList.add('is-typing');
+      chat.appendChild(dots);
+      scroll();
+      later(function () {
+        chat.removeChild(dots);
+        status.textContent = 'online';
+        status.classList.remove('is-typing');
+        say('in', node.ia);
+        toCrm(node.crm);
+        later(function () { options(node); }, 420);
+      }, 700 + Math.min(node.ia.length * 14, 1300));
+    }
+    function options(node) {
+      quick.textContent = '';
+      if (node.fim) { ending(); return; }
+      node.opcoes.forEach(function (k, i) {
+        var b = el('button', null, ROTEIRO[k].q);
+        b.type = 'button';
+        b.dataset.k = k;
+        b.style.setProperty('--i', i);
+        quick.appendChild(b);
+      });
+      if (auto) later(autoTap, 2600);
+    }
+    function ending() {
+      var again = el('button');
+      again.type = 'button';
+      again.dataset.k = 'recomecar';
+      again.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-redo"/></svg>Recomeçar';
+      var cta = el('a', null, 'Quero isso no meu WhatsApp');
+      cta.href = waLink('demo');
+      cta.target = '_blank';
+      cta.rel = 'noopener';
+      cta.dataset.cta = 'demo-celular';
+      cta.style.setProperty('--i', 1);
+      quick.appendChild(again);
+      quick.appendChild(cta);
+      if (auto) later(function () { if (visible) start(); else waiting = true; }, 6500);
+    }
+    function send(key) {
+      quick.textContent = '';
+      minute += 1;
+      say('out', ROTEIRO[key].q);
+      later(function () { reply(key); }, 450);
+    }
+    function autoTap() {
+      var key = AUTO[autoStep];
+      var b = key && quick.querySelector('[data-k="' + key + '"]');
+      if (!b) return;
+      autoStep += 1;
+      b.classList.add('is-tap');
+      later(function () { send(key); }, 380);
+    }
+    function start() {
+      clear();
+      started = true;
+      waiting = false;
+      minute = 0;
+      autoStep = 0;
+      chat.textContent = '';
+      quick.textContent = '';
+      log.textContent = '';
+      chat.appendChild(el('p', 'wa-day', 'Hoje'));
+      stage.textContent = 'Novo contato';
+      later(function () {
+        say('out', 'Oi! Vi o anúncio de vocês');
+        later(function () { reply('inicio'); }, 450);
+      }, 700);
+    }
+
+    quick.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      auto = false;
+      clear();
+      if (b.dataset.k === 'recomecar') start(); else send(b.dataset.k);
+    });
+
+    // limpa a conversa de exemplo (que fica para quem não tem JavaScript)
+    chat.textContent = '';
+    quick.textContent = '';
+    log.textContent = '';
+    stage.textContent = 'Novo contato';
+    chat.appendChild(el('p', 'wa-day', 'Hoje'));
+
+    this.show = function (on) {
+      visible = on;
+      if (on && (!started || waiting)) start();
+    };
+  }
+
+  var demoBox = doc.getElementById('demo');
+  if (demoBox) {
+    var phone = demoBox.demo = new PhoneDemo(demoBox);
+    if (hasIO) {
+      new IntersectionObserver(function (entries) {
+        phone.show(entries[0].isIntersecting);
+      }, { threshold: 0.35 }).observe(demoBox);
+    } else {
+      phone.show(true);
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     CENAS QUE RESPONDEM AO TOQUE
+     A cena roda sozinha até o visitante tocar num [data-act] dela. Aí
+     ela para no quadro final (scene.hold) e passa a obedecer. TOQUE[nome]
+     (nome = data-int da cena) prepara a cena ao carregar a página e
+     devolve { inicio: no primeiro toque, toque: a cada toque }.
+     ------------------------------------------------------------------ */
+  function mk(tag, cls, html) {
+    var n = doc.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+  function tocavel(n) {
+    if (n.tagName === 'BUTTON') return;
+    n.setAttribute('role', 'button');
+    n.tabIndex = 0;
+  }
+  function bump(n, cls) {
+    if (!n) return;
+    n.classList.remove(cls);
+    void n.offsetWidth;
+    n.classList.add(cls);
+  }
+  function aperta(list, on) {
+    list.forEach(function (n) {
+      n.classList.toggle('on', n === on);
+      n.setAttribute('aria-pressed', n === on ? 'true' : 'false');
+    });
+  }
+
+  var TOQUE = {};
+
+  TOQUE.funil = function (el) {
+    var cols = $$('.bcol', el);
+    var NOMES = ['Ana Beatriz', 'Diego Martins', 'Fernanda Costa', 'Gustavo Lima', 'Helena Rocha', 'Igor Santos', 'Larissa Melo', 'Thiago Prado'];
+    var VALORES = ['R$ 950', 'R$ 1.200', 'R$ 1.800', 'R$ 2.400', 'R$ 3.200'];
+    var n = 0;
+    function cabe(col) {
+      var cs = $$('.card', col);
+      if (cs.length > 4) col.removeChild(cs[cs.length - 1]);
+    }
+    function movel(c) { c.dataset.act = 'mover'; tocavel(c); }
+    return {
+      inicio: function () {
+        $$('.card', el).forEach(function (c) {
+          var anim = c.classList.contains('rv') || c.classList.contains('card--mv');
+          if (anim && !c.classList.contains('on')) { c.parentNode.removeChild(c); return; }
+          c.classList.remove('rv', 'card--mv', 'on');
+          c.removeAttribute('data-at');
+          c.removeAttribute('data-until');
+          movel(c);
+        });
+        $$('.srcs li', el).forEach(function (s) { s.classList.remove('on'); });
+      },
+      toque: function (t) {
+        if (t.dataset.act === 'lead') {
+          $$('.srcs li', el).forEach(function (s) { s.classList.toggle('on', s === t); });
+          var c = mk('div', 'card', '<b>' + NOMES[n % NOMES.length] + '</b><small>' + t.textContent + '</small><i>' + VALORES[(n * 3) % VALORES.length] + '</i>');
+          n += 1;
+          movel(c);
+          cols[0].insertBefore(c, cols[0].querySelector('.card'));
+          bump(c, 'card--in');
+          cabe(cols[0]);
+          return;
+        }
+        var vis = cols.filter(function (col) { return col.offsetParent !== null; });
+        var at = vis.indexOf(t.parentNode);
+        if (at > -1 && at < vis.length - 1) {
+          vis[at + 1].insertBefore(t, vis[at + 1].querySelector('.card'));
+          cabe(vis[at + 1]);
+        }
+        bump(t, 'card--in');
+      }
+    };
+  };
+
+  TOQUE.inbox = function (el) {
+    var row = el.querySelector('.row--new'), cmp = el.querySelector('.cmp'), menu = null;
+    var RESP = [
+      ['/valores', 'O trimestral sai por R$ 297 e já inclui a avaliação.'],
+      ['/horarios', 'Funcionamos de segunda a sábado, das 6h às 22h.'],
+      ['/endereco', 'Estamos na Rua das Acácias, 120, no Centro.']
+    ];
+    function fecha() { if (menu) { cmp.removeChild(menu); menu = null; } }
+    return {
+      inicio: function () {},
+      toque: function (t) {
+        var act = t.dataset.act;
+        if (act === 'cmp') {
+          if (menu) { fecha(); return; }
+          menu = mk('div', 'qrm');
+          RESP.forEach(function (r, i) {
+            var o = mk('span', null, '<b>' + r[0] + '</b>' + r[1]);
+            o.dataset.act = 'resp';
+            o.dataset.i = i;
+            tocavel(o);
+            menu.appendChild(o);
+          });
+          cmp.appendChild(menu);
+          return;
+        }
+        fecha();
+        if (act === 'filtro') {
+          $$('.pl', el).forEach(function (p) { p.classList.toggle('pl--on', p === t); });
+          $$('.row', el).forEach(function (r) {
+            var f = t.dataset.f;
+            r.hidden = !(f === 'todas' || (f === 'naolidas' && r.dataset.lida === '0') || (f === 'abertas' && r.dataset.st === 'aberta'));
+          });
+          return;
+        }
+        if (act === 'resp') {
+          var ps = $$('.swap p', row);
+          ps[0].classList.remove('on');
+          ps[1].classList.add('on');
+          ps[1].textContent = 'Ana: ' + RESP[+t.dataset.i][1];
+          bump(ps[1], 'card--in');
+        }
+      }
+    };
+  };
+
+  TOQUE.agente = function (el) {
+    var NIVEL = {
+      1: ['Analisa e sugere. Tudo passa por você antes de acontecer.', 'sugerindo a resposta para Marina',
+        '<div class="apv"><p class="mini__t">Sugestão da Lia</p><q>Oi, Marina! Tenho quinta às 14h ou sexta às 10h. Qual fica melhor?</q><small>Nada sai sem você.</small><div class="apv__w"><div class="apv__b"><span class="bt" data-act="editar">Editar</span><span class="bt" data-act="enviar">Enviar</span></div></div></div>'],
+      2: ['Mantém o CRM em dia sozinho. Qualquer coisa que o cliente veja pede aprovação.', 'aguardando a sua aprovação',
+        '<div class="apv"><p class="mini__t">Aprovação pendente</p><q>Consigo 10% de desconto no plano anual, válido até sexta.</q><small>Desconto sempre pede a sua aprovação.</small><div class="apv__w"><div class="apv__b"><span class="bt" data-act="recusar">Recusar</span><span class="bt" data-act="aprovar">Aprovar</span></div></div></div>'],
+      3: ['Conduz a operação comercial dentro dos limites configurados.', 'atendendo 3 conversas',
+        '<ul class="acts"><li>Respondeu Marina e marcou quinta, 14h<em>feito</em></li><li>Moveu o cartão para Agendamento<em>feito</em></li><li>Desconto de 10% para o Lucas<em>espera você</em></li></ul>'],
+      4: ['Planeja a própria fila e distribui tarefas para os outros agentes.', 'organizando a fila de hoje',
+        '<p class="mini__t" style="margin:2px 0 0">Fila de hoje, planejada pela Lia</p><ul class="acts"><li>Responder 3 leads novos<em>Lia</em></li><li>Retomar 5 propostas paradas<em>agente de follow-up</em></li><li>Confirmar 4 consultas de amanhã<em>agente de agenda</em></li></ul>']
+    };
+    var FIM = { aprovar: 'Aprovado por você. Mensagem enviada.', recusar: 'Recusado. A mensagem não foi enviada.', enviar: 'Você enviou a sugestão.', editar: 'Você ajusta o texto e envia quando quiser.' };
+    var NOTA = '<p class="log">Desconto, fechamento e exclusão pedem aprovação em qualquer nível.</p>';
+    var area = el.querySelector('.agw'), desc = el.querySelector('.lv__d'), status = el.querySelector('.agent__s');
+    var tg = el.querySelector('.tg'), face = el.querySelector('.face'), niveis = $$('.lv li', el);
+    var nivel = 2, ligado = true;
+    function mostra(n) {
+      nivel = n;
+      niveis.forEach(function (li) {
+        li.classList.toggle('sel', +li.dataset.n === n);
+        li.setAttribute('aria-pressed', +li.dataset.n === n ? 'true' : 'false');
+      });
+      desc.textContent = NIVEL[n][0];
+      area.innerHTML = NIVEL[n][2] + NOTA;
+      $$('[data-act]', area).forEach(tocavel);
+      if (ligado) status.textContent = NIVEL[n][1];
+      bump(area, 'card--in');
+    }
+    tg.setAttribute('aria-pressed', 'true');
+    return {
+      inicio: function () { status.className = 'agent__s'; mostra(2); },
+      toque: function (t) {
+        var act = t.dataset.act;
+        if (act === 'nivel') { mostra(+t.dataset.n); return; }
+        if (act === 'liga') {
+          ligado = !ligado;
+          tg.classList.toggle('off', !ligado);
+          face.classList.toggle('off', !ligado);
+          tg.setAttribute('aria-pressed', ligado ? 'true' : 'false');
+          status.textContent = ligado ? NIVEL[nivel][1] : 'desligada: as conversas vão para a equipe';
+          return;
+        }
+        var w = area.querySelector('.apv__w');
+        if (!FIM[act] || !w) return;
+        w.innerHTML = '<p class="apv__ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>' + FIM[act] + '</p>';
+        if (act === 'aprovar') status.textContent = 'mensagem aprovada e enviada';
+      }
+    };
+  };
+
+  TOQUE.agenda = function (el) {
+    var DIAS = ['quarta', 'quinta', 'sexta'];
+    var HORAS = $$('.ag time', el).map(function (t) { return t.textContent.replace(/^0/, ''); });
+    var bubs = $$('.rem .bub', el), meu = null, timer = null;
+    $$('.ag .cell', el).forEach(function (c, i) {
+      c.dataset.dia = DIAS[i % 3];
+      c.dataset.h = HORAS[Math.floor(i / 3)];
+      if (/cell--[bht]/.test(c.className)) return;
+      c.dataset.act = 'marcar';
+      c.setAttribute('aria-label', 'Marcar ' + c.dataset.dia + ', ' + c.dataset.h);
+    });
+    return {
+      inicio: function () {},
+      toque: function (t) {
+        if (t === meu) return;
+        if (meu) { meu.innerHTML = ''; meu.classList.remove('cell--t', 'on'); }
+        meu = t;
+        t.classList.add('cell--t', 'on');
+        t.innerHTML = '<span class="slot__on on">Você<svg class="ic rv" aria-hidden="true"><use href="#i-check"/></svg></span>';
+        bubs[0].innerHTML = '<span class="ai">Lembrete</span>Oi! Sua avaliação é ' + t.dataset.dia + ', às ' + t.dataset.h + '. Podemos confirmar?';
+        bump(bubs[0], 'card--in');
+        bubs[1].classList.remove('on');
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          bubs[1].classList.add('on');
+          t.querySelector('.ic').classList.add('on');
+        }, reduce ? 0 : 1100);
+      }
+    };
+  };
+
+  TOQUE.auto = function (el) {
+    var timers = [];
+    return {
+      inicio: function () {},
+      toque: function () {
+        var lis = $$('.flow li', el);
+        timers.forEach(clearTimeout);
+        timers = [];
+        lis.forEach(function (li, i) {
+          li.classList.remove('on');
+          timers.push(setTimeout(function () { li.classList.add('on'); }, reduce ? 0 : 300 + i * 650));
+        });
+      }
+    };
+  };
+
+  TOQUE.ext = function (el) {
+    var ETAPAS = ['Qualificado', 'Proposta enviada', 'Negociação', 'Ganho'], e = 1;
+    var etapa = el.querySelector('.ext__r .swap'), tarefa = el.querySelector('.ext__k');
+    return {
+      inicio: function () {
+        etapa.innerHTML = '<b>' + ETAPAS[e] + '</b>';
+        tarefa.classList.add('on');
+      },
+      toque: function (t) {
+        var act = t.dataset.act;
+        if (act === 'temp') { aperta($$('.temp span', el), t); return; }
+        if (act === 'etapa') {
+          e = (e + 1) % ETAPAS.length;
+          etapa.innerHTML = '<b>' + ETAPAS[e] + '</b>';
+          bump(etapa.firstChild, 'card--in');
+          return;
+        }
+        if (act === 'tarefa') {
+          var feita = t.dataset.feita === '1';
+          t.dataset.feita = feita ? '0' : '1';
+          t.textContent = feita ? 'Tarefa: ligar amanhã, 10h' : 'Tarefa concluída. Boa!';
+          bump(t, 'card--in');
+        }
+      }
+    };
+  };
+
+  TOQUE.rel = function (el) {
+    var P = [
+      ['Qual origem trouxe mais resultado?', 'Instagram trouxe mais leads. Indicação fechou mais: 5 de 9.'],
+      ['Quem respondeu mais rápido?', 'A Lia, em 3 segundos em média. Na equipe, a Ana, em 4 minutos.'],
+      ['Quantos leads chegaram no mês?', '100 leads: 42 do Instagram, 31 do Google, 18 do site e 9 por indicação.']
+    ];
+    var ask = el.querySelector('.ask [data-type]'), ans = el.querySelector('.ans'), tick = null;
+    return {
+      inicio: function () {},
+      toque: function (t) {
+        var q = P[+t.dataset.q], i = 0;
+        aperta($$('.qs span', el), t);
+        clearInterval(tick);
+        ans.classList.remove('on');
+        ask.textContent = reduce ? q[0] : '';
+        ans.textContent = q[1];
+        if (reduce) { ans.classList.add('on'); return; }
+        tick = setInterval(function () {
+          i += 1;
+          ask.textContent = q[0].slice(0, i);
+          if (i < q[0].length) return;
+          clearInterval(tick);
+          ans.classList.add('on');
+        }, 28);
+      }
+    };
+  };
+
+  TOQUE.quiz = function (el) {
+    var Q = [
+      ['Você já treina?', ['Sim', 'Ainda não', 'Já treinei antes']],
+      ['Qual é o seu objetivo agora?', ['Emagrecer', 'Ganhar massa', 'Voltar a treinar']],
+      ['Quando quer começar?', ['Esta semana', 'Este mês', 'Só pesquisando']]
+    ];
+    var box = el.querySelector('.qz'), i = 1, ultima = '';
+    function barra(f) { return '<div class="qz__p"><i style="transform:scaleX(' + f + ')"></i></div>'; }
+    function render() {
+      if (i >= Q.length) {
+        var quente = ultima !== 'Só pesquisando';
+        box.innerHTML = barra(1) + '<p class="mini__t">Concluído</p><p class="qz__q">' +
+          (quente ? 'Pronto! A equipe já recebeu as suas respostas.' : 'Obrigado! A gente te manda novidades.') +
+          '</p><div class="res"><span class="tag">Resultado: ' + (quente ? 'qualificado' : 'nutrir') + '</span><span class="tag">Cartão criado no funil</span></div>' +
+          '<span class="opt" data-act="refazer">Refazer o quiz</span>';
+      } else {
+        box.innerHTML = barra((i + 1) / 3) + '<p class="mini__t">Pergunta ' + (i + 1) + ' de 3</p><p class="qz__q">' + Q[i][0] + '</p>' +
+          Q[i][1].map(function (o) { return '<span class="opt" data-act="opt">' + o + '</span>'; }).join('');
+      }
+      $$('[data-act]', box).forEach(tocavel);
+    }
+    return {
+      inicio: function () {},
+      toque: function (t) {
+        if (t.dataset.act === 'refazer') { i = 0; render(); return; }
+        $$('.opt', box).forEach(function (o) { o.classList.toggle('on', o === t); });
+        ultima = t.textContent;
+        i += 1;
+        setTimeout(render, reduce ? 0 : 380);
+      }
+    };
+  };
+
+  TOQUE.impl = function (el) {
+    var ready = el.querySelector('.ready'), itens = $$('.sws li', el);
+    return {
+      inicio: function () {},
+      toque: function (t) {
+        t.classList.toggle('on');
+        itens.forEach(function (li) { li.setAttribute('aria-pressed', li.classList.contains('on') ? 'true' : 'false'); });
+        ready.classList.toggle('on', itens.every(function (li) { return li.classList.contains('on'); }));
+      }
+    };
+  };
+
+  $$('[data-int]').forEach(function (el) {
+    var make = TOQUE[el.dataset.int];
+    if (!make) return;
+    var ctl = make(el), tomado = false;
+    el.setAttribute('role', 'group');
+    $$('[data-act]', el).forEach(tocavel);
+    function go(t) {
+      if (!tomado) {
+        tomado = true;
+        if (el.scene) el.scene.hold();
+        ctl.inicio();
+      }
+      ctl.toque(t);
+    }
+    el.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-act]');
+      if (t && el.contains(t)) go(t);
+    });
+    el.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var t = e.target.closest('[data-act]');
+      if (!t || t.tagName === 'BUTTON' || !el.contains(t)) return;
+      e.preventDefault();
+      go(t);
+    });
+  });
+
+  /* ---------- dores: a mesma conversa, sem e com o Harpium ---------- */
+  $$('.seg').forEach(function (seg) {
+    var box = seg.nextElementSibling;
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      $$('button', seg).forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      box.querySelector('.dead__sem').hidden = b.dataset.v !== 'sem';
+      box.querySelector('.dead__com').hidden = b.dataset.v !== 'com';
+    });
+  });
+
   /* ---------- ramos (abas) ---------- */
   var tabs = $$('.tab');
   function selectTab(tab, focus) {
@@ -1461,11 +2094,12 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
   var nav = doc.getElementById('nav');
   var sticky = doc.getElementById('sticky');
   var endVisible = false;
+  var demoVisible = false;   // o botão fixo não cobre o celular da demonstração
   var queued = false;
   function onScroll() {
     var y = window.scrollY || root.scrollTop;
     nav.classList.toggle('is-stuck', y > 24);
-    sticky.classList.toggle('show', y > 420 && !endVisible);
+    sticky.classList.toggle('show', y > 420 && !endVisible && !demoVisible);
     queued = false;
   }
   window.addEventListener('scroll', function () {
@@ -1478,6 +2112,12 @@ footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-fami
       endVisible = entries[0].isIntersecting;
       onScroll();
     }, { threshold: 0.3 }).observe(doc.getElementById('comecar'));
+    if (demoBox) {
+      new IntersectionObserver(function (entries) {
+        demoVisible = entries[0].isIntersecting;
+        onScroll();
+      }, { threshold: 0.2 }).observe(demoBox);
+    }
   }
   onScroll();
 
