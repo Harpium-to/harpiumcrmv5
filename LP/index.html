@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harpium CRM — Nenhum lead sem resposta no seu WhatsApp</title>
+<meta name="description" content="CRM de WhatsApp com implantação: WhatsApp, Instagram, funil, agenda e agentes de IA na mesma tela. A equipe da Harpium conecta seu número, monta o funil e treina seu time.">
+<meta name="theme-color" content="#14100b">
+<!-- Endereço público da página. Se o subdomínio mudar, troque nas quatro linhas marcadas com crm.harpium.com.br. -->
+<link rel="canonical" href="https://crm.harpium.com.br/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Harpium CRM">
+<meta property="og:url" content="https://crm.harpium.com.br/">
+<meta property="og:title" content="Harpium CRM — Nenhum lead sem resposta no seu WhatsApp">
+<meta property="og:description" content="WhatsApp, Instagram, funil, agenda e agentes de IA na mesma tela. E a nossa equipe entrega tudo configurado.">
+<meta property="og:image" content="https://crm.harpium.com.br/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Harpium CRM: nenhum lead sem resposta. Lead chegou, IA respondeu, horário marcado.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://crm.harpium.com.br/og.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='196 186 650 650'%3E%3Crect x='196' y='186' width='650' height='650' rx='150' fill='%2314100b'/%3E%3Cpath fill='%23f2e7ce' fill-rule='evenodd' d='M256 414 L344 356 C390 375 430 390 466 396 C428 386 388 366 362 338 C352 322 344 304 347 285 C372 312 420 306 470 302 C560 296 660 296 705 330 C735 352 752 392 762 428 C776 440 786 456 786 474 C760 462 730 458 700 462 C600 480 500 560 455 735 C440 560 380 450 256 414 Z M640 386 C662 378 722 392 758 428 C720 418 668 412 646 404 C634 400 632 390 640 386 Z'/%3E%3C/svg%3E">
+<script>document.documentElement.className='js'</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   HARPIUM CRM — landing page
+   Identidade: creme sobre espresso (o tema Areia do CRM).
+   Regra de cor: o que está ligado fica creme e sólido; o resto recua.
+   Duas vozes: Bricolage Grotesque fala a página, Inter fala o produto.
+   ===================================================================== */
+:root{
+  --bg:#14100b;--bg-2:#1b1611;--card:#221d18;--card-2:#2b2721;--card-3:#2f2a25;--line:#38332e;
+  --edge:rgba(255,255,255,.07);--fg:#f5efe8;--muted:#a49d96;--dim:#777069;
+  --cream:#f2e7ce;--cream-hi:#fef5df;--ink:#201910;
+  --c14:rgba(242,231,206,.14);--c26:rgba(242,231,206,.26);
+  --glass:rgba(34,29,24,.72);--well:rgba(20,16,11,.5);--blue:#3987e5;
+  --r:18px;--rl:28px;--max:1160px;--ease:cubic-bezier(.16,1,.3,1);
+  --display:'Bricolage Grotesque','Inter',system-ui,sans-serif;
+  --ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,'Roboto Mono',monospace;
+}
+
+/* ---------- base ---------- */
+*,*::before,*::after{box-sizing:border-box}
+*{margin:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;scroll-padding-top:92px}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);font-size:1.0625rem;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;overflow-x:clip}
+h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
+a{color:inherit;text-decoration:none}
+ul,ol{list-style:none;padding:0}
+svg{display:block}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+q{quotes:"“" "”"}
+:focus-visible{outline:2px solid var(--cream);outline-offset:3px;border-radius:8px}
+::selection{background:var(--cream);color:var(--ink)}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.wrap{position:relative;width:min(100% - 40px,var(--max));margin-inline:auto}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mark{width:30px;height:auto;flex:none;fill:url(#hm-metal)}
+
+/* ---------- atmosfera: brilho quente + granulado ---------- */
+.atmo{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.atmo i{position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(242,231,206,.17),rgba(242,231,206,0));animation:drift 18s ease-in-out infinite;will-change:transform}
+.atmo i:nth-child(1){width:min(130vw,960px);height:min(96vw,660px);left:50%;top:-240px;margin-left:calc(min(130vw,960px)/-2)}
+.atmo i:nth-child(2){width:560px;height:560px;right:-260px;bottom:-280px;animation-delay:-9s;opacity:.75}
+.atmo::after{content:"";position:absolute;inset:0;opacity:.07;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@keyframes drift{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(2%,-3%,0) scale(1.12)}}
+
+/* ---------- tipografia ---------- */
+.display{font-weight:300;font-stretch:96%;letter-spacing:-.038em;line-height:.94;font-size:clamp(2.95rem,13.2vw,7.5rem)}
+.h2{font-weight:300;font-stretch:96%;letter-spacing:-.034em;line-height:1.02;font-size:clamp(2.1rem,7.2vw,3.9rem);text-wrap:balance}
+.h3{font-weight:400;letter-spacing:-.03em;line-height:1.1;font-size:clamp(1.5rem,4.6vw,2.15rem);text-wrap:balance}
+.lead{font-size:clamp(1.08rem,2.8vw,1.26rem);line-height:1.5;color:var(--muted);text-wrap:pretty}
+.eyebrow{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.micro{font-family:var(--ui);font-size:.86rem;color:var(--muted)}
+.c{color:var(--cream)}
+
+/* o interruptor: liga quando o bloco entra na tela */
+.sw{position:relative;width:26px;height:14px;border-radius:999px;background:var(--card-3);transition:background .5s var(--ease) .35s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--muted);transition:transform .5s var(--ease) .35s,background .5s .35s}
+[data-reveal="shown"] .sw,html:not(.js) .sw{background:var(--cream)}
+[data-reveal="shown"] .sw::after,html:not(.js) .sw::after{transform:translateX(12px);background:var(--ink)}
+
+/* ---------- seções ---------- */
+section{position:relative;padding:78px 0}
+.sec-head{display:grid;gap:18px;max-width:47rem;margin-bottom:40px}
+@media(min-width:900px){section{padding:132px 0}.sec-head{margin-bottom:68px}}
+
+/* ---------- entrada ao rolar ---------- */
+.js [data-reveal]{opacity:0}
+.js [data-reveal="shown"]{animation:rise .75s var(--ease) both;animation-delay:var(--d,0ms)}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@media(min-width:900px){@keyframes rise{from{opacity:0;transform:translateY(18px);filter:blur(8px)}to{opacity:1;transform:none;filter:blur(0)}}}
+
+/* ---------- botões e pílulas ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:58px;padding:0 1.7rem;border-radius:999px;font-family:var(--ui);font-weight:600;font-size:1rem;letter-spacing:-.005em;white-space:nowrap;transition:transform .3s var(--ease),box-shadow .3s,background .2s}
+.btn--on{background:var(--cream);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 20px 48px -20px rgba(242,231,206,.6)}
+.btn--on:hover{background:var(--cream-hi);transform:translateY(-2px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 26px 56px -20px rgba(242,231,206,.75)}
+.btn--on:active{transform:translateY(0)}
+.btn--ghost{background:var(--glass);color:var(--fg);box-shadow:inset 0 0 0 1px var(--edge)}
+.btn--ghost:hover{box-shadow:inset 0 0 0 1px var(--c26);transform:translateY(-2px)}
+.btn--ink{background:var(--ink);color:var(--cream)}
+.btn--ink:hover{transform:translateY(-2px)}
+.btn--sm{min-height:44px;padding:0 1.1rem;font-size:.9rem}
+.btn .ic{transition:transform .3s var(--ease)}
+.btn:hover .ic--go{transform:translateX(3px)}
+.chip{display:inline-flex;align-items:center;gap:.55rem;border-radius:999px;padding:.5rem .95rem;font-family:var(--ui);font-size:.84rem;color:var(--muted);background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--cream);box-shadow:0 0 0 4px var(--c14)}
+.ticks{display:grid;gap:11px;margin-top:4px}
+.ticks li{display:grid;grid-template-columns:20px 1fr;gap:10px;color:var(--muted)}
+.ticks .ic{margin-top:4px;color:var(--cream)}
+
+/* ---------- navegação ---------- */
+.nav{position:fixed;z-index:50;top:10px;left:10px;right:10px;max-width:calc(var(--max) + 44px);margin-inline:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 6px 6px 16px;border-radius:999px;background:rgba(27,22,17,.7);box-shadow:inset 0 0 0 1px var(--edge);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);font-family:var(--ui);transition:background .3s,box-shadow .3s}
+.nav.is-stuck{background:rgba(27,22,17,.88);box-shadow:inset 0 0 0 1px var(--edge),0 20px 40px -24px #000}
+.brand{display:flex;align-items:center;gap:10px;min-height:44px}
+.brand__n{font-weight:600;letter-spacing:.2em;text-transform:uppercase;font-size:.84rem}
+.brand__t{border-radius:999px;background:rgba(245,239,232,.1);padding:2px 8px;font-size:.6rem;font-weight:600;letter-spacing:.16em;color:var(--muted)}
+.nav__l{display:none;gap:2px}
+.nav__l a{padding:.55rem .95rem;border-radius:999px;font-size:.9rem;color:var(--muted);transition:color .2s,background .2s}
+.nav__l a:hover{color:var(--fg);background:rgba(245,239,232,.06)}
+.lg,.md{display:none}
+@media(min-width:400px){.lg{display:inline}}
+@media(min-width:640px){.md{display:inline}}
+@media(min-width:900px){.nav{top:16px;padding:8px 8px 8px 22px}.nav__l{display:flex}}
+
+/* ---------- hero ---------- */
+.hero{padding:118px 0 60px;isolation:isolate;overflow-x:hidden;overflow-x:clip}
+.hero .wrap{display:flex;flex-direction:column}
+.hero .chip{align-self:flex-start}
+.hero .stage{order:2}
+.hero .proof{order:3}
+.hero__bird{position:absolute;z-index:-1;top:-8px;right:-52%;width:128vw;max-width:none;fill:none;stroke:url(#hm-metal);stroke-width:1.3;opacity:.24;pointer-events:none}
+.js .hero__bird path{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 2.8s cubic-bezier(.65,0,.35,1) .25s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.hero h1{margin:22px 0 26px}
+.cut{display:block;overflow:hidden;padding-bottom:.14em;margin-bottom:-.14em}
+.cut>span{display:block}
+.js .cut>span{transform:translateY(114%);animation:cut 1.05s var(--ease) both;animation-delay:var(--d,0ms)}
+@keyframes cut{to{transform:none}}
+.hero__row{display:grid;gap:26px}
+.hero__cta{display:grid;gap:12px}
+.proof{display:flex;flex-wrap:wrap;gap:8px;margin-top:30px}
+.proof li{display:inline-flex;align-items:center;gap:.5rem;border-radius:999px;padding:.45rem .85rem .45rem .6rem;font-family:var(--ui);font-size:.82rem;color:var(--muted);background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.proof .ic{width:15px;height:15px;color:var(--cream)}
+@media(min-width:640px){.hero__cta,.how__a{justify-items:start}}
+@media(min-width:900px){
+  .hero{padding:184px 0 90px}
+  .hero__bird{top:34px;right:-7%;width:min(60vw,860px);opacity:.26}
+  .hero h1{margin:26px 0 40px}
+  .hero__row{grid-template-columns:minmax(0,35rem) auto;justify-content:space-between;align-items:end}
+  .hero__cta{justify-items:end;text-align:right}
+  .hero .proof{order:2}
+  .hero .stage{order:3}
+}
+
+/* =====================================================================
+   CENAS — o produto em movimento, desenhado em código.
+   Um motor só (ver o script): cada cena tem passos; [data-at] recebe
+   .on quando o passo chega e perde em [data-until].
+   ===================================================================== */
+.scene{position:relative;font-family:var(--ui);font-size:.8125rem;line-height:1.4;color:var(--fg);border-radius:var(--rl);background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge),0 50px 100px -60px rgba(0,0,0,.95);padding:12px}
+.scene::before{content:"";position:absolute;left:14%;right:14%;bottom:0;height:1px;background:linear-gradient(90deg,transparent,var(--c26),transparent)}
+.scene>*{transition:opacity .4s ease}
+.scene.is-reset>*{opacity:0}
+.scene.is-reset>* *{transition:none!important}
+.rv{opacity:0;transform:translateY(10px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.rv.on{opacity:1;transform:none}
+html:not(.js) .rv{opacity:1;transform:none}
+html:not(.js) [data-until]{display:none}
+.swap{display:grid}
+.swap>*{grid-area:1/1;min-width:0}
+.pane{border-radius:var(--r);background:var(--well);box-shadow:inset 0 0 0 1px var(--edge);padding:12px}
+.mini__t{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:var(--card-3);font-size:.68rem;font-weight:600;letter-spacing:.02em}
+.tag{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-size:.64rem;font-weight:600;white-space:nowrap;background:var(--c14);color:var(--cream)}
+.ai{display:inline-block;vertical-align:1px;margin-right:6px;border-radius:999px;padding:1px 6px;font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;background:rgba(32,25,16,.14)}
+.ai--c{background:var(--c14);color:var(--cream)}
+
+/* conversa */
+.msg{position:relative;display:flex}
+.msg--out{justify-content:flex-end}
+.bub{max-width:86%;border-radius:16px;padding:8px 12px;font-size:.84rem;line-height:1.4}
+.msg--in .bub{background:#29241f;border-bottom-left-radius:5px}
+.msg--out .bub{background:var(--cream);color:var(--ink);border-bottom-right-radius:5px}
+.typing{position:absolute;top:0;display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 12px;border-radius:14px}
+.msg--out .typing{right:0;background:var(--c26);color:var(--cream)}
+.typing i{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 1.4s ease-in-out infinite}
+.typing i:nth-child(2){animation-delay:.18s}
+.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+/* --- cena do hero --- */
+.stage{margin-top:46px}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.steps li{display:grid;gap:1px;border-radius:14px;padding:10px 12px;background:rgba(41,36,31,.55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);color:var(--dim);transition:background .6s var(--ease),color .6s var(--ease),box-shadow .6s var(--ease)}
+.steps time{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em}
+.steps b{font-weight:500;font-size:.84rem}
+.steps li.on{background:var(--cream);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 16px 36px -18px rgba(242,231,206,.75)}
+.stage__g{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.scene :where(div,ul,ol,li,p){min-width:0}
+.il{display:none}
+.il li{display:flex;gap:10px;align-items:center;padding:9px 8px;border-radius:14px}
+.il li>div{min-width:0}
+.il strong{display:block;font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.il div span{display:block;font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.il .cur{opacity:0;transform:translateY(-8px);transition:opacity .5s var(--ease),transform .5s var(--ease),background .5s}
+.il .cur.on{opacity:1;transform:none;background:var(--c14);box-shadow:inset 0 0 0 1px var(--c26)}
+.il .cur::after{content:"";margin-left:auto;width:8px;height:8px;flex:none;border-radius:50%;background:var(--cream)}
+.chat__h{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06)}
+.chat__h>div{min-width:0}
+.chat__h strong{display:block;font-weight:600;font-size:.86rem}
+.chat__h small{display:block;color:var(--muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat__h .tag{margin-left:auto}
+.chat__b{display:flex;flex-direction:column;gap:8px;padding:12px 0 2px}
+.side{display:grid;gap:10px}
+.side .pane{padding:11px;min-width:0}
+.slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.slots li{display:grid;gap:4px}
+.slots time{font-family:var(--mono);font-size:.6rem;color:var(--dim)}
+.slot{position:relative;display:block;min-height:28px;border-radius:9px;padding:6px 8px;font-size:.7rem;background:#29241f;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot--free{background:none;box-shadow:inset 0 0 0 1px rgba(242,231,206,.22);color:var(--dim)}
+.slot__on{position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;border-radius:9px;background:var(--cream);color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;opacity:0;transform:scale(.9);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.slot__on.on{opacity:1;transform:none}
+.slot__on em{font-style:normal}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cols>div{min-width:0}
+.cols h5{font-size:.62rem;font-weight:500;color:var(--muted);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl{position:relative;min-height:28px;margin-bottom:5px;border-radius:9px;background:#29241f;padding:6px 8px 6px 11px;font-size:.7rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cream)}
+.dl--g{background:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.dl--g::before{display:none}
+.dl--s{font-weight:500;color:var(--muted)}
+.dl--s::before{background:var(--dim)}
+.dl--a{opacity:0;transform:translateX(14px);transition:opacity .45s var(--ease),transform .55s var(--ease)}
+.dl--b{opacity:0;transform:translateX(-14px);transition:opacity .5s var(--ease),transform .6s var(--ease)}
+.dl--a.on,.dl--b.on{opacity:1;transform:none}
+.dl--b.on{box-shadow:inset 0 0 0 1px var(--c26)}
+@media(min-width:1000px){
+  .scene{padding:16px}
+  .steps{grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  .steps li{padding:12px 16px}
+  .stage{margin-top:72px}
+  .stage__g{grid-template-columns:236px minmax(0,1fr) 296px;gap:12px}
+  .il{display:block}
+  .side{align-content:start}
+  .slots{grid-template-columns:minmax(0,1fr)}
+  .slots li{grid-template-columns:32px minmax(0,1fr);align-items:center;gap:6px}
+  .chat__b{padding:18px 6px 6px;gap:12px}
+  .stage .bub{font-size:.94rem;padding:10px 14px;max-width:74%}
+  .stage .typing{height:38px}
+}
+
+/* ---------- faixa de origens ---------- */
+.band{padding:8px 0 30px}
+.band p{text-align:center;margin-bottom:18px}
+.marq{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.marq__t{display:flex;width:max-content;animation:marq 42s linear infinite}
+.marq:hover .marq__t{animation-play-state:paused}
+.marq ul{display:flex;gap:10px;padding-right:10px}
+.marq li{white-space:nowrap}
+@keyframes marq{to{transform:translateX(-50%)}}
+
+/* ---------- dores ---------- */
+.pain__g{display:grid;gap:34px}
+.dead{font-family:var(--ui);border-radius:var(--rl);background:rgba(27,22,17,.7);box-shadow:inset 0 0 0 1px var(--edge);padding:18px;display:grid;gap:10px}
+.dmsg{display:grid;gap:3px;justify-items:start}
+.dmsg--out{justify-items:end}
+.dmsg time{font-family:var(--mono);font-size:.64rem;color:var(--dim)}
+.dmsg p{max-width:86%;border-radius:16px 16px 16px 5px;padding:8px 12px;font-size:.9rem;line-height:1.4;background:#29241f;color:var(--muted)}
+.dmsg--out p{border-radius:16px 16px 5px 16px;background:#38332e}
+.dgap{display:flex;align-items:center;gap:12px;padding:14px 0;font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.dgap::before,.dgap::after{content:"";flex:1;height:1px;background:repeating-linear-gradient(90deg,var(--line) 0 6px,transparent 6px 12px)}
+.pains{display:grid}
+.pains li{display:grid;gap:6px;padding:20px 0;border-top:1px solid rgba(255,255,255,.08)}
+.pains li:last-child{border-bottom:1px solid rgba(255,255,255,.08)}
+.pains span{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.pains p{font-size:1.14rem;line-height:1.35;letter-spacing:-.01em}
+.turn{margin-top:44px;max-width:44rem;color:var(--muted)}
+@media(min-width:900px){.pain__g{grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:84px;align-items:start}.dead{position:sticky;top:110px;padding:22px}.pains p{font-size:1.3rem}.turn{margin-top:72px}}
+
+/* ---------- quem faz ---------- */
+.who{padding-top:20px}
+.who__c{border-radius:var(--rl);padding:30px 22px;background:linear-gradient(180deg,rgba(242,231,206,.09),rgba(242,231,206,.02));box-shadow:inset 0 0 0 1px var(--c14);display:grid;gap:22px}
+.who__f{display:grid;gap:14px;font-family:var(--ui);font-size:.92rem;color:var(--muted)}
+.who__f li{display:grid;gap:2px}
+.who__f b{font-family:var(--mono);font-weight:400;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+@media(min-width:900px){.who__c{grid-template-columns:minmax(0,7fr) minmax(0,4fr);gap:72px;padding:56px;align-items:end}}
+
+/* ---------- funcionalidades ---------- */
+.feat{display:grid;gap:26px;margin-bottom:78px}
+.feat__t{display:grid;gap:16px;align-content:start}
+.feat__t p{color:var(--muted)}
+@media(min-width:900px){.feat{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:76px;align-items:center;margin-bottom:150px}.feat--flip{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}.feat--flip .feat__t{order:2}}
+
+/* leads -> funil */
+.srcs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.srcs li{border-radius:999px;padding:6px 11px;font-size:.72rem;color:var(--muted);background:rgba(41,36,31,.7);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);transition:background .4s var(--ease),color .4s,box-shadow .4s}
+.srcs li.on{background:var(--cream);color:var(--ink);box-shadow:0 12px 28px -12px rgba(242,231,206,.75)}
+.board{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bcol{min-width:0;min-height:308px;border-radius:16px;background:var(--well);box-shadow:inset 0 0 0 1px var(--edge);padding:10px}
+.bcol h5{font-size:.72rem;font-weight:500;color:var(--muted);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bcol--x{display:none}
+.card{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:1px 8px;margin-bottom:6px;border-radius:12px;background:rgba(41,36,31,.8);box-shadow:inset 0 0 0 1px rgba(56,51,46,.8);padding:8px 10px 8px 14px}
+.card::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--cream)}
+.card b{grid-column:1/-1;font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card small{font-size:.66rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card i{font-style:normal;font-size:.68rem;font-weight:600;color:var(--cream)}
+.card--mv{opacity:0;transform:translateX(-18px);transition:opacity .5s var(--ease),transform .6s var(--ease)}
+.card--mv.on{opacity:1;transform:none;box-shadow:inset 0 0 0 1px var(--c26)}
+@media(min-width:640px){.board{grid-template-columns:repeat(3,1fr)}.bcol{min-height:244px}.bcol--x{display:block}.card{grid-template-columns:minmax(0,1fr) auto}}
+
+/* caixa de entrada */
+.bar2{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:30px}
+.pl{border-radius:999px;padding:5px 11px;font-size:.72rem;color:var(--muted);background:rgba(41,36,31,.7)}
+.pl--on{color:var(--fg);background:var(--c14);box-shadow:inset 0 0 0 1px var(--c26)}
+.wait{margin-left:auto;display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 11px;font-size:.7rem;font-weight:600;background:var(--cream);color:var(--ink)}
+.wait i{width:6px;height:6px;border-radius:50%;background:var(--ink);animation:blink 1.4s ease-in-out infinite}
+.rows{display:grid;gap:4px}
+.row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border-radius:14px;background:var(--well)}
+.row strong{display:block;font-size:.82rem;font-weight:600}
+.row p{font-size:.74rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row__m{display:grid;gap:4px;justify-items:end}
+.row time{font-family:var(--mono);font-size:.6rem;color:var(--dim)}
+.st{display:inline-flex;align-items:center;gap:5px;justify-self:end;border-radius:999px;padding:2px 8px 2px 3px;font-size:.62rem;white-space:nowrap;background:rgba(245,239,232,.08);color:var(--muted)}
+.st--n{padding-left:8px}
+.who2{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--cream);color:var(--ink);font-size:.5rem;font-weight:600}
+.row--new{max-height:0;opacity:0;padding-block:0;overflow:hidden;transition:max-height .7s var(--ease),opacity .5s,padding .7s var(--ease),background .6s}
+.row--new.on{max-height:84px;opacity:1;padding-block:9px;background:var(--c14);box-shadow:inset 0 0 0 1px var(--c26)}
+html:not(.js) .row--new{max-height:none;opacity:1;padding-block:9px}
+.cmp{position:relative;margin-top:10px;border-radius:14px;background:rgba(20,16,11,.65);box-shadow:inset 0 0 0 1px var(--edge);padding:11px 13px;font-size:.78rem}
+.cmp__ph{color:var(--dim);transition:opacity .3s}
+.scene[data-step="4"] .cmp__ph{opacity:0}
+.qr{position:absolute;left:8px;bottom:calc(100% + 6px);z-index:2;border-radius:12px;background:var(--card-2);box-shadow:inset 0 0 0 1px var(--c26),0 18px 30px -14px #000;padding:8px 12px;font-size:.74rem;white-space:nowrap}
+.qr b{font-family:var(--mono);font-weight:400;color:var(--cream);margin-right:8px}
+
+/* agentes de IA */
+.sc--agent{display:grid;gap:10px}
+.agent{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center}
+.face{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--cream);color:var(--ink);animation:halo 2.4s var(--ease) infinite}
+@keyframes halo{0%{box-shadow:0 0 0 0 var(--c26)}70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.agent strong{font-size:.92rem;font-weight:600}
+.agent small{display:block;font-size:.72rem;color:var(--muted)}
+.agent__s{margin-top:3px;font-size:.72rem;color:var(--cream)}
+.agent__s span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg{position:relative;width:38px;height:22px;border-radius:999px;background:var(--cream)}
+.tg::after{content:"";position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--ink)}
+.lv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.lv li{border-radius:12px;padding:8px 1px;text-align:center;font-size:.56rem;letter-spacing:-.01em;color:var(--muted);background:rgba(41,36,31,.6);white-space:nowrap;overflow:hidden}
+.lv b{display:block;font-family:var(--mono);font-size:.92rem;font-weight:400;color:var(--fg)}
+.lv .sel{background:var(--cream);color:var(--ink);font-weight:500;box-shadow:0 12px 26px -14px rgba(242,231,206,.7)}
+@media(min-width:480px){.lv li{font-size:.62rem;letter-spacing:0}}
+.lv .sel b{color:var(--ink)}
+.lv__d{margin-top:9px;font-size:.74rem;color:var(--muted)}
+.apv{border-radius:var(--r);background:var(--card-2);box-shadow:inset 0 0 0 1px var(--c26);padding:12px}
+.apv q{display:block;margin-bottom:4px;font-size:.88rem;line-height:1.35}
+.apv small{font-size:.7rem;color:var(--muted)}
+.apv__w{margin-top:11px}
+.apv__b{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bt{display:grid;place-items:center;height:36px;border-radius:999px;font-size:.78rem;font-weight:600;background:rgba(245,239,232,.08);transition:background .25s,color .25s,transform .3s var(--ease)}
+.bt.on{background:var(--cream);color:var(--ink);transform:scale(.95)}
+.apv__ok{display:flex;align-items:center;gap:8px;height:36px;font-size:.78rem;font-weight:600;color:var(--cream)}
+.apv__ok .ic{width:16px;height:16px}
+.log{display:flex;gap:9px;padding:0 4px;font-size:.76rem;color:var(--muted)}
+.log::before{content:"";width:6px;height:6px;margin-top:6px;flex:none;border-radius:50%;background:var(--cream)}
+
+/* agenda */
+.lk{margin-left:auto;display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 11px;font-size:.7rem;color:var(--muted);background:rgba(41,36,31,.7);transition:background .5s var(--ease),color .5s}
+.lk .ic{width:13px;height:13px}
+.lk.on{background:var(--cream);color:var(--ink);font-weight:600}
+.ag{display:grid;grid-template-columns:28px repeat(3,minmax(0,1fr));gap:5px}
+.ag h6{padding-bottom:3px;font-size:.66rem;font-weight:500;color:var(--muted);text-align:center}
+.ag time{align-self:center;font-family:var(--mono);font-size:.58rem;color:var(--dim)}
+.cell{position:relative;min-height:34px;border-radius:9px;padding:8px 7px;font-size:.66rem;color:var(--muted);background:rgba(20,16,11,.45);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:box-shadow .4s}
+.cell--b{background:#29241f}
+.cell--h{color:var(--dim);background-color:rgba(245,239,232,.05);background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(245,239,232,.07) 6px 7px)}
+.cell--t.on{box-shadow:inset 0 0 0 1px var(--cream)}
+.cell .slot__on{justify-content:space-between;gap:4px;border-radius:9px;font-size:.66rem;padding:0 7px}
+.cell .slot__on .ic{width:13px;height:13px;stroke-width:2.4}
+.rem{display:grid;gap:6px;margin-top:12px}
+
+/* ---------- grade de blocos ---------- */
+.bento{display:grid;gap:14px}
+.tile{display:grid;gap:18px;align-content:start;border-radius:var(--rl);padding:22px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.tile h4{font-size:1.36rem;font-weight:400;letter-spacing:-.025em;line-height:1.14;text-wrap:balance}
+.tile>div>p{margin-top:8px;color:var(--muted);font-size:1rem}
+.scene--in{border-radius:var(--r);background:var(--well);box-shadow:inset 0 0 0 1px var(--edge);padding:12px}
+.scene--in::before{display:none}
+@media(min-width:760px){.bento{grid-template-columns:1fr 1fr}.tile{padding:30px;gap:24px}}
+
+/* automações */
+.flow li{position:relative;display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px;align-items:center;margin-bottom:14px;border-radius:12px;padding:10px 12px;font-size:.78rem;color:var(--muted);background:rgba(41,36,31,.6);transition:background .6s var(--ease),color .6s,box-shadow .6s}
+.flow li:last-child{margin-bottom:0}
+.flow li::after{content:"";position:absolute;left:30px;top:100%;width:1px;height:14px;background:var(--line);transition:background .6s}
+.flow li:last-child::after{display:none}
+.flow .k{font-family:var(--mono);font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);transition:color .6s}
+.flow li.on{color:var(--fg);background:var(--c14);box-shadow:inset 0 0 0 1px var(--c26)}
+.flow li.on .k{color:var(--cream)}
+.flow li.on::after{background:var(--cream)}
+.flow li:last-child.on{background:var(--cream);color:var(--ink);box-shadow:0 14px 30px -16px rgba(242,231,206,.7)}
+.flow li:last-child.on .k{color:var(--ink)}
+
+/* extensão */
+.wa{position:relative;min-height:204px;border-radius:14px;overflow:hidden;background:var(--bg-2)}
+.wa__chat{display:grid;gap:8px;align-content:start;padding:12px}
+.ln{height:26px;width:58%;border-radius:12px 12px 12px 4px;background:#29241f}
+.ln--r{justify-self:end;width:46%;border-radius:12px 12px 4px 12px;background:rgba(242,231,206,.16)}
+.ln--s{width:38%}
+.ext{position:absolute;top:8px;right:8px;bottom:8px;width:58%;display:grid;gap:9px;align-content:start;border-radius:14px;background:var(--card-2);box-shadow:inset 0 0 0 1px var(--c26),-22px 0 44px -18px #000;padding:11px;transform:translateX(114%);transition:transform .8s var(--ease)}
+.ext.on{transform:none}
+html:not(.js) .ext{transform:none}
+.ext__h{display:flex;align-items:center;gap:7px;font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.ext__h .mark{width:18px}
+.ext strong{font-size:.86rem;font-weight:600}
+.temp{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.temp span{border-radius:999px;padding:5px 0;text-align:center;font-size:.64rem;color:var(--muted);background:rgba(20,16,11,.5);transition:background .4s var(--ease),color .4s}
+.temp span.on{background:var(--cream);color:var(--ink);font-weight:600}
+.ext__r{display:grid;gap:2px;font-size:.74rem}
+.ext__r small{font-size:.6rem;color:var(--dim)}
+.ext__r b{font-weight:600}
+.ext__k{border-radius:10px;padding:7px 9px;font-size:.68rem;background:var(--c14);color:var(--cream)}
+
+/* relatórios */
+.bars{display:grid;gap:8px}
+.bars li{display:grid;grid-template-columns:70px minmax(0,1fr) 22px;gap:8px;align-items:center;font-size:.7rem;color:var(--muted)}
+.bars b{font-weight:500;color:var(--fg);text-align:right;font-variant-numeric:tabular-nums}
+.tr{display:block;height:8px;border-radius:999px;background:#2c2c2a;overflow:hidden}
+.tr i{display:block;height:100%;width:var(--w);border-radius:999px;background:var(--blue);transform:scaleX(0);transform-origin:left;transition:transform 1.1s var(--ease)}
+.tr i.on{transform:scaleX(1)}
+html:not(.js) .tr i{transform:none}
+.bars li:nth-child(2) i{transition-delay:.08s}
+.bars li:nth-child(3) i{transition-delay:.16s}
+.bars li:nth-child(4) i{transition-delay:.24s}
+.ask{min-height:38px;margin-top:12px;border-radius:12px;padding:9px 11px;font-size:.76rem;background:rgba(41,36,31,.7)}
+.ask [data-type]::after{content:"";display:inline-block;width:1px;height:.95em;margin-left:2px;vertical-align:-2px;background:var(--cream);animation:blink 1s steps(1) infinite}
+.ans{margin-top:8px;padding:0 2px;font-size:.78rem}
+
+/* quiz */
+.qz{display:grid;gap:7px}
+.qz__p{height:4px;margin-bottom:6px;border-radius:999px;background:#29241f;overflow:hidden}
+.qz__p i{display:block;height:100%;background:var(--cream);transform:scaleX(.34);transform-origin:left;transition:transform .9s var(--ease)}
+.s1 .qz__p i{transform:scaleX(.67)}
+.s2 .qz__p i{transform:scaleX(1)}
+.qz .mini__t{margin-bottom:0}
+.qz__q{margin-bottom:3px;font-size:.92rem;font-weight:600}
+.opt{border-radius:12px;padding:9px 12px;font-size:.78rem;color:var(--muted);background:rgba(41,36,31,.6);transition:background .4s var(--ease),color .4s}
+.opt.on{background:var(--cream);color:var(--ink);font-weight:600}
+.res{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+
+/* ---------- implantação ---------- */
+.how__g{display:grid;gap:36px}
+.stepx{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;padding:24px 0;border-top:1px solid rgba(255,255,255,.08)}
+.stepx:last-child{border-bottom:1px solid rgba(255,255,255,.08)}
+.stepx__n{padding-top:7px;font-family:var(--mono);font-size:.76rem;letter-spacing:.1em;color:var(--cream)}
+.stepx h3{margin-bottom:7px;font-size:1.42rem;font-weight:400;letter-spacing:-.025em;line-height:1.15}
+.stepx p{color:var(--muted)}
+.how__a{display:grid;gap:12px}
+.sws{display:grid;gap:6px}
+.sws li{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px;padding:13px 14px;font-size:.9rem;color:var(--dim);background:var(--well);transition:color .5s,background .5s}
+.sws li.on{color:var(--fg);background:rgba(41,36,31,.8)}
+.sw2{position:relative;width:40px;height:22px;flex:none;border-radius:999px;background:var(--card-3);transition:background .5s var(--ease)}
+.sw2::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--dim);transition:transform .5s var(--ease),background .5s}
+.sws li.on .sw2{background:var(--cream)}
+.sws li.on .sw2::after{transform:translateX(18px);background:var(--ink)}
+.ready{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;border-radius:14px;padding:13px;font-size:.92rem;font-weight:600;background:var(--cream);color:var(--ink);box-shadow:0 18px 40px -18px rgba(242,231,206,.75)}
+@media(min-width:900px){.how__g{grid-template-columns:minmax(0,6fr) minmax(0,5fr);gap:34px 84px;align-items:center}.how__g>.scene{grid-column:2;grid-row:1/span 2}.how__a{grid-column:1;grid-row:2;justify-items:start}}
+
+/* ---------- por que ---------- */
+.why__g{display:grid;gap:12px}
+.wc{display:grid;grid-template-columns:42px minmax(0,1fr);gap:6px 16px;align-content:start;border-radius:24px;padding:22px 20px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge);transition:transform .35s var(--ease),box-shadow .35s}
+.wc:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 1px var(--c26),0 24px 44px -26px rgba(242,231,206,.4)}
+.wc__i{grid-row:1/span 2;display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--c14);color:var(--cream)}
+.wc h3{align-self:center;font-size:1.22rem;font-weight:500;letter-spacing:-.02em;line-height:1.2}
+.wc p{grid-column:2;color:var(--muted)}
+@media(min-width:640px){.why__g{grid-template-columns:1fr 1fr}.wc{grid-template-columns:minmax(0,1fr);gap:10px;padding:24px 22px}.wc__i{grid-row:auto;margin-bottom:6px}.wc p{grid-column:auto}}
+@media(min-width:1000px){.why__g{grid-template-columns:repeat(3,1fr)}}
+
+/* ---------- ramos ---------- */
+.tabs{display:inline-flex;gap:4px;max-width:100%;padding:5px;border-radius:999px;overflow-x:auto;scrollbar-width:none;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge);font-family:var(--ui)}
+.tabs::-webkit-scrollbar{display:none}
+.tab{min-height:44px;padding:0 .8rem;border-radius:999px;font-size:.88rem;white-space:nowrap;color:var(--muted);transition:background .35s var(--ease),color .35s}
+@media(min-width:480px){.tab{padding:0 1.05rem;font-size:.92rem}}
+.tab[aria-selected="true"]{background:var(--cream);color:var(--ink);font-weight:600}
+.np{display:grid;gap:26px;margin-top:28px;font-family:var(--ui)}
+.np[hidden]{display:none}
+.stg{display:grid;gap:6px;counter-reset:st}
+.stg li{counter-increment:st;display:flex;align-items:center;gap:12px;border-radius:14px;padding:13px 16px;font-size:.96rem;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.stg li::before{content:counter(st,decimal-leading-zero);font-family:var(--mono);font-size:.66rem;color:var(--dim)}
+.stg .goal{background:var(--cream);color:var(--ink);font-weight:600;box-shadow:0 18px 40px -20px rgba(242,231,206,.7)}
+.stg .goal::before{color:var(--ink);opacity:.6}
+.js .np.play .stg li{animation:rise .6s var(--ease) both;animation-delay:calc(var(--i)*80ms)}
+.meta{display:grid;gap:20px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags li{border-radius:999px;padding:6px 12px;font-size:.84rem;color:var(--muted);background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.np__n{font-family:var(--display);color:var(--muted)}
+@media(min-width:900px){.stg{grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}.stg li{flex-direction:column;align-items:flex-start;gap:26px;padding:18px;min-height:128px;justify-content:space-between}.meta{grid-template-columns:1fr 1fr;gap:44px}}
+
+/* ---------- planos ---------- */
+.pg{display:grid;gap:14px;font-family:var(--ui)}
+.plan{display:grid;gap:20px;align-content:start;border-radius:var(--rl);padding:28px 24px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge)}
+.plan--on{background:var(--cream);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 50px 90px -50px rgba(242,231,206,.6)}
+.plan__n{display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase}
+.plan__n span{border-radius:999px;padding:3px 9px;font-size:.6rem;letter-spacing:.1em;background:var(--ink);color:var(--cream)}
+.plan__p{font-family:var(--display);font-weight:300;font-stretch:92%;font-size:3.6rem;letter-spacing:-.05em;line-height:1}
+.plan__p small{font-family:var(--ui);font-size:.92rem;font-weight:400;letter-spacing:0;opacity:.65}
+.plan__u{font-size:.96rem;font-weight:600}
+.plan ul{display:grid;gap:10px;font-size:.95rem}
+.plan li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;opacity:.82}
+.plan li .ic{width:16px;height:16px;margin-top:3px}
+.plan__i{padding-top:16px;border-top:1px solid rgba(255,255,255,.1);font-size:.88rem;opacity:.75}
+.plan--on .plan__i{border-color:rgba(32,25,16,.16)}
+.plan .btn{width:100%}
+.notes{display:grid;gap:10px;margin-top:30px;max-width:50rem;font-family:var(--ui);font-size:.9rem;color:var(--muted)}
+.notes li{display:grid;grid-template-columns:14px minmax(0,1fr);gap:8px}
+.notes li::before{content:"";width:5px;height:5px;margin-top:.6em;border-radius:50%;background:var(--dim)}
+@media(min-width:900px){.pg{grid-template-columns:repeat(3,1fr)}.plan{padding:34px 30px;grid-template-rows:auto auto auto 1fr auto auto}}
+
+/* ---------- dúvidas ---------- */
+.faq__l{display:grid;gap:8px;max-width:54rem}
+details{border-radius:20px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--edge);transition:box-shadow .3s}
+details[open]{box-shadow:inset 0 0 0 1px var(--c26)}
+summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px;padding:16px 16px 16px 22px;font-size:1.12rem;letter-spacing:-.01em;line-height:1.3;cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+.pm{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:50%;background:rgba(245,239,232,.08);transition:transform .4s var(--ease),background .3s,color .3s}
+.pm .ic{width:15px;height:15px}
+details[open] .pm{transform:rotate(45deg);background:var(--cream);color:var(--ink)}
+details p{max-width:44rem;padding:0 22px 22px;color:var(--muted)}
+
+/* ---------- chamada final e rodapé ---------- */
+.end{padding-bottom:110px;text-align:center}
+.end .wrap{display:grid;justify-items:center;gap:26px}
+.mark-xl{width:min(40vw,190px);overflow:visible}
+.mark-xl path{fill:url(#hm-metal);stroke:url(#hm-metal);stroke-width:5;stroke-linejoin:round}
+.js .mark-xl path{stroke-dasharray:1;stroke-dashoffset:1;fill-opacity:0}
+.js [data-reveal="shown"] .mark-xl path{animation:draw 1.7s cubic-bezier(.65,0,.35,1) .2s forwards,fillin 1s ease-out 1.4s forwards}
+@keyframes fillin{to{fill-opacity:1}}
+.end .display{font-size:clamp(2.6rem,10vw,5.6rem);max-width:16ch;text-wrap:balance}
+footer{padding:44px 0 124px;border-top:1px solid rgba(255,255,255,.07);font-family:var(--ui);font-size:.86rem;color:var(--muted)}
+.ft{display:grid;gap:24px}
+.ft p{max-width:36rem}
+.ft__l a{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+.ft__l a:hover{color:var(--fg)}
+.ft__l{display:flex;flex-wrap:wrap;gap:8px 22px}
+.ft small{font-size:.78rem;color:var(--dim)}
+@media(min-width:900px){footer{padding-bottom:56px}.ft{grid-template-columns:1fr 1fr;gap:60px}}
+
+/* ---------- botão fixo no celular ---------- */
+.sticky{position:fixed;z-index:45;left:10px;right:10px;bottom:10px;padding:7px;border-radius:999px;background:rgba(27,22,17,.86);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:inset 0 0 0 1px var(--edge),0 24px 44px -12px #000;transform:translateY(160%);transition:transform .55s var(--ease)}
+.sticky.show{transform:none}
+.sticky .btn{width:100%;min-height:52px}
+@media(min-width:900px){.sticky{display:none}}
+
+/* ---------- quem prefere menos movimento ---------- */
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .js [data-reveal]{opacity:1}
+  .js .cut>span{transform:none}
+  .js .hero__bird path{stroke-dashoffset:0}
+  .js .mark-xl path{stroke-dashoffset:0;fill-opacity:1}
+  .marq{-webkit-mask-image:none;mask-image:none}
+  .marq__t{width:auto;flex-wrap:wrap;justify-content:center}
+  .marq ul{flex-wrap:wrap;justify-content:center;padding:0}
+  .marq ul[aria-hidden]{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- formas reutilizadas: a harpia e os ícones -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="hm-metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e4e0d8"/><stop offset=".55" stop-color="#a39e96"/><stop offset="1" stop-color="#69645e"/>
+    </linearGradient>
+  </defs>
+  <symbol id="harpia" viewBox="236 266 570 489"><path fill-rule="evenodd" d="M256 414 L344 356 C390 375 430 390 466 396 C428 386 388 366 362 338 C352 322 344 304 347 285 C372 312 420 306 470 302 C560 296 660 296 705 330 C735 352 752 392 762 428 C776 440 786 456 786 474 C760 462 730 458 700 462 C600 480 500 560 455 735 C440 560 380 450 256 414 Z M640 386 C662 378 722 392 758 428 C720 418 668 412 646 404 C634 400 632 390 640 386 Z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-go" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-rocket" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z"/><path d="m12 15-3-3a22 22 0 0 1 2-4A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22 22 0 0 1-4 2z"/><path d="M9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="i-split" viewBox="0 0 24 24"><path d="M16 3h5v5M8 3H3v5M12 22v-8.3a4 4 0 0 0-1.2-2.8L3 3M15 9l6-6"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7l10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></symbol>
+</svg>
+
+<div class="atmo" aria-hidden="true"><i></i><i></i></div>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#topo" aria-label="Harpium CRM, voltar ao início">
+    <svg class="mark" viewBox="0 0 570 489" aria-hidden="true"><use href="#harpia"/></svg>
+    <span class="brand__n">Harpium</span><span class="brand__t">CRM</span>
+  </a>
+  <nav class="nav__l" aria-label="Seções da página">
+    <a href="#funcionalidades">Funcionalidades</a>
+    <a href="#implantacao">Implantação</a>
+    <a href="#planos" data-precos>Planos</a>
+    <a href="#duvidas">Dúvidas</a>
+  </nav>
+  <a class="btn btn--on btn--sm" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="menu" target="_blank" rel="noopener"><span><span class="lg">Falar no </span>WhatsApp</span></a>
+</header>
+
+<main id="topo">
+
+<!-- ============================ HERO ============================ -->
+<section class="hero">
+  <div class="wrap">
+    <svg class="hero__bird" viewBox="226 256 590 509" aria-hidden="true"><path pathLength="1" d="M256 414 L344 356 C390 375 430 390 466 396 C428 386 388 366 362 338 C352 322 344 304 347 285 C372 312 420 306 470 302 C560 296 660 296 705 330 C735 352 752 392 762 428 C776 440 786 456 786 474 C760 462 730 458 700 462 C600 480 500 560 455 735 C440 560 380 450 256 414 Z M640 386 C662 378 722 392 758 428 C720 418 668 412 646 404 C634 400 632 390 640 386 Z"/></svg>
+
+    <p class="chip" data-reveal><span class="dot"></span>CRM de WhatsApp com implantação</p>
+    <h1 class="display"><span class="cut"><span style="--d:120ms">Nenhum lead</span></span><span class="cut"><span style="--d:240ms">sem resposta.</span></span></h1>
+
+    <div class="hero__row">
+      <p class="lead" data-reveal style="--d:420ms">O Harpium CRM coloca WhatsApp, Instagram, funil, agenda e agentes de IA na mesma tela. E a nossa equipe entrega tudo configurado: número conectado, funil montado e time treinado.</p>
+      <div class="hero__cta" data-reveal style="--d:540ms">
+        <a class="btn btn--on" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="hero" target="_blank" rel="noopener">Quero ver funcionando<svg class="ic ic--go" aria-hidden="true"><use href="#i-go"/></svg></a>
+        <p class="micro">Demonstração pelo WhatsApp, com o cenário da sua empresa.</p>
+      </div>
+    </div>
+
+    <ul class="proof" data-reveal style="--d:660ms">
+      <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Preço por empresa, não por usuário</li>
+      <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>WhatsApp oficial da Meta ou QR code</li>
+      <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Implantação feita pela nossa equipe</li>
+    </ul>
+
+    <!-- a cena: o mesmo lead, respondido em segundos -->
+    <div class="scene stage" data-reveal style="--d:780ms" data-scene data-steps="900,1100,1300,2100,1500,1100,1700,1500,4400" role="img" aria-label="Demonstração do Harpium CRM: às 21h04 chega um lead vindo de um anúncio. O agente de IA responde na hora, oferece dois horários, marca a avaliação na agenda e o cartão da cliente avança no funil.">
+      <ol class="steps">
+        <li data-at="1"><time>21:04</time><b>Lead chegou</b></li>
+        <li data-at="4"><time>21:04</time><b>IA respondeu</b></li>
+        <li data-at="7"><time>21:05</time><b>Horário marcado</b></li>
+        <li data-at="8"><time>21:05</time><b>Cartão no funil</b></li>
+      </ol>
+      <div class="stage__g">
+        <ul class="il pane">
+          <li class="cur" data-at="1"><span class="av">MS</span><div><strong>Marina Souza</strong><span>Oi! Vi o anúncio de vocês…</span></div></li>
+          <li><span class="av">CM</span><div><strong>Carlos Mendes</strong><span>Obrigado, até quinta!</span></div></li>
+          <li><span class="av">BN</span><div><strong>Bia Nunes</strong><span>Vou ver com meu marido e te falo</span></div></li>
+          <li><span class="av">SV</span><div><strong>Studio Vila</strong><span>Qual o valor do pacote?</span></div></li>
+        </ul>
+        <div class="chat pane">
+          <div class="chat__h">
+            <span class="av">MS</span>
+            <div><strong>Marina Souza</strong><small>WhatsApp · veio do anúncio no Instagram</small></div>
+            <span class="tag rv" data-at="4">IA atendendo</span>
+          </div>
+          <div class="chat__b">
+            <div class="msg msg--in"><p class="bub rv" data-at="2">Oi! Vi o anúncio de vocês. Tem horário essa semana?</p></div>
+            <div class="msg msg--out"><span class="typing rv" data-at="3" data-until="4"><i></i><i></i><i></i></span><p class="bub rv" data-at="4"><span class="ai">IA</span>Oi, Marina! Tenho quinta às 14h ou sexta às 10h. Qual fica melhor?</p></div>
+            <div class="msg msg--in"><p class="bub rv" data-at="5">Quinta às 14h</p></div>
+            <div class="msg msg--out"><span class="typing rv" data-at="6" data-until="7"><i></i><i></i><i></i></span><p class="bub rv" data-at="7"><span class="ai">IA</span>Marcado: quinta, 14h. Um dia antes eu te mando um lembrete.</p></div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="pane">
+            <p class="mini__t">Agenda · Dra. Paula</p>
+            <ul class="slots">
+              <li><time>13h</time><span class="slot">Carlos M.</span></li>
+              <li><time>14h</time><span class="slot slot--free">livre<span class="slot__on" data-at="7">Marina S.</span></span></li>
+              <li><time>15h</time><span class="slot">Retorno</span></li>
+            </ul>
+          </div>
+          <div class="pane">
+            <p class="mini__t">Funil · Pacientes</p>
+            <div class="cols">
+              <div><h5>Novo contato</h5><div class="dl dl--a" data-at="1" data-until="8">Marina S.</div><div class="dl dl--g"></div></div>
+              <div><h5>Agendamento</h5><div class="dl dl--s">Carlos M.</div><div class="dl dl--b" data-at="8">Marina S.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ ORIGENS ============================ -->
+<section class="band" aria-label="De onde os leads chegam">
+  <p class="eyebrow" style="justify-content:center">Tudo o que entra cai no mesmo lugar</p>
+  <div class="marq">
+    <div class="marq__t">
+      <ul>
+        <li class="chip">WhatsApp oficial</li><li class="chip">WhatsApp por QR code</li><li class="chip">Instagram Direct</li><li class="chip">Meta Lead Ads</li><li class="chip">Google Ads</li><li class="chip">Formulário do site</li><li class="chip">Quiz</li><li class="chip">Zapier</li><li class="chip">Make</li><li class="chip">Webhook</li>
+      </ul>
+      <ul aria-hidden="true">
+        <li class="chip">WhatsApp oficial</li><li class="chip">WhatsApp por QR code</li><li class="chip">Instagram Direct</li><li class="chip">Meta Lead Ads</li><li class="chip">Google Ads</li><li class="chip">Formulário do site</li><li class="chip">Quiz</li><li class="chip">Zapier</li><li class="chip">Make</li><li class="chip">Webhook</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ DORES ============================ -->
+<section class="pain" id="dores">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>Antes do Harpium</p>
+      <h2 class="h2">Parece o seu dia?</h2>
+    </div>
+    <div class="pain__g">
+      <div class="dead" data-reveal role="img" aria-label="Uma conversa sem resposta: a cliente escreve às 21h04, a empresa só responde às 9h12 do dia seguinte e ela já fechou com outra clínica.">
+        <div class="dmsg"><time>21:04</time><p>Oi! Vi o anúncio de vocês. Tem horário essa semana?</p></div>
+        <div class="dgap"><span>12 horas depois</span></div>
+        <div class="dmsg dmsg--out"><time>09:12</time><p>Bom dia! Temos sim. Ainda tem interesse?</p></div>
+        <div class="dmsg"><time>09:40</time><p>Já fechei com outra clínica, obrigada.</p></div>
+      </div>
+      <ul class="pains">
+        <li data-reveal><span>3 pessoas, 1 número</span><p>Todo mundo atende no mesmo WhatsApp e ninguém sabe quem respondeu o quê.</p></li>
+        <li data-reveal style="--d:60ms"><span>Anúncio todo mês</span><p>Você paga para o lead chegar e não sabe dizer quantos viraram venda.</p></li>
+        <li data-reveal style="--d:120ms"><span>Visto, sem retorno</span><p>O cliente pediu orçamento, sumiu, e ninguém lembrou de chamar de novo.</p></li>
+        <li data-reveal style="--d:180ms"><span>Celular pessoal</span><p>A atendente saiu da empresa e as conversas foram embora no celular dela.</p></li>
+        <li data-reveal style="--d:240ms"><span>planilha_final_v3.xlsx</span><p>Já assinou um CRM. Ninguém usou. Voltou tudo para a planilha.</p></li>
+      </ul>
+    </div>
+    <p class="h3 turn" data-reveal>Não é falta de esforço. <span class="c">Falta um lugar onde tudo isso acontece junto, e alguém que monte com você.</span></p>
+  </div>
+</section>
+
+<!-- ============================ QUEM FAZ ============================ -->
+<section class="who">
+  <div class="wrap">
+    <div class="who__c" data-reveal>
+      <div style="display:grid;gap:18px">
+        <p class="eyebrow"><span class="sw"></span>Quem faz</p>
+        <h2 class="h3">Por trás do sistema tem uma agência.</h2>
+        <p class="lead">A Harpium cuida de anúncio, presença no Google e atendimento de empresas todo dia. O CRM nasceu do que a gente via faltar: o lead que chega e ninguém responde.</p>
+      </div>
+      <ul class="who__f">
+        <li><b>De onde</b>Palmas (TO), atendendo empresas de todo o Brasil</li>
+        <li><b>O que faz</b>Anúncios, Google, sites e atendimento pelo WhatsApp</li>
+        <li><b>Quem responde</b>Pessoas da nossa equipe, em português</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!--
+  DEPOIMENTOS — ainda não há. Quando os primeiros clientes derem retorno com números,
+  esta é a posição do bloco: logo depois de "Quem faz". Cada depoimento precisa de nome,
+  empresa, cidade e um resultado específico ("respondemos em 2 minutos em vez de 3 horas").
+-->
+
+<!-- ============================ FUNCIONALIDADES ============================ -->
+<section class="feats" id="funcionalidades">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>O sistema</p>
+      <h2 class="h2">Veja o CRM trabalhando.</h2>
+      <p class="lead">Cada cena abaixo é uma parte do Harpium CRM, na ordem em que o seu cliente passa por ela.</p>
+    </div>
+
+    <!-- 01 leads e funil -->
+    <article class="feat">
+      <div class="feat__t" data-reveal>
+        <p class="eyebrow"><span class="sw"></span>01 · Leads e funil</p>
+        <h3 class="h3">Do anúncio ao funil, sem ninguém copiar e colar.</h3>
+        <p>O lead do Facebook, do Google, do site ou do quiz entra sozinho como contato e como cartão no funil. Nada se perde no caminho.</p>
+        <ul class="ticks">
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Meta Lead Ads, Google Ads, Zapier, Make ou qualquer webhook</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Quiz e formulários próprios, com as respostas de cada pessoa</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Você vê de qual origem veio cada lead</li>
+        </ul>
+      </div>
+      <div class="scene" data-reveal data-scene data-steps="700,700,700,700,700,700,700,900,1300,3600" role="img" aria-label="Leads chegando de quatro origens, Meta Lead Ads, Google Ads, formulário do site e quiz, e virando cartões na coluna Novo lead do funil. O lead que saiu qualificado do quiz avança sozinho para a etapa Qualificado.">
+        <div>
+          <ul class="srcs">
+            <li data-at="1" data-until="3">Meta Lead Ads</li>
+            <li data-at="3" data-until="5">Google Ads</li>
+            <li data-at="5" data-until="7">Formulário do site</li>
+            <li data-at="7" data-until="10">Quiz</li>
+          </ul>
+          <div class="board">
+            <div class="bcol">
+              <h5>Novo lead</h5>
+              <div class="card rv" data-at="2"><b>Rafael Lima</b><small>Meta Lead Ads</small><i>R$ 1.800</i></div>
+              <div class="card rv" data-at="4"><b>Juliana Reis</b><small>Google Ads</small><i>R$ 2.400</i></div>
+              <div class="card rv" data-at="6"><b>Camila Prado</b><small>Site</small><i>R$ 950</i></div>
+              <div class="card rv" data-at="8" data-until="9"><b>Pedro Alves</b><small>Quiz · qualificado</small><i>R$ 3.200</i></div>
+            </div>
+            <div class="bcol">
+              <h5>Qualificado</h5>
+              <div class="card"><b>Marcos Teixeira</b><small>Indicação</small><i>R$ 5.000</i></div>
+              <div class="card card--mv" data-at="9"><b>Pedro Alves</b><small>Quiz · qualificado</small><i>R$ 3.200</i></div>
+            </div>
+            <div class="bcol bcol--x">
+              <h5>Proposta enviada</h5>
+              <div class="card"><b>Clínica Vitta</b><small>Google Ads</small><i>R$ 7.500</i></div>
+              <div class="card"><b>Aline Rocha</b><small>Instagram</small><i>R$ 1.200</i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 02 caixa de entrada -->
+    <article class="feat feat--flip">
+      <div class="feat__t" data-reveal>
+        <p class="eyebrow"><span class="sw"></span>02 · Caixa de entrada</p>
+        <h3 class="h3">A equipe inteira no mesmo número, sem atropelo.</h3>
+        <p>Cada conversa tem dono, status e histórico. Quem assume aparece para todos, e ninguém responde duas vezes.</p>
+        <ul class="ticks">
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>WhatsApp e Instagram na mesma tela</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Respostas rápidas com texto, foto, áudio e documento</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Aviso quando um cliente está esperando por uma pessoa</li>
+        </ul>
+      </div>
+      <div class="scene" data-reveal data-scene data-steps="900,1600,1500,1400,1900,3600" role="img" aria-label="Caixa de entrada: chega uma mensagem nova, o sistema avisa que há um cliente aguardando, a atendente Ana assume a conversa, usa uma resposta rápida e a conversa fica como pendente.">
+        <div>
+          <div class="bar2">
+            <span class="pl pl--on">Todas</span><span class="pl">Não lidas</span><span class="pl md">Abertas</span>
+            <span class="wait rv" data-at="1" data-until="2"><i></i>1 aguardando<span class="md">&nbsp;atendente</span></span>
+          </div>
+          <ul class="rows">
+            <li class="row row--new" data-at="1">
+              <span class="av">LC</span>
+              <div>
+                <strong>Lucas Carvalho</strong>
+                <div class="swap">
+                  <p class="rv" data-at="1" data-until="5">Quanto fica o plano trimestral?</p>
+                  <p class="rv" data-at="5">Ana: Oi, Lucas! O trimestral sai por R$ 297…</p>
+                </div>
+              </div>
+              <div class="row__m">
+                <time>agora</time>
+                <div class="swap">
+                  <span class="st rv" data-at="2" data-until="5"><b class="who2">AN</b>Aberta</span>
+                  <span class="st rv" data-at="5"><b class="who2">AN</b>Pendente</span>
+                </div>
+              </div>
+            </li>
+            <li class="row"><span class="av">BN</span><div><strong>Beatriz Nunes</strong><p>Pode ser sexta às 9h?</p></div><div class="row__m"><time>14:02</time><span class="st"><b class="who2">BR</b>Aberta</span></div></li>
+            <li class="row"><span class="av">SV</span><div><strong>@studio.vila</strong><p>Instagram · Vocês atendem sábado?</p></div><div class="row__m"><time>13:47</time><span class="st"><b class="who2">IA</b>Aberta</span></div></li>
+            <li class="row"><span class="av">CM</span><div><strong>Carla Menezes</strong><p>Obrigada, deu tudo certo!</p></div><div class="row__m"><time>11:20</time><span class="st st--n">Fechada</span></div></li>
+          </ul>
+          <div class="cmp">
+            <span class="qr rv" data-at="3" data-until="4"><b>/valores</b>Valores e planos</span>
+            <div class="swap">
+              <p class="cmp__ph">Digite / para usar uma resposta rápida</p>
+              <p class="rv" data-at="4" data-until="5">Oi, Lucas! O trimestral sai por R$ 297 e já inclui a avaliação.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 03 agentes de IA -->
+    <article class="feat">
+      <div class="feat__t" data-reveal>
+        <p class="eyebrow"><span class="sw"></span>03 · Agentes de IA</p>
+        <h3 class="h3">IA que responde na hora. E só faz o que você deixou.</h3>
+        <p>O agente atende, qualifica e marca horário, a qualquer hora. Você escolhe o quanto ele faz sozinho e o que precisa passar por você.</p>
+        <ul class="ticks">
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Treinado com as informações da sua empresa</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Desconto e fechamento sempre pedem a sua aprovação</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Quando não sabe, avisa o cliente e passa para uma pessoa</li>
+        </ul>
+      </div>
+      <div class="scene" data-reveal data-scene data-steps="1200,2200,900,2200,4200" role="img" aria-label="Agente de IA chamado Lia, com autonomia no nível 2 de 4. Ele pede aprovação antes de oferecer um desconto, o dono aprova, a mensagem é enviada e, quando o cliente pede uma pessoa, o agente avisa e passa a conversa para a atendente.">
+        <div class="sc--agent">
+          <div class="pane agent">
+            <span class="face"><svg class="ic" aria-hidden="true"><use href="#i-bot"/></svg></span>
+            <div style="min-width:0">
+              <strong>Lia</strong><small>Pré-vendas (SDR)</small>
+              <div class="swap agent__s">
+                <span class="rv" data-at="0" data-until="1">respondendo Marina Souza</span>
+                <span class="rv" data-at="1" data-until="3">aguardando a sua aprovação</span>
+                <span class="rv" data-at="3" data-until="4">mensagem aprovada e enviada</span>
+                <span class="rv" data-at="4">conversa passada para Ana</span>
+              </div>
+            </div>
+            <span class="tg"></span>
+          </div>
+          <div class="pane">
+            <p class="mini__t">Autonomia</p>
+            <ol class="lv"><li><b>1</b>Assistido</li><li class="sel"><b>2</b>Semiautônomo</li><li><b>3</b>Autônomo</li><li><b>4</b>Avançada</li></ol>
+            <p class="lv__d">Mantém o CRM em dia sozinha. O que o cliente vê pede aprovação.</p>
+          </div>
+          <div class="apv rv" data-at="1">
+            <p class="mini__t">Aprovação pendente</p>
+            <q>Consigo 10% de desconto no plano anual, válido até sexta.</q>
+            <small>Desconto sempre pede a sua aprovação.</small>
+            <div class="swap apv__w">
+              <div class="apv__b rv" data-at="1" data-until="3"><span class="bt">Recusar</span><span class="bt" data-at="2">Aprovar</span></div>
+              <p class="apv__ok rv" data-at="3"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Aprovado por você. Mensagem enviada.</p>
+            </div>
+          </div>
+          <p class="log rv" data-at="4">O cliente pediu para falar com uma pessoa. Lia avisou e passou a conversa para Ana.</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- 04 agenda -->
+    <article class="feat feat--flip">
+      <div class="feat__t" data-reveal>
+        <p class="eyebrow"><span class="sw"></span>04 · Agenda</p>
+        <h3 class="h3">O cliente marca sozinho. O lembrete sai sozinho.</h3>
+        <p>Cada profissional tem a sua agenda. O cliente escolhe um horário livre pelo link, e a confirmação e o lembrete chegam no WhatsApp dele.</p>
+        <ul class="ticks">
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Link público de agendamento</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>O agente de IA só oferece horário que está livre</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Aparece no Google Agenda de cada profissional</li>
+        </ul>
+      </div>
+      <div class="scene" data-reveal data-scene data-steps="1000,1300,1500,1900,1500,3800" role="img" aria-label="Agenda da semana: a cliente escolhe a quinta-feira às 14h pelo link público, o horário fica marcado, o lembrete sai sozinho pelo WhatsApp e, quando ela responde, o agendamento passa para confirmado.">
+        <div>
+          <div class="bar2">
+            <span class="pl pl--on">Semana</span><span class="pl">Dia</span>
+            <span class="lk" data-at="1"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg>Link público</span>
+          </div>
+          <div class="ag">
+            <span></span><h6>Qua 12</h6><h6>Qui 13</h6><h6>Sex 14</h6>
+            <time>09h</time><div class="cell cell--b">Carlos M.</div><div class="cell"></div><div class="cell cell--b">Retorno</div>
+            <time>10h</time><div class="cell"></div><div class="cell cell--b">Júlia P.</div><div class="cell"></div>
+            <time>11h</time><div class="cell cell--b">Avaliação</div><div class="cell"></div><div class="cell cell--b">Bruno T.</div>
+            <time>12h</time><div class="cell cell--h">Almoço</div><div class="cell cell--h"></div><div class="cell cell--h"></div>
+            <time>14h</time><div class="cell"></div>
+            <div class="cell cell--t" data-at="1"><span class="slot__on" data-at="2">Marina S.<svg class="ic rv" data-at="5" aria-hidden="true"><use href="#i-check"/></svg></span></div>
+            <div class="cell cell--b">Retorno</div>
+          </div>
+          <div class="rem">
+            <div class="msg msg--out"><p class="bub rv" data-at="3"><span class="ai">Lembrete</span>Oi, Marina! Sua avaliação é amanhã, quinta, às 14h. Podemos confirmar?</p></div>
+            <div class="msg msg--in"><p class="bub rv" data-at="4">Confirmado!</p></div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- o resto do dia -->
+    <div class="sec-head" data-reveal style="margin-bottom:28px">
+      <h3 class="h3">E o que faz o resto do dia render.</h3>
+    </div>
+    <div class="bento">
+      <article class="tile" data-reveal>
+        <div>
+          <h4>O follow-up que ninguém lembrava agora sai sozinho.</h4>
+          <p>Boas-vindas, lembretes e mudança de etapa rodam sem ninguém apertar botão.</p>
+        </div>
+        <div class="scene scene--in" data-scene data-steps="800,1100,1100,1100,3200" role="img" aria-label="Automação em quatro passos: quando o cliente não responde em 24 horas, o sistema envia uma mensagem, espera dois dias e então marca o contato como morno e cria uma tarefa para a atendente.">
+          <ol class="flow">
+            <li data-at="1"><span class="k">Gatilho</span>Cliente não respondeu em 24 h</li>
+            <li data-at="2"><span class="k">Ação</span>Enviar “Ainda posso te ajudar?”</li>
+            <li data-at="3"><span class="k">Esperar</span>2 dias</li>
+            <li data-at="4"><span class="k">Ação</span>Etiqueta Morno e tarefa para Ana</li>
+          </ol>
+        </div>
+      </article>
+
+      <article class="tile" data-reveal style="--d:90ms">
+        <div>
+          <h4>Para quem não larga o WhatsApp Web.</h4>
+          <p>A extensão do Chrome põe a ficha do cliente, o funil e as respostas rápidas ao lado da conversa.</p>
+        </div>
+        <div class="scene scene--in" data-scene data-steps="900,1200,1300,1400,3400" role="img" aria-label="Extensão do Chrome: o painel do Harpium CRM abre ao lado da conversa no WhatsApp Web. A atendente marca o contato como quente, muda a etapa do negócio para Proposta enviada e cria uma tarefa.">
+          <div class="wa">
+            <div class="wa__chat"><span class="ln"></span><span class="ln ln--r"></span><span class="ln ln--s"></span><span class="ln ln--r ln--s"></span><span class="ln"></span></div>
+            <div class="ext" data-at="1">
+              <p class="ext__h"><svg class="mark" viewBox="0 0 570 489" aria-hidden="true"><use href="#harpia"/></svg>Harpium CRM</p>
+              <strong>Lucas Carvalho</strong>
+              <div class="temp"><span>Frio</span><span>Morno</span><span data-at="2">Quente</span></div>
+              <p class="ext__r"><small>Etapa do negócio</small><span class="swap"><b class="rv" data-at="0" data-until="3">Qualificado</b><b class="rv" data-at="3">Proposta enviada</b></span></p>
+              <p class="ext__k rv" data-at="4">Tarefa: ligar amanhã, 10h</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="tile" data-reveal>
+        <div>
+          <h4>Pergunte aos seus números.</h4>
+          <p>Leads por origem, tempo de primeira resposta, ganhos por pessoa. E um analista de IA que responde em português.</p>
+        </div>
+        <div class="scene scene--in" data-scene data-steps="700,1600,2100,4000" role="img" aria-label="Relatório de leads por origem em barras, e o analista de IA respondendo à pergunta: qual origem trouxe mais resultado?">
+          <div>
+            <p class="mini__t">Leads por origem · exemplo</p>
+            <ul class="bars">
+              <li><span>Instagram</span><span class="tr"><i data-at="1" style="--w:100%"></i></span><b>42</b></li>
+              <li><span>Google</span><span class="tr"><i data-at="1" style="--w:74%"></i></span><b>31</b></li>
+              <li><span>Site</span><span class="tr"><i data-at="1" style="--w:43%"></i></span><b>18</b></li>
+              <li><span>Indicação</span><span class="tr"><i data-at="1" style="--w:21%"></i></span><b>9</b></li>
+            </ul>
+            <p class="ask"><span class="ai ai--c">Analista</span><span data-at="2" data-type>Qual origem trouxe mais resultado?</span></p>
+            <p class="ans rv" data-at="3">Instagram trouxe mais leads. Indicação fechou mais: 5 de 9.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="tile" data-reveal style="--d:90ms">
+        <div>
+          <h4>Um quiz que entrega o lead já qualificado.</h4>
+          <p>Uma pergunta por tela. Quem conclui vira contato e cartão no funil, com as respostas junto.</p>
+        </div>
+        <div class="scene scene--in" data-scene data-steps="1200,1100,1300,3600" role="img" aria-label="Quiz: a pessoa responde qual é o objetivo dela, o resultado sai como qualificado e o contato e o cartão são criados no funil.">
+          <div class="qz">
+            <div class="qz__p"><i></i></div>
+            <p class="mini__t">Pergunta 2 de 3</p>
+            <p class="qz__q">Qual é o seu objetivo agora?</p>
+            <span class="opt">Emagrecer</span>
+            <span class="opt">Ganhar massa</span>
+            <span class="opt" data-at="1">Voltar a treinar</span>
+            <div class="res"><span class="tag rv" data-at="2">Resultado: qualificado</span><span class="tag rv" data-at="3">Cartão criado no funil</span></div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ IMPLANTAÇÃO ============================ -->
+<section class="how" id="implantacao">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>Como funciona</p>
+      <h2 class="h2">Você não recebe um login. Recebe o CRM funcionando.</h2>
+    </div>
+    <div class="how__g">
+      <div>
+        <ol>
+          <li class="stepx" data-reveal>
+            <span class="stepx__n">01</span>
+            <div><h3>Você mostra como vende</h3><p>Numa conversa pelo WhatsApp, a gente entende o seu atendimento, os seus anúncios e onde os clientes se perdem hoje.</p></div>
+          </li>
+          <li class="stepx" data-reveal style="--d:80ms">
+            <span class="stepx__n">02</span>
+            <div><h3>A gente monta tudo</h3><p>Conectamos o seu número, montamos o funil do seu ramo, cadastramos as mensagens que vocês repetem e treinamos o agente de IA com as informações da sua empresa.</p></div>
+          </li>
+          <li class="stepx" data-reveal style="--d:160ms">
+            <span class="stepx__n">03</span>
+            <div><h3>Sua equipe começa a atender</h3><p>Treinamos quem atende e seguimos no suporte. Você acompanha tudo pelo painel.</p></div>
+          </li>
+        </ol>
+      </div>
+      <div class="scene" data-reveal data-scene data-steps="700,800,800,800,800,900,3800" role="img" aria-label="Lista da implantação sendo ligada item por item: WhatsApp conectado, funil do seu ramo montado, respostas rápidas cadastradas, agente de IA treinado e equipe treinada. No fim, o aviso: pronto para atender.">
+        <div>
+          <p class="mini__t" style="padding:6px 4px 0">Implantação · sua empresa</p>
+          <ul class="sws">
+            <li data-at="1">WhatsApp conectado<span class="sw2"></span></li>
+            <li data-at="2">Funil do seu ramo montado<span class="sw2"></span></li>
+            <li data-at="3">Respostas rápidas cadastradas<span class="sw2"></span></li>
+            <li data-at="4">Agente de IA treinado<span class="sw2"></span></li>
+            <li data-at="5">Equipe treinada<span class="sw2"></span></li>
+          </ul>
+          <p class="ready rv" data-at="6"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Pronto para atender</p>
+        </div>
+      </div>
+      <div class="how__a" data-reveal>
+        <a class="btn btn--on" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Quero%20entender%20como%20funciona%20a%20implanta%C3%A7%C3%A3o%20do%20Harpium%20CRM." data-wa="implantacao" data-cta="implantacao" target="_blank" rel="noopener">Quero o meu CRM montado<svg class="ic ic--go" aria-hidden="true"><use href="#i-go"/></svg></a>
+        <p class="micro">Você fala com uma pessoa da nossa equipe. Sem compromisso.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ POR QUE ============================ -->
+<section class="why">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>Por que o Harpium</p>
+      <h2 class="h2">O que muda quando o CRM vem com gente junto.</h2>
+    </div>
+    <div class="why__g">
+      <article class="wc" data-reveal>
+        <span class="wc__i"><svg class="ic" aria-hidden="true"><use href="#i-rocket"/></svg></span>
+        <h3>Chega funcionando</h3>
+        <p>Nossa equipe conecta, monta e treina. Você não fica sozinho com um tutorial.</p>
+      </article>
+      <article class="wc" data-reveal style="--d:70ms">
+        <span class="wc__i"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <h3>Preço por empresa</h3>
+        <p>A equipe entra no plano. Você não paga mais a cada pessoa que contrata.</p>
+      </article>
+      <article class="wc" data-reveal style="--d:140ms">
+        <span class="wc__i"><svg class="ic" aria-hidden="true"><use href="#i-split"/></svg></span>
+        <h3>WhatsApp oficial ou QR code</h3>
+        <p>Você escolhe o caminho, e a gente explica o custo e o risco de cada um antes.</p>
+      </article>
+      <article class="wc" data-reveal>
+        <span class="wc__i"><svg class="ic" aria-hidden="true"><use href="#i-dial"/></svg></span>
+        <h3>IA com rédea</h3>
+        <p>Você define o que o agente faz sozinho. O resto espera a sua aprovação.</p>
+      </article>
+      <article class="wc" data-reveal style="--d:70ms">
+        <span class="wc__i"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg></span>
+        <h3>Seus dados, suas regras</h3>
+        <p>O dono da conta decide o que a agência enxerga, e tudo o que fizermos fica registrado.</p>
+      </article>
+      <article class="wc" data-reveal style="--d:140ms">
+        <span class="wc__i"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg></span>
+        <h3>Pronto para o seu ramo</h3>
+        <p>Clínica, academia e serviços já saem com funil, etiquetas e mensagens prontas.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ RAMOS ============================ -->
+<section class="niches" id="ramos">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>Modelos por ramo</p>
+      <h2 class="h2">Seu funil já vem com as etapas do seu negócio.</h2>
+    </div>
+    <div data-reveal>
+      <div class="tabs" role="tablist" aria-label="Escolha o ramo">
+        <button class="tab" role="tab" id="tab-clinica" aria-controls="np-clinica" aria-selected="true">Clínica</button>
+        <button class="tab" role="tab" id="tab-academia" aria-controls="np-academia" aria-selected="false" tabindex="-1">Academia e studio</button>
+        <button class="tab" role="tab" id="tab-servicos" aria-controls="np-servicos" aria-selected="false" tabindex="-1">Serviços</button>
+      </div>
+
+      <div class="np play" id="np-clinica" role="tabpanel" aria-labelledby="tab-clinica" tabindex="0">
+        <ol class="stg">
+          <li style="--i:0">Novo contato</li><li style="--i:1">Agendamento</li><li style="--i:2">Consulta realizada</li><li style="--i:3">Retorno ou tratamento</li><li class="goal" style="--i:4">Fidelizado</li>
+        </ol>
+        <div class="meta">
+          <div><p class="mini__t">Etiquetas prontas</p><ul class="tags"><li>Particular</li><li>Convênio</li><li>Primeira consulta</li><li>Retorno</li><li>Urgente</li></ul></div>
+          <div><p class="mini__t">Respostas rápidas prontas</p><ul class="tags"><li>Boas-vindas</li><li>Confirmar consulta</li><li>Endereço e como chegar</li><li>Documentos para a consulta</li><li>Pós-consulta</li></ul></div>
+        </div>
+      </div>
+
+      <div class="np" id="np-academia" role="tabpanel" aria-labelledby="tab-academia" tabindex="0" hidden>
+        <ol class="stg">
+          <li style="--i:0">Interessado</li><li style="--i:1">Aula experimental agendada</li><li style="--i:2">Aula experimental feita</li><li class="goal" style="--i:3">Matriculado</li>
+        </ol>
+        <div class="meta">
+          <div><p class="mini__t">Etiquetas prontas</p><ul class="tags"><li>Musculação</li><li>Funcional</li><li>Pilates</li><li>Aula experimental</li><li>Plano anual</li><li>Ex-aluno</li></ul></div>
+          <div><p class="mini__t">Respostas rápidas prontas</p><ul class="tags"><li>Boas-vindas</li><li>Valores e planos</li><li>Agendar aula experimental</li><li>Horários</li><li>Reativação</li></ul></div>
+        </div>
+      </div>
+
+      <div class="np" id="np-servicos" role="tabpanel" aria-labelledby="tab-servicos" tabindex="0" hidden>
+        <ol class="stg">
+          <li style="--i:0">Novo lead</li><li style="--i:1">Qualificado</li><li style="--i:2">Proposta enviada</li><li style="--i:3">Negociação</li><li class="goal" style="--i:4">Ganho</li>
+        </ol>
+        <div class="meta">
+          <div><p class="mini__t">Etiquetas prontas</p><ul class="tags"><li>Quente</li><li>Morno</li><li>Frio</li><li>Indicação</li><li>Cliente</li></ul></div>
+          <div><p class="mini__t">Respostas rápidas prontas</p><ul class="tags"><li>Boas-vindas</li><li>Apresentação</li><li>Enviar proposta</li><li>Follow-up da proposta</li><li>Agradecimento</li></ul></div>
+        </div>
+      </div>
+
+      <p class="np__n" style="margin-top:26px">Seu ramo não está aqui? A gente monta o funil do zero na implantação.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PLANOS ============================ -->
+<section class="plans" id="planos" data-precos>
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>Planos</p>
+      <h2 class="h2">Um preço por empresa. A equipe entra junto.</h2>
+      <p class="lead">Sem cobrança por usuário e sem dólar. A implantação é paga uma vez.</p>
+    </div>
+    <div class="pg">
+      <article class="plan" data-reveal>
+        <p class="plan__n">Essencial</p>
+        <p class="plan__p">R$ 197<small> /mês</small></p>
+        <p class="plan__u">3 usuários incluídos</p>
+        <ul>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>1 número de WhatsApp, oficial ou por QR code</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Caixa de entrada, contatos e funil</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Agenda com link público</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Leads de todas as origens</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Respostas rápidas e extensão do Chrome</li>
+        </ul>
+        <p class="plan__i">Implantação: R$ 497, uma vez</p>
+        <a class="btn btn--ghost" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20saber%20mais%20sobre%20o%20plano%20Essencial." data-wa="plano" data-plano="Essencial" data-cta="plano-essencial" target="_blank" rel="noopener">Quero o Essencial</a>
+      </article>
+      <article class="plan plan--on" data-reveal style="--d:80ms">
+        <p class="plan__n">Profissional<span>Recomendado</span></p>
+        <p class="plan__p">R$ 397<small> /mês</small></p>
+        <p class="plan__u">6 usuários incluídos</p>
+        <ul>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Tudo do Essencial</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Instagram Direct na mesma caixa de entrada</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Automações, fluxos e envio em massa</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Agentes de IA, com 1.000 respostas por mês</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Relatórios e analista de IA</li>
+        </ul>
+        <p class="plan__i">Implantação: R$ 997, uma vez</p>
+        <a class="btn btn--ink" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20saber%20mais%20sobre%20o%20plano%20Profissional." data-wa="plano" data-plano="Profissional" data-cta="plano-profissional" target="_blank" rel="noopener">Quero o Profissional</a>
+      </article>
+      <article class="plan" data-reveal style="--d:160ms">
+        <p class="plan__n">Escala</p>
+        <p class="plan__p">R$ 797<small> /mês</small></p>
+        <p class="plan__u">15 usuários incluídos</p>
+        <ul>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Tudo do Profissional</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Equipe de agentes de IA, com 3.000 respostas por mês</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>API pública e webhooks</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Revisão mensal com a agência</li>
+          <li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>Suporte prioritário</li>
+        </ul>
+        <p class="plan__i">Implantação: R$ 1.997, uma vez</p>
+        <a class="btn btn--ghost" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20saber%20mais%20sobre%20o%20plano%20Escala." data-wa="plano" data-plano="Escala" data-cta="plano-escala" target="_blank" rel="noopener">Quero o Escala</a>
+      </article>
+    </div>
+    <ul class="notes" data-reveal>
+      <li>Usuário extra: R$ 39 por mês. Pacote com mais 1.000 respostas de IA: R$ 79.</li>
+      <li>No plano anual você paga 10 meses e usa 12, e a implantação sai pela metade.</li>
+      <li>Na API oficial, as mensagens que a empresa inicia são cobradas pela Meta, direto de você. Responder o cliente em até 24 horas não tem custo.</li>
+      <li>Nos CRMs de WhatsApp cobrados por usuário, uma equipe de 6 pessoas paga de R$ 900 a R$ 1.200 por mês (preços públicos consultados em novembro de 2026).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ DÚVIDAS ============================ -->
+<section class="faq" id="duvidas">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow"><span class="sw"></span>Dúvidas</p>
+      <h2 class="h2">O que perguntam antes de decidir.</h2>
+    </div>
+    <div class="faq__l" data-reveal>
+      <details>
+        <summary>Preciso trocar de número?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Não. Você conecta o número que a empresa já usa. Pela API oficial dá para continuar usando o aplicativo WhatsApp Business no celular ao mesmo tempo.</p>
+      </details>
+      <details>
+        <summary>Qual a diferença entre o WhatsApp oficial e o QR code?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>A API oficial é o caminho da Meta para empresas: mais estável, e com cobrança da Meta nas mensagens que a empresa inicia. O QR code conecta como o WhatsApp Web: não tem custo por mensagem, mas a conexão pode cair e o número corre mais risco de bloqueio. A gente explica os dois antes de você escolher.</p>
+      </details>
+      <details>
+        <summary>Quanto custam as mensagens do WhatsApp oficial?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Responder um cliente em até 24 horas depois da última mensagem dele não tem custo. Mensagens que a empresa inicia, como lembretes e promoções, são cobradas pela Meta direto de você e não entram na mensalidade.</p>
+      </details>
+      <details>
+        <summary>A IA vai falar o que quiser com o meu cliente?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Não. Você escreve as instruções, escolhe o nível de autonomia e pode exigir aprovação antes de cada resposta. Desconto e fechamento pedem aprovação em qualquer nível. Quando o agente não sabe, ele avisa o cliente e passa a conversa para uma pessoa.</p>
+      </details>
+      <details>
+        <summary>Já tentei CRM e a equipe não usou. Por que agora seria diferente?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Porque ninguém começa de uma tela vazia. A gente monta o funil, cadastra as mensagens e treina quem atende. E quem prefere o WhatsApp Web usa a extensão, que leva o CRM para dentro dele.</p>
+      </details>
+      <details>
+        <summary>Quem vê os dados dos meus clientes?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Você decide. O dono da conta escolhe se a Harpium vê só os números gerais, se pode ler as conversas ou se pode operar o CRM. Tudo o que a nossa equipe fizer lá dentro fica registrado para você.</p>
+      </details>
+      <details>
+        <summary>Consigo levar os contatos e as conversas que já tenho?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Sim. Dá para importar uma planilha de contatos, e no WhatsApp por QR code o sistema traz as conversas que já estão no celular.</p>
+      </details>
+      <details>
+        <summary>Funciona no celular?<span class="pm"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></summary>
+        <p>Abre no navegador do computador e do celular. Ainda não há aplicativo nas lojas.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ CHAMADA FINAL ============================ -->
+<section class="end" id="comecar">
+  <div class="wrap" data-reveal>
+    <svg class="mark-xl" viewBox="236 266 570 489" aria-hidden="true"><path pathLength="1" fill-rule="evenodd" d="M256 414 L344 356 C390 375 430 390 466 396 C428 386 388 366 362 338 C352 322 344 304 347 285 C372 312 420 306 470 302 C560 296 660 296 705 330 C735 352 752 392 762 428 C776 440 786 456 786 474 C760 462 730 458 700 462 C600 480 500 560 455 735 C440 560 380 450 256 414 Z M640 386 C662 378 722 392 758 428 C720 418 668 412 646 404 C634 400 632 390 640 386 Z"/></svg>
+    <h2 class="display">Seu próximo lead chega hoje à noite.</h2>
+    <p class="lead">Quem vai responder?</p>
+    <a class="btn btn--on" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="final" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>Chamar no WhatsApp</a>
+    <p class="micro">Abre uma conversa com a equipe da Harpium. Sem compromisso.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap ft">
+    <div style="display:grid;gap:16px;align-content:start">
+      <a class="brand" href="#topo" aria-label="Harpium CRM, voltar ao início">
+        <svg class="mark" viewBox="0 0 570 489" aria-hidden="true"><use href="#harpia"/></svg>
+        <span class="brand__n">Harpium</span><span class="brand__t">CRM</span>
+      </a>
+      <p>O Harpium CRM é um produto da Harpium, agência de marketing digital de Palmas (TO).</p>
+      <div class="ft__l">
+        <a href="https://harpium.com.br/" target="_blank" rel="noopener">harpium.com.br</a>
+        <a href="https://harpium-crm.netlify.app/privacidade" target="_blank" rel="noopener">Política de privacidade</a>
+        <a href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="rodape" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
+    <div style="display:grid;gap:14px;align-content:start">
+      <p>LUMA PUBLICIDADE E MARKETING DIGITAL LTDA - ME · CNPJ 31.443.644/0001-88<br>Quadra 103 Sul, Av. JK, Conj. 01, Lote 41, Ed. JK Business Center, Sala 1003, Palmas (TO), CEP 77015-012</p>
+      <small>WhatsApp e Instagram são marcas da Meta Platforms, Inc. O Harpium CRM não é afiliado à Meta. © <span id="ano">2026</span> Harpium.</small>
+    </div>
+  </div>
+</footer>
+
+<div class="sticky" id="sticky">
+  <a class="btn btn--on" href="https://wa.me/5563992085436?text=Ol%C3%A1!%20Vi%20a%20p%C3%A1gina%20do%20Harpium%20CRM%20e%20quero%20ver%20uma%20demonstra%C3%A7%C3%A3o." data-wa="demo" data-cta="fixo" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg>Falar no WhatsApp</a>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------
+     AJUSTES — o que muda sem mexer no resto da página.
+     O número e as mensagens valem para todos os botões de WhatsApp.
+     ------------------------------------------------------------------ */
+  var CONFIG = {
+    whatsapp: '5563992085436',   // só números, com 55 e DDD
+    mostrarPrecos: true,         // false esconde a seção de planos e o link do menu
+    mensagens: {
+      demo: 'Olá! Vi a página do Harpium CRM e quero ver uma demonstração.',
+      implantacao: 'Olá! Quero entender como funciona a implantação do Harpium CRM.',
+      plano: 'Olá! Vi a página do Harpium CRM e quero saber mais sobre o plano {plano}.'
+    }
+  };
+
+  var doc = document;
+  var root = doc.documentElement;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var hasIO = 'IntersectionObserver' in window;
+  function $$(sel, el) { return Array.prototype.slice.call((el || doc).querySelectorAll(sel)); }
+
+  /* ---------- botões de WhatsApp ---------- */
+  $$('[data-wa]').forEach(function (a) {
+    var msg = CONFIG.mensagens[a.dataset.wa] || CONFIG.mensagens.demo;
+    msg = msg.replace('{plano}', a.dataset.plano || '');
+    a.href = 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(msg);
+  });
+
+  /* ---------- planos ---------- */
+  if (!CONFIG.mostrarPrecos) $$('[data-precos]').forEach(function (el) { el.hidden = true; });
+
+  /* ---------- entrada ao rolar ---------- */
+  var reveals = $$('[data-reveal]');
+  if (reduce || !hasIO) {
+    reveals.forEach(function (el) { el.dataset.reveal = 'shown'; });
+  } else {
+    var revealer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        e.target.dataset.reveal = 'shown';
+        revealer.unobserve(e.target);
+      });
+    }, { rootMargin: '0px 0px -6% 0px', threshold: 0.06 });
+    reveals.forEach(function (el) { revealer.observe(el); });
+  }
+
+  /* ------------------------------------------------------------------
+     CENAS
+     data-steps="a,b,c,…": tempo de espera antes de cada passo; o último
+     número é quanto a cena fica parada no fim antes de recomeçar.
+     Dentro da cena, data-at="n" liga o elemento no passo n e
+     data-until="m" desliga no passo m. A cena também recebe as classes
+     s1, s2… (acumuladas) e data-step com o passo atual.
+     Só roda enquanto está na tela.
+     ------------------------------------------------------------------ */
+  function Scene(el) {
+    var durs = el.dataset.steps.split(',').map(Number);
+    var last = durs.length - 1;
+    var step = 0, timer = null, running = false;
+    var items = $$('[data-at]', el).map(function (n) {
+      var typed = n.hasAttribute('data-type') ? n.textContent : null;
+      if (typed !== null && !reduce) n.textContent = '';
+      return { n: n, at: +n.dataset.at, until: n.dataset.until ? +n.dataset.until : Infinity, typed: typed, on: false, tick: null };
+    });
+
+    function typeIn(it) {
+      var i = 0;
+      clearInterval(it.tick);
+      it.n.textContent = '';
+      it.tick = setInterval(function () {
+        i += 1;
+        it.n.textContent = it.typed.slice(0, i);
+        if (i >= it.typed.length) clearInterval(it.tick);
+      }, 34);
+    }
+
+    function apply() {
+      el.dataset.step = step;
+      for (var i = 1; i <= last; i += 1) el.classList.toggle('s' + i, step >= i);
+      items.forEach(function (it) {
+        var on = step >= it.at && step < it.until;
+        if (on === it.on) return;
+        it.on = on;
+        it.n.classList.toggle('on', on);
+        if (it.typed === null) return;
+        if (reduce) { it.n.textContent = it.typed; return; }
+        if (on) typeIn(it); else { clearInterval(it.tick); it.n.textContent = ''; }
+      });
+    }
+
+    function tick() {
+      if (!running) return;
+      if (step >= last) { timer = setTimeout(restart, durs[last]); return; }
+      timer = setTimeout(function () { step += 1; apply(); tick(); }, durs[step]);
+    }
+
+    function restart() {
+      el.classList.add('is-reset');
+      timer = setTimeout(function () {
+        step = 0; apply();
+        void el.offsetWidth;
+        el.classList.remove('is-reset');
+        tick();
+      }, 480);
+    }
+
+    this.play = function () { if (running) return; running = true; tick(); };
+    this.pause = function () {
+      running = false;
+      clearTimeout(timer);
+      if (el.classList.contains('is-reset')) { step = 0; apply(); el.classList.remove('is-reset'); }
+    };
+    this.finish = function () { step = last; apply(); };
+
+    apply();
+  }
+
+  var sceneEls = $$('[data-scene]');
+  sceneEls.forEach(function (el) { el.scene = new Scene(el); });
+  if (reduce || !hasIO) {
+    sceneEls.forEach(function (el) { el.scene.finish(); });
+  } else {
+    var watcher = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && !doc.hidden) e.target.scene.play(); else e.target.scene.pause();
+      });
+    }, { threshold: 0.15 });
+    sceneEls.forEach(function (el) { watcher.observe(el); });
+    doc.addEventListener('visibilitychange', function () {
+      sceneEls.forEach(function (el) {
+        if (doc.hidden) { el.scene.pause(); return; }
+        watcher.unobserve(el);
+        watcher.observe(el);
+      });
+    });
+  }
+
+  /* ---------- ramos (abas) ---------- */
+  var tabs = $$('.tab');
+  function selectTab(tab, focus) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      var panel = doc.getElementById(t.getAttribute('aria-controls'));
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      panel.hidden = !on;
+      panel.classList.remove('play');
+      if (on) { void panel.offsetWidth; panel.classList.add('play'); }
+    });
+    if (focus) tab.focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { selectTab(t, false); });
+    t.addEventListener('keydown', function (e) {
+      var dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      selectTab(tabs[(i + dir + tabs.length) % tabs.length], true);
+    });
+  });
+
+  /* ---------- menu e botão fixo ---------- */
+  var nav = doc.getElementById('nav');
+  var sticky = doc.getElementById('sticky');
+  var endVisible = false;
+  var queued = false;
+  function onScroll() {
+    var y = window.scrollY || root.scrollTop;
+    nav.classList.toggle('is-stuck', y > 24);
+    sticky.classList.toggle('show', y > 420 && !endVisible);
+    queued = false;
+  }
+  window.addEventListener('scroll', function () {
+    if (queued) return;
+    queued = true;
+    window.requestAnimationFrame(onScroll);
+  }, { passive: true });
+  if (hasIO) {
+    new IntersectionObserver(function (entries) {
+      endVisible = entries[0].isIntersecting;
+      onScroll();
+    }, { threshold: 0.3 }).observe(doc.getElementById('comecar'));
+  }
+  onScroll();
+
+  doc.getElementById('ano').textContent = new Date().getFullYear();
+})();
+</script>
+
+</body>
+</html>

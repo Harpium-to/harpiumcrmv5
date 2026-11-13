@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "harpium-lp",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec python3 -m http.server \"${PORT:-4780}\" --bind 127.0.0.1 --directory LP"],
+      "port": 4780
     }
   ]
 }
