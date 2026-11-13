@@ -187,7 +187,10 @@ const SOURCES: ModelSource[] = [
   // ---- Harpium's own, always last ----
   {
     key: 'moveis-planejados',
-    name: 'Diagnóstico móveis planejados',
+    // The leads arrive with this name as their origin. "Quiz planejados"
+    // slugifies to quiz-planejados, the origin the old site sent and the
+    // agency's SDR automation filters by.
+    name: 'Quiz planejados',
     segment: 'Móveis planejados',
     description:
       'O quiz que a Harpium usa para qualificar lojas de móveis planejados para a assessoria. Uso interno: não é um modelo para os clientes.',

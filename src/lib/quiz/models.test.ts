@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { slugify } from '@/lib/leads/parse'
+
 import { evaluate, visibleBlocks, visibleSteps } from './engine'
 import { findQuizModel, QUIZ_MODELS, summarizeModel } from './templates'
 import { checkDefinition } from './validate'
@@ -52,6 +54,12 @@ describe('the list of models', () => {
     expect(QUIZ_MODELS[QUIZ_MODELS.length - 1].key).toBe('moveis-planejados')
     expect(QUIZ_MODELS.filter((m) => m.group === 'interno').map((m) => m.key)).toEqual(['moveis-planejados'])
     expect(QUIZ_MODELS.filter((m) => m.group === 'nicho').length).toBeGreaterThanOrEqual(10)
+  })
+
+  it('keeps the origin the agency’s automation filters by for the furniture-store quiz', () => {
+    // A lead's origin is the quiz's name; the SDR automation set up for
+    // the old site matches "quiz-planejados".
+    expect(slugify(findQuizModel('moveis-planejados')!.name)).toBe('quiz-planejados')
   })
 
   it('covers every niche a CRM can have, except "outro"', () => {
