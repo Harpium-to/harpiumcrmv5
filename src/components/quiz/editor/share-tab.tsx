@@ -1,23 +1,40 @@
 "use client";
 
 // ============================================================
-// Divulgação: the public link and its address, a link builder for
-// campaigns (UTMs), the Meta Pixel and the tags every lead of this
-// quiz gets.
+// Divulgação: everything about getting the quiz in front of people and
+// following up, split by purpose so similar-looking settings never sit
+// side by side:
+//
+//   Link            the public address, its slug and the campaign link;
+//   Rastreamento    Meta Pixel and the Conversions API;
+//   Leads no CRM    the tags of every lead and who stopped halfway;
+//   Incorporar      the code for a client's own site;
+//   Modelo          (agency only) save this quiz as an agency model.
 // ============================================================
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Copy, ExternalLink, Loader2 } from "lucide-react";
+import {
+  Building2,
+  Code,
+  Copy,
+  ExternalLink,
+  Link2,
+  Loader2,
+  Radar,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
 import { embedQuizUrl, publicQuizUrl, slugProblem } from "@/lib/quiz/slug";
 import type { QuizStatus } from "@/lib/quiz/types";
+import { cn } from "@/lib/utils";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
-import { Field, Section, TagsInput, type TabProps } from "./ui";
+import { Field, FormRow, RouteBadge, Section, SubTabs, TagsInput, type TabProps } from "./ui";
 
 export interface ShareTabProps extends TabProps {
   quiz: { id: string; name: string; slug: string; status: QuizStatus; hasCapiToken: boolean };
@@ -28,6 +45,8 @@ export interface ShareTabProps extends TabProps {
   /** The signed-in person is from the agency. */
   isAgencia: boolean;
 }
+
+type Part = "link" | "rastreamento" | "leads" | "incorporar" | "modelo";
 
 export async function copyText(text: string, done: string) {
   try {
@@ -66,6 +85,26 @@ function embedSnippet(url: string, slug: string): string {
   ].join("\n");
 }
 
+/** A value to copy, in a box that reads as "this is the thing to use". */
+function CopyBox({ value, done, small = false }: { value: string; done: string; small?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <code
+        className={cn(
+          "min-w-0 flex-1 basis-64 truncate rounded-xl border border-border bg-background/60 px-3 py-2.5 font-mono text-foreground",
+          small ? "text-xs" : "text-sm",
+        )}
+      >
+        {value}
+      </code>
+      <Button type="button" variant="outline" onClick={() => void copyText(value, done)}>
+        <Copy />
+        Copiar
+      </Button>
+    </div>
+  );
+}
+
 export function ShareTab({
   draft,
   update,
@@ -75,6 +114,7 @@ export function ShareTab({
   onSaveCapiToken,
   isAgencia,
 }: ShareTabProps) {
+  const [part, setPart] = useState<Part>("link");
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const url = publicQuizUrl(origin, quiz.slug);
   const live = quiz.status === "published";
@@ -144,290 +184,285 @@ export function ShareTab({
     }
   };
 
+  const parts: { value: Part; label: string; icon: typeof Link2 }[] = [
+    { value: "link", label: "Link", icon: Link2 },
+    { value: "rastreamento", label: "Rastreamento", icon: Radar },
+    { value: "leads", label: "Leads no CRM", icon: Users },
+    { value: "incorporar", label: "Incorporar no site", icon: Code },
+    ...(isAgencia && canEdit ? [{ value: "modelo" as Part, label: "Modelo da agência", icon: Building2 }] : []),
+  ];
+
   return (
-    <div className="grid gap-4">
-      <Section
-        title="Link público"
-        hint={
-          live
-            ? "É este o endereço que vai no anúncio, na bio e no WhatsApp. Abre sem login."
-            : "O link começa a funcionar quando o quiz é publicado."
-        }
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 basis-64 truncate rounded-lg bg-foreground/6 px-3 py-2 font-mono text-sm text-foreground">
-            {url}
-          </code>
-          <Button type="button" variant="outline" onClick={() => void copyText(url, "Link copiado")}>
-            <Copy />
-            Copiar
-          </Button>
-          {live ? (
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ variant: "outline" })}
-            >
-              <ExternalLink />
-              Abrir
-            </a>
-          ) : null}
-        </div>
+    <div className="space-y-4">
+      <SubTabs ariaLabel="Partes da divulgação" value={part} onChange={setPart} items={parts} />
 
-        {canEdit ? (
-          <div className="mt-6 max-w-xl">
-            <Field
-              label="Endereço"
-              htmlFor="quiz-slug"
-              hint={
-                slugIssue ??
-                "Letras minúsculas, números e hífens. Mudar o endereço faz o link antigo parar de funcionar: troque também nos anúncios."
-              }
-            >
-              <div className="flex gap-2">
-                <div className="flex min-w-0 flex-1 items-center rounded-lg border border-input pl-2.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30">
-                  <span className="shrink-0 font-mono text-sm text-muted-foreground">/q/</span>
-                  <input
-                    id="quiz-slug"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
-                    maxLength={60}
-                    aria-invalid={slugIssue ? true : undefined}
-                    className="h-9 min-w-0 flex-1 bg-transparent pr-2.5 font-mono text-sm text-foreground outline-none"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={slug === quiz.slug || !!slugIssue || savingSlug}
-                  onClick={() => void saveSlug()}
-                >
-                  {savingSlug ? <Loader2 className="animate-spin" /> : null}
-                  Salvar endereço
-                </Button>
-              </div>
-            </Field>
-          </div>
-        ) : null}
-      </Section>
-
-      <Section
-        title="Link de campanha"
-        hint="Preencha o que quiser medir e use o link gerado no anúncio. A campanha e o criativo aparecem no relatório e no lead."
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {UTM_FIELDS.map(([key, label, placeholder]) => (
-            <Field key={key} label={label} htmlFor={`utm-${key}`}>
-              <Input
-                id={`utm-${key}`}
-                value={utms[key] ?? ""}
-                placeholder={placeholder}
-                maxLength={120}
-                onChange={(e) => setUtms((now) => ({ ...now, [key]: e.target.value }))}
-              />
-            </Field>
-          ))}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 basis-64 truncate rounded-lg bg-foreground/6 px-3 py-2 font-mono text-xs text-foreground">
-            {campaignUrl}
-          </code>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void copyText(campaignUrl, "Link de campanha copiado")}
-          >
-            <Copy />
-            Copiar
-          </Button>
-        </div>
-      </Section>
-
-      <Section
-        title="Pixel da Meta"
-        hint="Com o ID do Pixel, a página registra a visita e dispara um evento quando a pessoa chega a um resultado. Qual evento cada resultado dispara é escolhido na aba Resultados."
-      >
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_1fr]">
-          <Field label="ID do Pixel" htmlFor="quiz-pixel" hint="Só números. Vazio = Pixel desligado.">
-            <Input
-              id="quiz-pixel"
-              inputMode="numeric"
-              value={draft.settings.pixelId ?? ""}
-              disabled={!canEdit}
-              placeholder="ex.: 1234567890123456"
-              maxLength={30}
-              onChange={(e) =>
-                update((d) => ({
-                  ...d,
-                  settings: { ...d.settings, pixelId: e.target.value.replace(/\D/g, "") || undefined },
-                }))
-              }
-            />
-          </Field>
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Evento de cada resultado</p>
-            <ul className="mt-2 grid gap-1.5 text-sm">
-              {draft.results.map((result) => (
-                <li key={result.id} className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-foreground">{result.name}</span>
-                  <span className="text-muted-foreground">
-                    {result.pixel.kind === "none"
-                      ? "não envia evento"
-                      : `${result.pixel.name} (${result.pixel.kind === "standard" ? "evento padrão" : "evento personalizado"})`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </Section>
-
-      <Section
-        title="Etiquetas de todo lead"
-        hint="Aplicadas a todos os leads deste quiz, além das etiquetas de cada resultado. Servem para filtrar contatos e disparar automações."
-      >
-        <div className="max-w-xl">
-          <TagsInput
-            value={draft.settings.tags}
-            disabled={!canEdit}
-            onChange={(tags) => update((d) => ({ ...d, settings: { ...d.settings, tags } }))}
-          />
-        </div>
-      </Section>
-
-      <Section
-        title="Quem parou no meio"
-        hint="Por padrão, só vira lead quem conclui o quiz. Com esta opção, quem deixou WhatsApp ou e-mail e parou também vai para o CRM."
-      >
-        <label className="flex max-w-2xl items-start gap-3 text-sm text-foreground">
-          <Switch
-            className="mt-0.5"
-            checked={draft.settings.partialLead === true}
-            disabled={!canEdit}
-            onCheckedChange={(on) =>
-              update((d) => ({ ...d, settings: { ...d.settings, partialLead: on ? true : undefined } }))
+      {part === "link" ? (
+        <div className="grid gap-4">
+          <Section
+            icon={Link2}
+            title="Link público"
+            hint={
+              live
+                ? "O endereço que vai no anúncio, na bio e no WhatsApp. Abre sem login."
+                : "O link começa a funcionar quando o quiz é publicado."
             }
-          />
-          <span>
-            Enviar como lead parcial
-            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-              O lead chega 30 minutos depois da última resposta, com a etiqueta{" "}
-              <code className="font-mono">quiz-incompleto</code>, as respostas dadas até ali e sem
-              rota. Só funciona se o contato for pedido antes do fim do quiz. Vale a partir da
-              próxima publicação.
-            </span>
-          </span>
-        </label>
-      </Section>
-
-      {canEdit ? (
-        <Section
-          title="API de Conversões da Meta"
-          hint="Envia o evento do resultado também pelo servidor, com o mesmo ID do Pixel, para a Meta contar uma vez só e receber o evento mesmo quando o navegador bloqueia o Pixel. Precisa do ID do Pixel acima."
-        >
-          <div className="max-w-xl">
-            <Field
-              label="Token de acesso"
-              htmlFor="quiz-capi"
-              hint={
-                quiz.hasCapiToken
-                  ? "Há um token salvo. Ele fica cifrado e não é mostrado de novo; cole outro para trocar."
-                  : "Gerado no Gerenciador de Eventos da Meta, em Configurações › API de Conversões. Fica cifrado e nunca vai ao navegador do visitante."
-              }
-            >
-              <div className="flex flex-wrap gap-2">
-                <Input
-                  id="quiz-capi"
-                  type="password"
-                  autoComplete="off"
-                  value={capi}
-                  maxLength={600}
-                  placeholder={quiz.hasCapiToken ? "•••••••• (salvo)" : "Cole o token aqui"}
-                  onChange={(e) => setCapi(e.target.value)}
-                  className="min-w-0 flex-1 basis-56"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!capi.trim() || savingCapi}
-                  onClick={() => void saveCapi(capi)}
-                >
-                  {savingCapi ? <Loader2 className="animate-spin" /> : null}
-                  Salvar token
-                </Button>
-                {quiz.hasCapiToken ? (
+            action={
+              live ? (
+                <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline" })}>
+                  <ExternalLink />
+                  Abrir
+                </a>
+              ) : null
+            }
+          >
+            <div className="py-4">
+              <CopyBox value={url} done="Link copiado" />
+            </div>
+            {canEdit ? (
+              <FormRow
+                title="Endereço"
+                hint="Mudar o endereço faz o link antigo parar de funcionar: troque também nos anúncios."
+              >
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex min-w-0 flex-1 basis-56 items-center rounded-lg border border-input pl-2.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30">
+                    <span className="shrink-0 font-mono text-sm text-muted-foreground">/q/</span>
+                    <input
+                      aria-label="Endereço do quiz"
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+                      maxLength={60}
+                      aria-invalid={slugIssue ? true : undefined}
+                      className="h-9 min-w-0 flex-1 bg-transparent pr-2.5 font-mono text-sm text-foreground outline-none"
+                    />
+                  </div>
                   <Button
                     type="button"
-                    variant="ghost"
-                    disabled={savingCapi}
-                    onClick={() => {
-                      if (window.confirm("Remover o token? Os eventos voltam a sair só pelo Pixel.")) {
-                        void saveCapi("");
-                      }
-                    }}
+                    variant="outline"
+                    disabled={slug === quiz.slug || !!slugIssue || savingSlug}
+                    onClick={() => void saveSlug()}
                   >
-                    Remover
+                    {savingSlug ? <Loader2 className="animate-spin" /> : null}
+                    Salvar endereço
                   </Button>
-                ) : null}
-              </div>
-            </Field>
+                </div>
+                <p className={cn("text-xs", slugIssue ? "text-red-500" : "text-muted-foreground")}>
+                  {slugIssue ?? "Letras minúsculas, números e hífens."}
+                </p>
+              </FormRow>
+            ) : null}
+          </Section>
+
+          <Section
+            title="Link de campanha"
+            hint="Preencha o que quiser medir e use o link gerado no anúncio. A campanha e o criativo aparecem no relatório e no lead."
+          >
+            <div className="grid gap-3 py-4 sm:grid-cols-2 xl:grid-cols-4">
+              {UTM_FIELDS.map(([key, label, placeholder]) => (
+                <Field key={key} label={label} htmlFor={`utm-${key}`}>
+                  <Input
+                    id={`utm-${key}`}
+                    value={utms[key] ?? ""}
+                    placeholder={placeholder}
+                    maxLength={120}
+                    onChange={(e) => setUtms((now) => ({ ...now, [key]: e.target.value }))}
+                  />
+                </Field>
+              ))}
+            </div>
+            <div className="pt-4">
+              <CopyBox value={campaignUrl} done="Link de campanha copiado" small />
+            </div>
+          </Section>
+        </div>
+      ) : null}
+
+      {part === "rastreamento" ? (
+        <div className="grid gap-4">
+          <Section
+            icon={Radar}
+            title="Pixel da Meta"
+            hint="Com o ID do Pixel, a página registra a visita e dispara um evento quando a pessoa chega a um resultado."
+          >
+            <FormRow title="ID do Pixel" hint="Só números. Vazio = Pixel desligado.">
+              <Input
+                aria-label="ID do Pixel"
+                inputMode="numeric"
+                value={draft.settings.pixelId ?? ""}
+                disabled={!canEdit}
+                placeholder="ex.: 1234567890123456"
+                maxLength={30}
+                className="max-w-xs font-mono"
+                onChange={(e) =>
+                  update((d) => ({
+                    ...d,
+                    settings: { ...d.settings, pixelId: e.target.value.replace(/\D/g, "") || undefined },
+                  }))
+                }
+              />
+            </FormRow>
+            <FormRow title="Evento de cada resultado" hint="Escolhido em Resultados, em cada tela de resultado.">
+              <ul className="divide-y divide-border rounded-xl border border-border">
+                {draft.results.map((result) => (
+                  <li key={result.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                    <RouteBadge route={result.route} />
+                    <span className="min-w-0 flex-1 truncate text-foreground">{result.name}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {result.pixel.kind === "none"
+                        ? "não envia"
+                        : `${result.pixel.name} · ${result.pixel.kind === "standard" ? "padrão" : "personalizado"}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </FormRow>
+          </Section>
+
+          {canEdit ? (
+            <Section
+              icon={ShieldCheck}
+              title="API de Conversões da Meta"
+              hint="Envia o mesmo evento também pelo servidor, com o mesmo ID, para a Meta contar uma vez só e receber o evento mesmo quando o navegador bloqueia o Pixel."
+            >
+              <FormRow
+                title="Token de acesso"
+                hint={
+                  quiz.hasCapiToken
+                    ? "Há um token salvo. Ele fica cifrado e não é mostrado de novo; cole outro para trocar."
+                    : "Gerado no Gerenciador de Eventos da Meta, em Configurações › API de Conversões. Precisa do ID do Pixel."
+                }
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    aria-label="Token da API de Conversões"
+                    value={capi}
+                    maxLength={600}
+                    placeholder={quiz.hasCapiToken ? "•••••••• (salvo)" : "Cole o token aqui"}
+                    onChange={(e) => setCapi(e.target.value)}
+                    className="min-w-0 flex-1 basis-56"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!capi.trim() || savingCapi}
+                    onClick={() => void saveCapi(capi)}
+                  >
+                    {savingCapi ? <Loader2 className="animate-spin" /> : null}
+                    Salvar token
+                  </Button>
+                  {quiz.hasCapiToken ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={savingCapi}
+                      onClick={() => {
+                        if (window.confirm("Remover o token? Os eventos voltam a sair só pelo Pixel.")) {
+                          void saveCapi("");
+                        }
+                      }}
+                    >
+                      Remover
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    aria-hidden
+                    className={cn("size-2 rounded-full", quiz.hasCapiToken ? "bg-emerald-500" : "bg-foreground/25")}
+                  />
+                  {quiz.hasCapiToken ? "Ligada" : "Desligada"}
+                </p>
+              </FormRow>
+            </Section>
+          ) : null}
+        </div>
+      ) : null}
+
+      {part === "leads" ? (
+        <Section icon={Users} title="Leads no CRM" hint="O que acompanha cada lead deste quiz quando ele chega ao CRM.">
+          <FormRow
+            title="Etiquetas de todo lead"
+            hint="Vão em todos os leads deste quiz, além das etiquetas de cada resultado e das etiquetas por resposta."
+          >
+            <TagsInput
+              value={draft.settings.tags}
+              disabled={!canEdit}
+              onChange={(tags) => update((d) => ({ ...d, settings: { ...d.settings, tags } }))}
+            />
+          </FormRow>
+          <FormRow
+            title="Quem parou no meio"
+            hint="Por padrão, só vira lead quem conclui. Vale a partir da próxima publicação."
+          >
+            <label className="flex items-start gap-3 text-sm text-foreground">
+              <Switch
+                className="mt-0.5"
+                checked={draft.settings.partialLead === true}
+                disabled={!canEdit}
+                onCheckedChange={(on) =>
+                  update((d) => ({ ...d, settings: { ...d.settings, partialLead: on ? true : undefined } }))
+                }
+              />
+              <span>
+                Enviar como lead parcial quem deixou WhatsApp ou e-mail e parou
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                  O lead chega 30 minutos depois da última resposta, com a etiqueta{" "}
+                  <code className="font-mono">quiz-incompleto</code>, as respostas até ali e sem rota. Só funciona
+                  se o contato for pedido antes do fim do quiz.
+                </span>
+              </span>
+            </label>
+          </FormRow>
+        </Section>
+      ) : null}
+
+      {part === "incorporar" ? (
+        <Section
+          icon={Code}
+          title="Incorporar no site"
+          hint="Cole este código na página do site onde o quiz deve aparecer. O quadro cresce junto com cada tela, e as UTMs da página vão junto para o lead."
+        >
+          <div className="space-y-3 pt-4">
+            <pre className="max-h-64 overflow-auto rounded-xl border border-border bg-background/60 p-3 font-mono text-xs leading-relaxed text-foreground">
+              {snippet}
+            </pre>
+            <Button type="button" variant="outline" onClick={() => void copyText(snippet, "Código copiado")}>
+              <Copy />
+              Copiar código
+            </Button>
           </div>
         </Section>
       ) : null}
 
-      <Section
-        title="Incorporar em um site"
-        hint="Cole este código na página do site onde o quiz deve aparecer. O quadro cresce junto com cada tela, e as UTMs da página vão junto para o lead."
-      >
-        <pre className="max-h-56 overflow-auto rounded-lg bg-foreground/6 p-3 font-mono text-xs leading-relaxed text-foreground">
-          {snippet}
-        </pre>
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-3"
-          onClick={() => void copyText(snippet, "Código copiado")}
-        >
-          <Copy />
-          Copiar código
-        </Button>
-      </Section>
-
-      {isAgencia && canEdit ? (
+      {part === "modelo" && isAgencia && canEdit ? (
         <Section
-          title="Modelo da agência"
-          hint="Salva este quiz como modelo. Ele passa a aparecer no “Novo quiz” de todos os CRMs. Vão as telas, as regras e os textos; não vão as visitas, os leads, o Pixel nem o logo."
+          icon={Building2}
+          title="Salvar como modelo da agência"
+          hint="O modelo aparece no “Novo quiz” de todos os CRMs. Vão as telas, as regras e os textos; não vão as visitas, os leads, o Pixel nem o logo."
         >
-          <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
-            <Field label="Nome do modelo" htmlFor="quiz-model-name">
-              <Input
-                id="quiz-model-name"
-                value={modelName}
-                maxLength={120}
-                onChange={(e) => setModelName(e.target.value)}
-              />
-            </Field>
-            <Field label="Descrição (opcional)" htmlFor="quiz-model-note">
-              <Input
-                id="quiz-model-note"
-                value={modelNote}
-                maxLength={300}
-                placeholder="ex.: Qualificação para clínicas de estética"
-                onChange={(e) => setModelNote(e.target.value)}
-              />
-            </Field>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-3"
-            disabled={!modelName.trim() || savingModel}
-            onClick={() => void saveModel()}
-          >
-            {savingModel ? <Loader2 className="animate-spin" /> : null}
-            Salvar como modelo da agência
-          </Button>
+          <FormRow title="Nome do modelo">
+            <Input
+              aria-label="Nome do modelo"
+              value={modelName}
+              maxLength={120}
+              onChange={(e) => setModelName(e.target.value)}
+              className="max-w-md"
+            />
+          </FormRow>
+          <FormRow title="Descrição" hint="Opcional. Ajuda a escolher o modelo certo.">
+            <Input
+              aria-label="Descrição do modelo"
+              value={modelNote}
+              maxLength={300}
+              placeholder="ex.: Qualificação para clínicas de estética"
+              onChange={(e) => setModelNote(e.target.value)}
+            />
+            <Button type="button" disabled={!modelName.trim() || savingModel} onClick={() => void saveModel()}>
+              {savingModel ? <Loader2 className="animate-spin" /> : <Building2 />}
+              Salvar como modelo da agência
+            </Button>
+          </FormRow>
         </Section>
       ) : null}
     </div>

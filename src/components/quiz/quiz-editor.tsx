@@ -9,19 +9,23 @@
 // to the live definition; until then visitors keep seeing the last
 // published version.
 //
-// Admins edit. Everyone else in the CRM gets the tabs that only show
-// (report, link), with the fields locked.
+// The tabs are numbered in the order a quiz is built (questions,
+// results, look, sharing); the report sits apart, after a divider,
+// because it is something to read, not a step to do. Admins edit;
+// everyone else in the CRM gets the report and the link.
 // ============================================================
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
   ChartColumn,
   Check,
+  ChevronDown,
   ChevronLeft,
   CircleAlert,
+  CircleCheck,
   ExternalLink,
   ListChecks,
   Loader2,
@@ -39,10 +43,10 @@ import { useCan } from "@/hooks/use-can";
 import { publicQuizUrl } from "@/lib/quiz/slug";
 import type { QuizDefinition, QuizStatus } from "@/lib/quiz/types";
 import type { DefinitionCheck } from "@/lib/quiz/validate";
+import { cn } from "@/lib/utils";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 
 import { AppearanceTab } from "./editor/appearance-tab";
 import { QuizPreview } from "./editor/preview";
@@ -71,21 +75,31 @@ const AUTOSAVE_MS = 1200;
 
 type TabId = "steps" | "results" | "look" | "share" | "report";
 
-const TABS: (PillItem & { value: TabId; adminOnly?: boolean })[] = [
-  { value: "steps", label: "Perguntas", icon: ListChecks, adminOnly: true },
-  { value: "results", label: "Resultados", icon: Trophy, adminOnly: true },
-  { value: "look", label: "Aparência", icon: Palette, adminOnly: true },
-  { value: "share", label: "Divulgação", icon: Share2 },
-  { value: "report", label: "Relatório", icon: ChartColumn },
+interface TabDef {
+  value: TabId;
+  label: string;
+  /** What the step is for, under its name. */
+  hint: string;
+  icon: ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
+}
+
+/** The steps of building a quiz, in order. */
+const BUILD_TABS: TabDef[] = [
+  { value: "steps", label: "Perguntas", hint: "as telas do quiz", icon: ListChecks, adminOnly: true },
+  { value: "results", label: "Resultados", hint: "o final e as regras", icon: Trophy, adminOnly: true },
+  { value: "look", label: "Aparência", hint: "logo e cor", icon: Palette, adminOnly: true },
+  { value: "share", label: "Divulgação", hint: "link, Pixel e leads", icon: Share2 },
 ];
+const REPORT_TAB: TabDef = { value: "report", label: "Relatório", hint: "visitas e leads", icon: ChartColumn };
 
 /** The tabs that edit what the visitor sees, and so sit beside the preview. */
 const WITH_PREVIEW: TabId[] = ["steps", "results", "look"];
 
-function tabFromUrl(allowed: TabId[]): TabId {
-  if (typeof window === "undefined") return allowed[0];
+function tabFromUrl(allowed: TabId[], fallback: TabId): TabId {
+  if (typeof window === "undefined") return fallback;
   const tab = new URLSearchParams(window.location.search).get("tab") as TabId | null;
-  return tab && allowed.includes(tab) ? tab : allowed[0];
+  return tab && allowed.includes(tab) ? tab : fallback;
 }
 
 export function QuizEditor({ id }: { id: string }) {
@@ -104,11 +118,10 @@ export function QuizEditor({ id }: { id: string }) {
   const { account } = useAuth();
 
   // Who cannot edit lands on what they came for: the report.
-  const tabs = canEdit
-    ? TABS
-    : TABS.filter((t) => !t.adminOnly).reverse();
-  const allowed = tabs.map((t) => t.value);
-  const activeTab = allowed.includes(tab) ? tab : allowed[0];
+  const buildTabs = BUILD_TABS.filter((t) => canEdit || !t.adminOnly);
+  const allowed: TabId[] = [...buildTabs.map((t) => t.value), REPORT_TAB.value];
+  const fallback: TabId = canEdit ? "steps" : "report";
+  const activeTab = allowed.includes(tab) ? tab : fallback;
 
   // The newest draft, for the save that is about to go out.
   const latest = useRef<QuizDefinition | null>(null);
@@ -148,13 +161,13 @@ export function QuizEditor({ id }: { id: string }) {
 
   // Open on the tab the address names (?tab=report), once.
   useEffect(() => {
-    setTab(tabFromUrl(allowed));
+    setTab(tabFromUrl(allowed, fallback));
     // Only on mount and when the role resolves.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit]);
 
-  const selectTab = (value: string) => {
-    setTab(value as TabId);
+  const selectTab = (value: TabId) => {
+    setTab(value);
     // The preview follows the tab: a result screen on Resultados, a
     // question (or the entry) everywhere else. A test run is left alone.
     setPreview((now) => {
@@ -167,6 +180,7 @@ export function QuizEditor({ id }: { id: string }) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", value);
     window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const patch = useCallback(
@@ -261,9 +275,7 @@ export function QuizEditor({ id }: { id: string }) {
     return (
       <div className="surface mx-auto mt-10 max-w-md rounded-3xl p-8 text-center">
         <p className="text-base font-medium text-foreground">Quiz não encontrado</p>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Ele pode ter sido apagado, ou pertence a outro CRM.
-        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">Ele pode ter sido apagado, ou pertence a outro CRM.</p>
         <Link href="/ferramentas/quiz" className={buttonVariants({ className: "mt-5" })}>
           Ver os quizzes
         </Link>
@@ -282,10 +294,11 @@ export function QuizEditor({ id }: { id: string }) {
   const url = publicQuizUrl(window.location.origin, quiz.slug);
   const neverPublished = quiz.publishedAt === null;
   const canPublish = neverPublished || quiz.unpublishedChanges || saveState !== "saved";
-  const shown = problems.length > 0 ? problems : quiz.check.errors;
+  const issues = problems.length > 0 ? problems : quiz.check.errors;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* ---- Title and actions ---- */}
       <div>
         <Link
           href="/ferramentas/quiz"
@@ -295,7 +308,7 @@ export function QuizEditor({ id }: { id: string }) {
           Quiz e formulários
         </Link>
 
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
           <div className="min-w-0 flex-1 basis-72">
             <input
               value={name}
@@ -307,12 +320,13 @@ export function QuizEditor({ id }: { id: string }) {
               disabled={!canEdit}
               maxLength={120}
               aria-label="Nome do quiz"
-              className="display-sm w-full truncate rounded-lg bg-transparent text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              title={canEdit ? "Clique para renomear" : undefined}
+              className="display-sm -ml-1.5 w-full truncate rounded-lg bg-transparent px-1.5 text-foreground outline-none hover:bg-foreground/5 focus-visible:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:hover:bg-transparent"
             />
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <StatusBadge status={quiz.status} />
               {quiz.unpublishedChanges && saveState === "saved" ? (
-                <span>Há alterações que ainda não foram publicadas</span>
+                <span className="text-amber-600 dark:text-amber-400">Há alterações ainda não publicadas</span>
               ) : null}
               {canEdit ? <SaveIndicator state={saveState} onRetry={() => void saveDraft()} /> : null}
             </div>
@@ -320,12 +334,7 @@ export function QuizEditor({ id }: { id: string }) {
 
           <div className="flex flex-wrap items-center gap-2">
             {quiz.status === "published" ? (
-              <a
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonVariants({ variant: "outline" })}
-              >
+              <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline" })}>
                 <ExternalLink />
                 Abrir
               </a>
@@ -335,9 +344,7 @@ export function QuizEditor({ id }: { id: string }) {
                 type="button"
                 variant="outline"
                 disabled={acting !== null}
-                onClick={() =>
-                  void act("pause", { action: "pause" }, "Quiz pausado. O link saiu do ar.")
-                }
+                onClick={() => void act("pause", { action: "pause" }, "Quiz pausado. O link saiu do ar.")}
               >
                 {acting === "pause" ? <Loader2 className="animate-spin" /> : <Pause />}
                 Pausar
@@ -375,32 +382,39 @@ export function QuizEditor({ id }: { id: string }) {
         </div>
       </div>
 
-      {canEdit && shown.length > 0 ? (
-        <Notice
-          tone="error"
-          title={problems.length > 0 ? "Ainda falta ajustar antes de publicar" : "Falta para publicar"}
-          items={shown}
-        />
-      ) : null}
-      {canEdit && shown.length === 0 && quiz.check.warnings.length > 0 ? (
-        <Notice tone="warning" title="Vale conferir" items={quiz.check.warnings} />
+      {canEdit ? (
+        <Readiness errors={issues} warnings={quiz.check.warnings} rejected={problems.length > 0} />
       ) : null}
 
-      {tabs.length > 1 ? (
-        <PillNav
-          items={tabs}
-          value={activeTab}
-          onChange={selectTab}
-          ariaLabel="Partes do quiz"
-          className="max-w-full overflow-x-auto"
-        />
-      ) : null}
+      {/* ---- Tabs: the build steps, then the report ---- */}
+      <nav
+        aria-label="Partes do quiz"
+        className="surface flex max-w-full items-stretch gap-1 overflow-x-auto rounded-2xl p-1.5 [scrollbar-width:none]"
+      >
+        {buildTabs.map((t, i) => (
+          <TabButton
+            key={t.value}
+            tab={t}
+            number={canEdit ? i + 1 : undefined}
+            active={activeTab === t.value}
+            onClick={() => selectTab(t.value)}
+          />
+        ))}
+        <span aria-hidden className="mx-1 my-2 w-px shrink-0 bg-border" />
+        <TabButton tab={REPORT_TAB} active={activeTab === "report"} onClick={() => selectTab("report")} />
+      </nav>
 
       {WITH_PREVIEW.includes(activeTab) ? (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
           <div className="min-w-0">
             {activeTab === "steps" ? (
-              <StepsTab draft={draft} update={update} canEdit={canEdit} onFocus={setPreview} />
+              <StepsTab
+                draft={draft}
+                update={update}
+                canEdit={canEdit}
+                onFocus={setPreview}
+                onGoToResults={() => selectTab("results")}
+              />
             ) : activeTab === "results" ? (
               <ResultsTab draft={draft} update={update} canEdit={canEdit} onFocus={setPreview} />
             ) : (
@@ -464,6 +478,105 @@ export function QuizEditor({ id }: { id: string }) {
   );
 }
 
+function TabButton({
+  tab,
+  number,
+  active,
+  onClick,
+}: {
+  tab: TabDef;
+  number?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const Icon = tab.icon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex min-w-0 shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors sm:flex-1",
+        active ? "surface-on" : "text-muted-foreground hover:bg-foreground/6 hover:text-foreground",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+          active ? "bg-primary text-primary-foreground" : "bg-foreground/8 text-foreground/70",
+        )}
+      >
+        {number ?? <Icon className="size-3.5" />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{tab.label}</span>
+        <span className={cn("hidden truncate text-[11px] md:block", active ? "opacity-75" : "opacity-70")}>
+          {tab.hint}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Whether the quiz can be published, in one line, opening into the list
+ * of what is missing. Errors block Publicar; warnings only advise.
+ */
+function Readiness({ errors, warnings, rejected }: { errors: string[]; warnings: string[]; rejected: boolean }) {
+  // Opens by itself when a publish was refused, until the person toggles it.
+  const [choice, setChoice] = useState<boolean | null>(null);
+  const open = choice ?? rejected;
+
+  const blocking = errors.length > 0;
+  const items = blocking ? errors : warnings;
+  const tone = blocking ? "error" : warnings.length > 0 ? "warning" : "ok";
+
+  return (
+    <div
+      className={cn(
+        "rounded-2xl border px-4 py-2.5",
+        tone === "error" && "border-red-500/30 bg-red-500/8",
+        tone === "warning" && "border-amber-500/30 bg-amber-500/8",
+        tone === "ok" && "border-emerald-500/30 bg-emerald-500/8",
+      )}
+      role={blocking ? "alert" : "status"}
+    >
+      <button
+        type="button"
+        disabled={items.length === 0}
+        aria-expanded={open}
+        onClick={() => setChoice(!open)}
+        className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground disabled:cursor-default"
+      >
+        {tone === "error" ? <AlertTriangle className="size-4 shrink-0 text-red-500" /> : null}
+        {tone === "warning" ? <CircleAlert className="size-4 shrink-0 text-amber-500" /> : null}
+        {tone === "ok" ? <CircleCheck className="size-4 shrink-0 text-emerald-500" /> : null}
+        <span className="flex-1">
+          {tone === "error"
+            ? `${errors.length} ${errors.length === 1 ? "ajuste" : "ajustes"} antes de publicar`
+            : tone === "warning"
+              ? `Pronto para publicar · ${warnings.length} ${warnings.length === 1 ? "ponto" : "pontos"} para conferir`
+              : "Pronto para publicar"}
+        </span>
+        {items.length > 0 ? (
+          <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+            {open ? "Esconder" : "Ver"}
+            <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+          </span>
+        ) : null}
+      </button>
+      {open && items.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-0.5 pl-6 text-sm text-muted-foreground">
+          {items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
   if (state === "saving") {
     return (
@@ -488,38 +601,5 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
     <span className="inline-flex items-center gap-1">
       <Check className="size-3" /> Rascunho salvo
     </span>
-  );
-}
-
-function Notice({
-  tone,
-  title,
-  items,
-}: {
-  tone: "error" | "warning";
-  title: string;
-  items: string[];
-}) {
-  return (
-    <div
-      role={tone === "error" ? "alert" : "status"}
-      className={
-        tone === "error"
-          ? "rounded-2xl border border-red-500/30 bg-red-500/8 px-4 py-3"
-          : "rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3"
-      }
-    >
-      <p className="flex items-center gap-2 text-sm font-medium text-foreground">
-        <AlertTriangle
-          className={tone === "error" ? "size-4 text-red-500" : "size-4 text-amber-500"}
-        />
-        {title}
-      </p>
-      <ul className="mt-1.5 list-disc space-y-0.5 pl-9 text-sm text-muted-foreground">
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-    </div>
   );
 }
