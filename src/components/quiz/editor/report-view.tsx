@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { FilterChips, type PillItem } from "@/components/ui/pill-nav";
 
 import { percent } from "../quiz-list";
-import { RouteBadge } from "./results-tab";
+import { RouteBadge } from "./ui";
 
 function Card({
   title,
