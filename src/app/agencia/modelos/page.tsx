@@ -4,14 +4,18 @@ import { ArrowLeft, LayoutTemplate } from 'lucide-react'
 import { requireAgencia } from '@/lib/agencia/guard'
 import { listTemplates } from '@/lib/agencia/template-store'
 import { AGENCY_ACCESS_LABEL, nicheLabel } from '@/lib/agencia/crm'
+import { hasAgenciaRole } from '@/lib/agencia/roles'
 import { describeCounts } from '@/lib/agencia/templates'
+import { listAgencyModels } from '@/lib/quiz/agency-models'
 import { NewTemplateButton } from './new-template'
+import { QuizModels } from './quiz-models'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ModelosPage() {
   const { admin, role } = await requireAgencia()
   const templates = await listTemplates(admin)
+  const quizModels = await listAgencyModels(admin)
 
   return (
     <div className="space-y-6">
@@ -74,6 +78,8 @@ export default async function ModelosPage() {
           ))}
         </div>
       )}
+
+      <QuizModels models={quizModels} canManage={hasAgenciaRole(role, 'manager')} />
     </div>
   )
 }

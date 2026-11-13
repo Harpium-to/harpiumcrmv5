@@ -68,6 +68,19 @@ const SECURITY_HEADERS = [
   },
 ] as const;
 
+/**
+ * The public quiz (/q/<slug>, migration 072) is the one page meant to
+ * be shown inside other sites: a client pastes it into their own page
+ * as an <iframe>. So it alone goes without X-Frame-Options, and its
+ * CSP lets any site frame it. It carries no session and nothing of the
+ * CRM, so there is nothing for a hostile frame to click on.
+ */
+const QUIZ_HEADERS = SECURITY_HEADERS.filter((h) => h.key !== "X-Frame-Options").map((h) =>
+  h.key.startsWith("Content-Security-Policy")
+    ? { key: h.key, value: h.value.replace("frame-ancestors 'none'", "frame-ancestors *") }
+    : { key: h.key, value: h.value },
+);
+
 const nextConfig: NextConfig = {
   /**
    * Cache-Control policy.
@@ -125,9 +138,15 @@ const nextConfig: NextConfig = {
       {
         // Security headers on every response, including /_next/static
         // assets (nosniff matters there) and /api/* (HSTS + referrer-
-        // policy don't hurt).
-        source: "/:path*",
+        // policy don't hurt) — except the public quiz, right below.
+        source: "/:path((?!q/).*)",
         headers: [...SECURITY_HEADERS],
+      },
+      {
+        // The public quiz: the same headers, minus the ones that stop
+        // a page from being embedded.
+        source: "/q/:path*",
+        headers: QUIZ_HEADERS,
       },
     ];
   },

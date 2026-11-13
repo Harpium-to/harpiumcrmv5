@@ -44,7 +44,8 @@
     "menuSignOut": "Sair",
     "reports": "Relatórios",
     "help": "Ajuda",
-    "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}"
+    "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}",
+    "tools": "Ferramentas"
   },
   "TopBar": {
     "openMenu": "Abrir menu",

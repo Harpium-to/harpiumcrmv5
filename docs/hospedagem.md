@@ -164,6 +164,24 @@ uma, faça um novo deploy (**Deploys › Trigger deploy**).
 
 ---
 
+### Domínio próprio para os quizzes (opcional)
+
+Os quizzes (Ferramentas › Quiz e formulários) abrem em
+`https://SEU-DOMINIO/q/endereco`. Para usar um endereço só deles, como
+`https://quiz.suaempresa.com.br/endereco`:
+
+1. No DNS, crie um `CNAME` de `quiz` para o endereço do app no Netlify.
+2. No Netlify, em **Domain management › Add a domain alias**, adicione
+   `quiz.suaempresa.com.br` ao mesmo site do CRM.
+3. Em **Environment variables**, crie
+   `NEXT_PUBLIC_QUIZ_URL=https://quiz.suaempresa.com.br` e faça um novo
+   deploy.
+
+Os links que o CRM mostra passam a usar o domínio novo. Os links
+`/q/endereco` antigos continuam funcionando.
+
+---
+
 ## 4. Agendador — agentes, automações e flows
 
 Três endpoints precisam ser chamados periodicamente. Sem eles, os
@@ -194,6 +212,11 @@ sair até 10 minutos depois.
 lembrete antes do horário e, como garantia, a confirmação de quem
 marcou. A confirmação sai na hora pela própria tela; o lembrete só sai
 pelo agendador, então com ele parado ninguém é lembrado.
+
+É ele ainda que cuida dos **quizzes** (migration 072): envia como lead
+parcial quem deixou o contato num quiz e parou (só nos quizzes que
+ligaram essa opção, depois de 30 minutos sem atividade) e tenta de novo
+o lead de quem concluiu e não foi gravado por alguma falha.
 
 Também é ele a garantia do **Google Agenda** (migrations 069 e 071):
 - **Do CRM para o Google:** cada mudança vai para o Google na hora. O que falhar (Google fora do ar, por exemplo) é reenviado pelo agendador, até 5 vezes, com intervalos crescentes.

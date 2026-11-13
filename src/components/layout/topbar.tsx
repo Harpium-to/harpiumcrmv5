@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
-import { LogOut, Menu, Puzzle, Settings as SettingsIcon, User } from "lucide-react";
+import { LogOut, Menu, Puzzle, Settings as SettingsIcon, User, Wrench } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -121,6 +121,18 @@ export function TopBar({ onOpenNav }: TopBarProps) {
         {/* ---- Right: live status + account ---- */}
         <div className="flex shrink-0 items-center gap-2">
           <AgentPulseChip className="hidden sm:inline-flex" />
+          {/* Ferramentas: the extra tools of the CRM (quiz e formulários
+              first). Beside the agents chip; on a phone it is in the
+              menu drawer instead. */}
+          <Link
+            href="/ferramentas"
+            aria-label={t("tools")}
+            data-active={pathname === "/ferramentas" || pathname.startsWith("/ferramentas/")}
+            className="chip hidden h-10 px-3.5 text-sm sm:inline-flex"
+          >
+            <Wrench className="size-4" />
+            <span className="hidden xl:inline">{t("tools")}</span>
+          </Link>
           <PageHelp />
           <ModeToggle />
 

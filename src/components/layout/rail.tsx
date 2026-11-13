@@ -115,7 +115,8 @@ export function Rail({ open = false, onClose }: RailProps) {
           )}
         >
           {NAV_GROUPS.map((group, groupIndex) => {
-            const items = NAV_ITEMS.filter((i) => i.group === group);
+            // Top-bar items (Ferramentas) have their own button up there.
+            const items = NAV_ITEMS.filter((i) => i.group === group && !i.topbar);
             if (items.length === 0) return null;
             return (
               <div key={group} className="flex flex-col gap-1">

@@ -1,7 +1,47 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { isValidSlug, quizHostUrl } from '@/lib/quiz/slug'
+
+/**
+ * The public quiz (/q/<slug>, migration 072) is the landing page of an
+ * ad: it has no session to refresh, and the round trip to Supabase
+ * that every other route pays here would only make it open slower. So
+ * it is answered before any of that.
+ *
+ * When the deployment keeps a domain just for quizzes
+ * (NEXT_PUBLIC_QUIZ_URL), a quiz also answers there at the short
+ * address /<slug>. Only an address that could be a quiz is rewritten —
+ * the app's own routes are reserved words (lib/quiz/slug.ts) — so
+ * pointing that variable at the CRM's own host by mistake breaks
+ * nothing.
+ */
+function publicQuizResponse(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl
+  const quizHost = quizHostUrl()
+  if (quizHost) {
+    const asked = (
+      request.headers.get('x-forwarded-host') ??
+      request.headers.get('host') ??
+      request.nextUrl.host
+    ).toLowerCase()
+    const short = /^\/([a-z0-9-]+)\/?$/.exec(pathname)
+    if (asked === new URL(quizHost).host.toLowerCase() && short && isValidSlug(short[1])) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/q/${short[1]}`
+      return NextResponse.rewrite(url)
+    }
+  }
+  if (pathname.startsWith('/q/') || pathname.startsWith('/api/public/quiz/')) {
+    return NextResponse.next()
+  }
+  return null
+}
+
 export async function proxy(request: NextRequest) {
+  const quiz = publicQuizResponse(request)
+  if (quiz) return quiz
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -70,7 +110,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/leads', '/canais', '/pipelines', '/agenda', '/broadcasts', '/automations', '/flows', '/agents', '/relatorios', '/notifications', '/settings', '/agencia', '/aguardando', '/ajuda']
+  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/leads', '/canais', '/pipelines', '/agenda', '/broadcasts', '/automations', '/flows', '/agents', '/relatorios', '/ferramentas', '/notifications', '/settings', '/agencia', '/aguardando', '/ajuda']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

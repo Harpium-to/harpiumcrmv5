@@ -8,6 +8,7 @@ import { processCalendarNotifications } from '@/lib/agenda/messages'
 import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { resolvePublicOrigin } from '@/lib/http/base-url'
+import { sweepQuizVisits } from '@/lib/quiz/sweep'
 
 /**
  * Drain due `automation_pending_executions` rows. Meant to be hit
@@ -26,7 +27,9 @@ import { resolvePublicOrigin } from '@/lib/http/base-url'
  * and the agenda's confirmations and reminders (migration 067,
  * src/lib/agenda/messages.ts), and keeps the agenda and Google Agenda
  * in step both ways (migrations 069 and 071, src/lib/agenda/google-sync.ts
- * and google-busy.ts), so they need no scheduler job of their own.
+ * and google-busy.ts), and sends the quiz visits that left a contact
+ * and stopped as partial leads (migration 072, src/lib/quiz/sweep.ts),
+ * so they need no scheduler job of their own.
  * They run first and never throw: nothing about them can hold the
  * automations back.
  */
@@ -49,6 +52,8 @@ export async function GET(request: Request) {
   })
   // And what is in Google back into the CRM (071).
   const google_busy = await refreshGoogleBusy(admin)
+  // Quiz visits that left a contact and stopped, and leads to retry (072).
+  const quiz_visits = await sweepQuizVisits(admin)
 
   const { data: due, error } = await admin
     .from('automation_pending_executions')
@@ -60,7 +65,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0) {
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits })
   }
 
   let processed = 0
@@ -91,5 +96,5 @@ export async function GET(request: Request) {
     processed++
   }
 
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits })
 }
