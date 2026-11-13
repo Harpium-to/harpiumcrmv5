@@ -18,6 +18,22 @@ O dono aprovou as cinco recomendações e pediu as quatro fases de uma vez. Um c
   - modelos de quiz da agência, que aparecem no "Novo quiz" de todos os CRMs;
   - no painel da agência, `/agencia/<crm>/quiz` mostra os números em qualquer nível de acesso e as pessoas só com "leitura" ou "total".
 
+### Depois do lançamento (13 de novembro de 2026)
+
+O dono pediu mais modelos e um editor mais claro:
+
+- **14 modelos prontos**, nesta ordem na janela "Novo quiz":
+  1. por nicho: clínica médica, odontologia, clínica de estética, academia e studio, imobiliária, advocacia, escola e cursos, loja e e-commerce, serviços para empresas e energia solar;
+  2. gerais: formulário de contato, pesquisa de satisfação (NPS) e em branco;
+  3. por último, em "Uso interno da Harpium": móveis planejados, que é da demanda da própria agência e não um modelo para os clientes.
+- **Modelo sugerido pelo nicho do CRM:** a janela mostra primeiro o modelo do nicho cadastrado no CRM, depois os modelos da agência.
+- **Editor redesenhado:**
+  - abas numeradas na ordem de montagem (1 Perguntas, 2 Resultados, 3 Aparência, 4 Divulgação), com o Relatório separado;
+  - uma faixa diz se o quiz está pronto para publicar e o que falta;
+  - em Perguntas, as telas formam um caminho da entrada ao resultado, cada tipo com cor e ícone próprios;
+  - em Resultados, as telas têm a cor da classificação (verde, amarelo, cinza) e as regras viram frases "SE … ENTÃO … SENÃO", com "E" e "OU" entre as condições;
+  - Divulgação e Resultados ficam em sub-abas, para assuntos parecidos não ficarem lado a lado.
+
 ### O que ficou diferente do plano
 
 - **Modelo de quiz dentro do modelo de CRM do nicho: não foi feito.** Aplicar um modelo de CRM é uma função do banco (migration 053), e incluir quizzes nela é uma mudança à parte. No lugar, os modelos de quiz da agência ficam disponíveis para todos os CRMs.

@@ -12,25 +12,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, Copy, CopyPlus, ListChecks, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, CopyPlus, ListChecks, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { useCan } from "@/hooks/use-can";
+import type { QuizModelSummary } from "@/lib/quiz/model-meta";
 import { publicQuizUrl } from "@/lib/quiz/slug";
 import type { QuizStatus } from "@/lib/quiz/types";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DisplayHeading } from "@/components/ui/display-heading";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+
+import { NewQuizDialog, type AgencyModelOption } from "./new-quiz-dialog";
 
 interface QuizItem {
   id: string;
@@ -39,14 +32,6 @@ interface QuizItem {
   status: QuizStatus;
   unpublishedChanges: boolean;
   totals: { visits: number; started: number; completed: number; leads: number };
-}
-
-interface ModelOption {
-  /** "model:<key>" for a built-in one, "agency:<id>" for the agency's. */
-  value: string;
-  name: string;
-  description: string | null;
-  fromAgency: boolean;
 }
 
 export const STATUS_LABEL: Record<QuizStatus, string> = {
@@ -87,11 +72,12 @@ export function QuizList() {
   const router = useRouter();
   const canManage = useCan("edit-settings");
   const [quizzes, setQuizzes] = useState<QuizItem[] | null>(null);
-  const [models, setModels] = useState<ModelOption[]>([]);
+  const [models, setModels] = useState<QuizModelSummary[]>([]);
+  const [agencyModels, setAgencyModels] = useState<AgencyModelOption[]>([]);
+  const [niche, setNiche] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [model, setModel] = useState("");
+  const [dialogKey, setDialogKey] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -101,23 +87,9 @@ export function QuizList() {
       if (!res.ok) throw new Error(json.error ?? "Falha ao carregar os quizzes");
       setPending(json.available === false ? json.error : null);
       setQuizzes(json.quizzes ?? []);
-      const builtIn = ((json.models ?? []) as { key: string; name: string; description: string }[]).map(
-        (m): ModelOption => ({
-          value: `model:${m.key}`,
-          name: m.name,
-          description: m.description,
-          fromAgency: false,
-        }),
-      );
-      const agency = ((json.agencyModels ?? []) as { id: string; name: string; description: string | null }[]).map(
-        (m): ModelOption => ({
-          value: `agency:${m.id}`,
-          name: m.name,
-          description: m.description,
-          fromAgency: true,
-        }),
-      );
-      setModels([...agency, ...builtIn]);
+      setModels(json.models ?? []);
+      setAgencyModels(json.agencyModels ?? []);
+      setNiche(typeof json.niche === "string" ? json.niche : null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao carregar os quizzes");
       setQuizzes([]);
@@ -129,8 +101,7 @@ export function QuizList() {
   }, [load]);
 
   const openDialog = () => {
-    setName("");
-    setModel(models[0]?.value ?? "model:em-branco");
+    setDialogKey((k) => k + 1);
     setDialogOpen(true);
   };
 
@@ -149,14 +120,6 @@ export function QuizList() {
       toast.error(err instanceof Error ? err.message : "Falha ao criar o quiz");
       setBusy(null);
     }
-  };
-
-  const create = () => {
-    const [kind, id] = model.split(":");
-    void post(
-      kind === "agency" ? { name, agencyModelId: id } : { name, model: id },
-      "create",
-    );
   };
 
   const remove = async (quiz: QuizItem) => {
@@ -188,8 +151,6 @@ export function QuizList() {
     }
   };
 
-  const chosen = models.find((m) => m.value === model);
-
   return (
     <div className="space-y-8">
       <div>
@@ -211,9 +172,7 @@ export function QuizList() {
       </div>
 
       {pending ? (
-        <p className="surface rounded-2xl px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
-          {pending}
-        </p>
+        <p className="surface rounded-2xl px-4 py-3 text-sm text-amber-600 dark:text-amber-400">{pending}</p>
       ) : null}
 
       {quizzes === null ? (
@@ -228,55 +187,45 @@ export function QuizList() {
             </span>
             <h2 className="mt-5 text-lg font-medium text-foreground">Nenhum quiz ainda</h2>
             <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
-              Crie um quiz ou um formulário, divulgue o link e receba os leads aqui no CRM, com
-              as respostas de cada pessoa.
+              Comece por um dos {models.length} modelos prontos (clínicas, academias, imobiliárias, cursos e
+              outros), divulgue o link e receba os leads aqui no CRM.
             </p>
             {canManage ? (
               <Button type="button" className="mt-6" onClick={openDialog}>
                 <Plus />
-                Criar o primeiro
+                Escolher um modelo
               </Button>
             ) : (
-              <p className="mt-5 text-xs text-muted-foreground">
-                Só administradores criam quizzes.
-              </p>
+              <p className="mt-5 text-xs text-muted-foreground">Só administradores criam quizzes.</p>
             )}
           </div>
         )
       ) : (
         <ul className="grid gap-3">
           {quizzes.map((quiz) => (
-            <li
-              key={quiz.id}
-              className="surface flex flex-wrap items-center gap-x-6 gap-y-4 rounded-3xl p-5"
-            >
-              <div className="min-w-0 flex-1 basis-64">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <Link
-                    href={`/ferramentas/quiz/${quiz.id}`}
-                    className="truncate text-base font-medium text-foreground hover:underline"
-                  >
-                    {quiz.name}
-                  </Link>
-                  <StatusBadge status={quiz.status} />
-                  {quiz.unpublishedChanges ? (
-                    <span className="text-xs text-muted-foreground">
-                      alterações não publicadas
+            <li key={quiz.id} className="surface flex flex-wrap items-center gap-x-6 gap-y-4 rounded-3xl p-5">
+              <Link href={`/ferramentas/quiz/${quiz.id}`} className="group flex min-w-0 flex-1 basis-64 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+                  <ListChecks className="size-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-base font-medium text-foreground group-hover:underline">
+                      {quiz.name}
                     </span>
-                  ) : null}
-                </div>
-                <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                  /q/{quiz.slug}
-                </p>
-              </div>
+                    <StatusBadge status={quiz.status} />
+                    {quiz.unpublishedChanges ? (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">alterações não publicadas</span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">/q/{quiz.slug}</span>
+                </span>
+              </Link>
 
               <dl className="flex gap-7 text-sm tabular-nums">
                 <Stat label="Visitas" value={quiz.totals.visits} />
                 <Stat label="Leads" value={quiz.totals.leads} />
-                <Stat
-                  label="Conclusão"
-                  value={percent(quiz.totals.completed, quiz.totals.visits)}
-                />
+                <Stat label="Conclusão" value={percent(quiz.totals.completed, quiz.totals.visits)} />
               </dl>
 
               <div className="flex items-center gap-1">
@@ -318,85 +267,29 @@ export function QuizList() {
                     </Button>
                   </>
                 ) : null}
+                <Link
+                  href={`/ferramentas/quiz/${quiz.id}`}
+                  aria-label={`Abrir ${quiz.name}`}
+                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-foreground/8 hover:text-foreground"
+                >
+                  <ChevronRight className="size-4" />
+                </Link>
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Novo quiz</DialogTitle>
-            <DialogDescription>
-              Escolha por onde começar. Tudo pode ser mudado depois, e nada vai ao ar antes de
-              você publicar.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid max-h-[46vh] gap-2 overflow-y-auto pr-1">
-            {models.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => setModel(m.value)}
-                aria-pressed={model === m.value}
-                className={cn(
-                  "rounded-2xl border p-4 text-left transition-colors",
-                  model === m.value
-                    ? "border-primary bg-primary-soft"
-                    : "border-border hover:border-foreground/30",
-                )}
-              >
-                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  {m.name}
-                  {m.fromAgency ? (
-                    <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-normal text-muted-foreground">
-                      modelo da agência
-                    </span>
-                  ) : null}
-                </span>
-                {m.description ? (
-                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
-                    {m.description}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="quiz-name">Nome do quiz</Label>
-            <Input
-              id="quiz-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={chosen && chosen.value !== "model:em-branco" ? chosen.name : "Ex.: Diagnóstico gratuito"}
-              maxLength={120}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") create();
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              Só a equipe vê. É também a origem com que os leads chegam no CRM.
-            </p>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={create}
-              disabled={busy !== null || (!name.trim() && model === "model:em-branco")}
-            >
-              {busy === "create" ? <Loader2 className="animate-spin" /> : <Plus />}
-              Criar quiz
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewQuizDialog
+        key={dialogKey}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        models={models}
+        agencyModels={agencyModels}
+        niche={niche}
+        busy={busy === "create"}
+        onCreate={(body) => void post(body, "create")}
+      />
     </div>
   );
 }

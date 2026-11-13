@@ -12,7 +12,8 @@ import { getCurrentAccount, requireRole, toErrorResponse } from '@/lib/auth/acco
 import { supabaseAdmin } from '@/lib/leads/admin-client'
 import { listAgencyModels, loadAgencyModel } from '@/lib/quiz/agency-models'
 import { createQuiz, getQuiz, listQuizzes, MIGRATION_PENDING } from '@/lib/quiz/store'
-import { findQuizModel, QUIZ_MODELS } from '@/lib/quiz/templates'
+import { isCrmNiche } from '@/lib/agencia/crm'
+import { findQuizModel, QUIZ_MODELS, summarizeModel } from '@/lib/quiz/templates'
 import { sanitizeDefinition } from '@/lib/quiz/validate'
 import type { QuizDefinition } from '@/lib/quiz/types'
 
@@ -20,12 +21,28 @@ export async function GET() {
   try {
     const ctx = await getCurrentAccount()
     const quizzes = await listQuizzes(ctx.supabase, ctx.accountId)
-    const models = QUIZ_MODELS.map(({ key, name, description }) => ({ key, name, description }))
+    const models = QUIZ_MODELS.map(summarizeModel)
+    // The CRM's niche (050), so "Novo quiz" can suggest its model first.
+    const { data: account } = await ctx.supabase
+      .from('accounts')
+      .select('niche')
+      .eq('id', ctx.accountId)
+      .maybeSingle()
+    const niche = isCrmNiche((account as { niche?: unknown } | null)?.niche)
+      ? (account as { niche: string }).niche
+      : null
     if (quizzes === null) {
-      return NextResponse.json({ available: false, error: MIGRATION_PENDING, quizzes: [], models, agencyModels: [] })
+      return NextResponse.json({
+        available: false,
+        error: MIGRATION_PENDING,
+        quizzes: [],
+        models,
+        agencyModels: [],
+        niche,
+      })
     }
     const agencyModels = await listAgencyModels(supabaseAdmin())
-    return NextResponse.json({ available: true, quizzes, models, agencyModels })
+    return NextResponse.json({ available: true, quizzes, models, agencyModels, niche })
   } catch (err) {
     return toErrorResponse(err)
   }

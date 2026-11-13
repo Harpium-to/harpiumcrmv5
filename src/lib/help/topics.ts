@@ -277,9 +277,9 @@ export const HELP_TOPICS: HelpTopic[] = [
       "As ferramentas extras do CRM. A primeira é Quiz e formulários: páginas de perguntas, no estilo Typeform, que você divulga por um link e cujos leads caem direto no CRM.",
     steps: [
       "Abra Ferramentas no botão da barra de cima e entre em Quiz e formulários.",
-      "Clique em Novo e escolha um modelo pronto ou comece em branco.",
-      "Em Perguntas, monte as telas: entrada, perguntas de escolha, campos de contato. Use a condição para mostrar uma pergunta só para quem deu certa resposta.",
-      "Em Resultados, escreva a tela de cada resultado e a regra que leva a ele. As regras são lidas de cima para baixo e a primeira que bater decide.",
+      "Clique em Novo quiz e escolha um modelo: há modelos prontos por nicho (clínicas, odontologia, estética, academias, imobiliárias, advocacia, cursos, lojas, serviços para empresas e energia solar), além de formulário de contato, pesquisa de satisfação e um quiz em branco.",
+      "Siga as abas numeradas. Em 1 · Perguntas, as telas aparecem na ordem em que a pessoa vê, cada tipo com a sua cor: entrada, pergunta de escolha, campos e mensagem. Use \"Quem vê esta tela\" para mostrar uma pergunta só para quem deu certa resposta.",
+      "Em 2 · Resultados, escreva a tela de cada resultado (verde: qualificado, amarelo: morno, cinza: desqualificado) e, em Regras, as frases SE … ENTÃO … que levam a cada um. As regras são lidas de cima para baixo e a primeira que bater decide.",
       "Em Aparência, coloque o logo e a cor da marca. Em Divulgação, copie o link e informe o ID do Pixel.",
       "Clique em Publicar. Daí em diante, quem concluir o quiz vira contato e lead no CRM, com as respostas, as etiquetas e o cartão no funil.",
       "Acompanhe em Relatório: visitas, em qual pergunta as pessoas param, as respostas e de qual campanha veio cada lead.",

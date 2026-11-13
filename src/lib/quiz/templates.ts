@@ -1,471 +1,221 @@
 // ============================================================
-// The quiz models that ship with the CRM.
+// The quiz models that ship with the CRM, in the order "Novo quiz"
+// shows them:
 //
-// "Móveis planejados" is the Harpium qualification quiz that used to
-// run as its own site (quiz-planejados): the same screens, the same
-// A/B/C rule and the same result texts, now as data. The other two are
-// starting points.
+//   1. by niche — one per kind of business the agency serves;
+//   2. general — a contact form, a satisfaction survey, a blank quiz;
+//   3. Harpium's own — the furniture-store qualification quiz, last on
+//      purpose: it is the agency's demand, not a model for its clients.
 //
-// Every model goes through sanitizeDefinition before it is used, so a
-// typo here cannot produce a quiz the player cannot run.
+// The models themselves live in ./models. Every one goes through
+// sanitizeDefinition here, so a typo cannot produce a quiz the player
+// cannot run, and models.test.ts checks each one end to end.
 // ============================================================
 
+import type { CrmNiche } from '@/lib/agencia/crm'
+
+import { ACADEMIA, ADVOCACIA, EDUCACAO, IMOBILIARIA } from './models/servicos-locais'
+import { CLINICA_MEDICA, ESTETICA, ODONTOLOGIA } from './models/saude'
+import { ENERGIA_SOLAR, SERVICOS_B2B, VAREJO } from './models/comercio'
+import { EM_BRANCO, FORMULARIO_CONTATO, PESQUISA_NPS } from './models/gerais'
+import { MOVEIS_PLANEJADOS } from './models/planejados'
+import type { QuizModelGroup, QuizModelIcon, QuizModelSummary } from './model-meta'
 import { sanitizeDefinition } from './validate'
-import type { QuizCondition, QuizDefinition, QuizOption } from './types'
+import type { QuizDefinition } from './types'
+
+export { MODEL_GROUP_LABEL } from './model-meta'
+export type { QuizModelGroup, QuizModelIcon, QuizModelSummary } from './model-meta'
 
 export interface QuizModel {
   key: string
+  /** The quiz's name when one is created from it. */
   name: string
+  /** The business it is written for ("Clínica médica"); null for a general model. */
+  segment: string | null
   description: string
+  group: QuizModelGroup
+  /** The CRM niche it fits, to suggest it first in a CRM of that niche. */
+  niche?: CrmNiche
+  icon: QuizModelIcon
   definition: QuizDefinition
 }
 
-const is = (stepId: string, ...optionIds: string[]): QuizCondition => ({ stepId, op: 'is', optionIds })
-const isNot = (stepId: string, ...optionIds: string[]): QuizCondition => ({
-  stepId,
-  op: 'is_not',
-  optionIds,
-})
-const options = (pairs: [string, string][]): QuizOption[] => pairs.map(([id, label]) => ({ id, label }))
-
-/** What comes first, by the answer to "o que mais te incomoda nas vendas". */
-const CHALLENGE_PHRASE: [string, string][] = [
-  ['nao_fecha', 'o seu processo comercial, antes de trazer mais gente'],
-  ['poucos', 'um posicionamento que faça a loja ser lembrada'],
-  ['indicacao', 'um canal próprio de aquisição'],
-  ['preco', 'a forma como sua marca comunica valor'],
-  ['anuncio', 'a estratégia por trás dos anúncios'],
-]
-
-const MOVEIS_PLANEJADOS = {
-  version: 1,
-  intro: {
-    enabled: true,
-    tag: 'Diagnóstico gratuito · Móveis planejados',
-    headline: 'Sua loja vende por indicação ou porque tem um sistema?',
-    sub: 'Descubra em 2 minutos o que está travando as vendas da sua loja.',
-    cta: 'Começar meu diagnóstico',
-    bullets: [
-      { strong: 'R$ 29 mil em anúncios → R$ 1,1 milhão em vendas', text: 'em 12 meses' },
-      { strong: 'R$ 358 mil em vendas em 9 meses', text: 'só pelo digital' },
-      { strong: 'Exclusividade:', text: 'atendemos só uma loja por região' },
-    ],
-  },
-  steps: [
-    {
-      id: 'nome',
-      type: 'fields',
-      label: 'Nome',
-      title: 'Antes de começar: como posso te chamar?',
-      cta: 'Continuar',
-      fields: [
-        { id: 'primeiro_nome', kind: 'name', label: 'Primeiro nome', placeholder: 'Seu primeiro nome', required: true },
-      ],
-    },
-    {
-      id: 'tipo',
-      type: 'choice',
-      label: 'Tipo de empresa',
-      title: 'Prazer, {nome}. O que descreve melhor a sua empresa?',
-      options: options([
-        ['fabrica', 'Fábrica ou marcenaria com showroom próprio'],
-        ['loja', 'Loja de móveis planejados (revenda ou franquia)'],
-        ['marcenaria', 'Marcenaria sem loja física'],
-        ['arquiteto', 'Sou arquiteto(a) ou designer de interiores'],
-        ['outro', 'Outro'],
-      ]),
-    },
-    {
-      id: 'cargo',
-      type: 'choice',
-      label: 'Cargo',
-      title: 'E qual é o seu papel na empresa?',
-      options: options([
-        ['dono', 'Sou o dono(a) ou sócio(a)'],
-        ['gerente', 'Gerente da loja ou responsável comercial'],
-        ['marketing', 'Cuido do marketing'],
-        ['outro', 'Outro'],
-      ]),
-    },
-    {
-      id: 'decisao',
-      type: 'choice',
-      label: 'Quem decide o investimento',
-      title: '{nome}, quando a empresa decide investir em marketing, quem dá a palavra final?',
-      options: options([
-        ['junto', 'Eu decido junto com o dono'],
-        ['levo', 'O dono decide, mas eu levo a proposta'],
-        ['so_dono', 'Só o dono decide'],
-      ]),
-      showIf: [is('cargo', 'gerente')],
-    },
-    {
-      id: 'faturamento',
-      type: 'choice',
-      label: 'Faturamento mensal',
-      title: 'Em média, quanto a empresa fatura por mês?',
-      note: 'Essa informação é confidencial e serve só para calibrarmos o diagnóstico.',
-      options: options([
-        ['ate30', 'Até R$ 30 mil'],
-        ['30a50', 'De R$ 30 mil a R$ 50 mil'],
-        ['50a75', 'De R$ 50 mil a R$ 75 mil'],
-        ['75a150', 'De R$ 75 mil a R$ 150 mil'],
-        ['150a300', 'De R$ 150 mil a R$ 300 mil'],
-        ['300mais', 'Acima de R$ 300 mil'],
-      ]),
-    },
-    {
-      id: 'ticket',
-      type: 'choice',
-      label: 'Ticket médio do projeto',
-      title: 'Qual é o ticket médio de um projeto fechado?',
-      options: options([
-        ['ate15', 'Até R$ 15 mil'],
-        ['15a40', 'De R$ 15 mil a R$ 40 mil'],
-        ['40a80', 'De R$ 40 mil a R$ 80 mil'],
-        ['80mais', 'Acima de R$ 80 mil'],
-      ]),
-    },
-    {
-      id: 'origem',
-      type: 'choice',
-      label: 'De onde vêm os clientes',
-      title: 'Hoje, de onde vem a maior parte dos seus clientes?',
-      options: options([
-        ['indicacao', 'Indicação de clientes ou arquitetos'],
-        ['instagram', 'Instagram (orgânico)'],
-        ['anuncios', 'Anúncios pagos'],
-        ['loja', 'Movimento da loja física'],
-        ['nao_sei', 'Não sei dizer com certeza'],
-      ]),
-    },
-    {
-      id: 'desafio',
-      type: 'choice',
-      label: 'Maior desafio nas vendas',
-      title: '{nome}, o que mais te incomoda nas vendas hoje?',
-      options: options([
-        ['nao_fecha', 'Os orçamentos chegam, mas pouca gente fecha'],
-        ['poucos', 'Chegam poucos clientes novos'],
-        ['indicacao', 'Dependo demais de indicação e de arquitetos'],
-        ['preco', 'Atraio muita gente procurando só preço'],
-        ['anuncio', 'Já tentei anúncio e não deu retorno'],
-      ]),
-    },
-    {
-      id: 'investimento',
-      type: 'choice',
-      label: 'Investimento mensal em marketing',
-      title: '{nome}, quanto faz sentido investir por mês em marketing?',
-      note: 'Somando time e anúncios.',
-      options: options([
-        ['sem_verba', 'Ainda não tenho verba para isso'],
-        ['ate2500', 'Menos de R$ 2.500'],
-        ['2500a5000', 'De R$ 2.500 a R$ 5.000'],
-        ['5000a10000', 'De R$ 5.000 a R$ 10.000'],
-        ['10000mais', 'Acima de R$ 10.000'],
-      ]),
-    },
-    {
-      id: 'prazo',
-      type: 'choice',
-      label: 'Quando quer começar',
-      title: 'E se fizer sentido, quando você quer começar?',
-      options: options([
-        ['ja', 'O quanto antes'],
-        ['30dias', 'Nos próximos 30 dias'],
-        ['3meses', 'Daqui a uns 3 meses'],
-        ['pesquisando', 'Por enquanto estou só pesquisando'],
-      ]),
-    },
-    {
-      id: 'contato',
-      type: 'fields',
-      label: 'Contato',
-      title: 'Pronto, {nome}. Seu diagnóstico já está montado. Para onde a gente envia?',
-      cta: 'Ver meu resultado',
-      fields: [
-        { id: 'whatsapp', kind: 'phone', label: 'WhatsApp', placeholder: '(11) 91234-5678', required: true },
-        { id: 'empresa', kind: 'company', label: 'Nome da empresa', placeholder: 'Ex.: Planejados Silva', required: true },
-        { id: 'cidade', kind: 'city', label: 'Cidade / UF', placeholder: 'Ex.: Palmas / TO', required: true },
-        { id: 'instagram', kind: 'instagram', label: '@ do Instagram da empresa', placeholder: '@suaempresa', required: false },
-      ],
-    },
-  ],
-  results: [
-    {
-      id: 'a',
-      name: 'A · Qualificado',
-      route: 'A',
-      tags: [],
-      pixel: { kind: 'standard', name: 'Lead' },
-      icon: 'check',
-      title: '{nome}, sua empresa tem perfil para crescer com a Harpium.',
-      blocks: [
-        {
-          id: 'a1',
-          type: 'text',
-          text: 'Pelas suas respostas, a {empresa} já tem estrutura, ticket e momento para transformar marketing em venda previsível. O que falta é método, e é exatamente isso que a gente faz.',
-        },
-        {
-          id: 'a2',
-          type: 'text',
-          text: 'Uma loja de planejados que atendemos investiu **R$ 29 mil em anúncios em 12 meses** e o marketing passou a responder por **quase metade do faturamento da empresa**. É esse tipo de conversa que vamos ter com você.',
-        },
-        {
-          id: 'a3',
-          type: 'highlight',
-          icon: 'message',
-          text: '**Próximo passo:** nosso time vai te chamar no WhatsApp para entender o cenário e marcar uma conversa estratégica. **Para ela render de verdade, o ideal é que o dono participe com você.**\nFica de olho no número **{whatsapp}**.',
-          showIf: [is('cargo', 'gerente')],
-        },
-        {
-          id: 'a4',
-          type: 'highlight',
-          icon: 'message',
-          text: '**Próximo passo:** nosso time vai te chamar no WhatsApp em instantes para entender alguns detalhes e marcar uma conversa estratégica.\nFica de olho no número **{whatsapp}**.',
-          showIf: [isNot('cargo', 'gerente')],
-        },
-      ],
-    },
-    {
-      id: 'b',
-      name: 'B · Morno',
-      route: 'B',
-      tags: [],
-      pixel: { kind: 'custom', name: 'QuizMorno' },
-      icon: 'bulb',
-      title: '{nome}, sua empresa está perto, mas ainda não é hora de uma assessoria completa.',
-      blocks: [
-        ...CHALLENGE_PHRASE.map(([optionId, phrase]) => ({
-          id: `b_${optionId}`,
-          type: 'text',
-          text: `Antes de investir em tráfego, vale ajustar o que vem primeiro: ${phrase}.`,
-          showIf: [is('desafio', optionId)],
-        })),
-        {
-          id: 'b2',
-          type: 'text',
-          text: 'O **Raio-X Comercial** é uma análise completa da sua loja (Instagram, anúncios, atendimento e processo de venda) com um plano claro para os próximos 90 dias.',
-        },
-        {
-          id: 'b3',
-          type: 'bullets',
-          items: [
-            'Análise prévia da sua loja, incluindo um contato oculto no WhatsApp',
-            'Sessão estratégica de 90 minutos, ao vivo',
-            'Plano de 90 dias: prioridades, verba de mídia, roteiro comercial e metas',
-            'Retorno de 30 minutos depois de 30 dias',
-          ],
-        },
-        {
-          id: 'b4',
-          type: 'highlight',
-          icon: 'bulb',
-          text: 'Se decidir seguir com a Harpium depois, o valor do Raio-X é abatido da assessoria.',
-        },
-        { id: 'b5', type: 'button', label: 'Quero meu Raio-X · R$ 697', kind: 'link', url: '' },
-      ],
-    },
-    {
-      id: 'c',
-      name: 'C · Desqualificado',
-      route: 'C',
-      tags: [],
-      pixel: { kind: 'custom', name: 'QuizDesqualificado' },
-      icon: 'gift',
-      title: '{nome}, obrigado por responder com sinceridade.',
-      blocks: [
-        {
-          id: 'c1',
-          type: 'text',
-          text: 'Pelo momento da sua empresa, uma assessoria agora seria mais custo do que solução. Mas dá para começar a ajustar sozinho.',
-        },
-        {
-          id: 'c2',
-          type: 'highlight',
-          icon: 'gift',
-          text: '**Baixe grátis:** 5 erros que fazem sua loja de planejados atrair só quem pede desconto.',
-        },
-        {
-          id: 'c3',
-          type: 'text',
-          text: 'Você também entra na lista do nosso material completo para lojas de planejados, com condição especial para quem chegou por aqui.',
-        },
-        { id: 'c4', type: 'button', label: 'Quero o material', kind: 'link', url: '' },
-      ],
-    },
-  ],
-  // C first: one eliminating answer beats everything else. Then B, for
-  // who is missing one piece. Everyone else is A.
-  rules: [
-    {
-      id: 'regra_c',
-      resultId: 'c',
-      match: 'any',
-      conditions: [
-        is('tipo', 'arquiteto', 'outro'),
-        is('faturamento', 'ate30', '30a50'),
-        is('investimento', 'sem_verba'),
-      ],
-    },
-    {
-      id: 'regra_b',
-      resultId: 'b',
-      match: 'any',
-      conditions: [
-        isNot('cargo', 'dono', 'gerente'),
-        is('faturamento', '50a75'),
-        is('prazo', 'pesquisando'),
-      ],
-    },
-  ],
-  defaultResultId: 'a',
-  tagRules: [
-    { id: 'tag_decisor_sim', tag: 'decisor:sim', match: 'all', conditions: [is('cargo', 'dono')] },
-    { id: 'tag_decisor_nao', tag: 'decisor:nao', match: 'all', conditions: [isNot('cargo', 'dono')] },
-    {
-      id: 'tag_prioridade',
-      tag: 'prioridade-baixa',
-      match: 'all',
-      conditions: [is('cargo', 'gerente'), is('decisao', 'so_dono')],
-    },
-    {
-      // Bills from R$ 75 mil but declared under R$ 2.500 a month: still
-      // A (the first offer is the advisory), flagged for the SDR.
-      id: 'tag_verba',
-      tag: 'verba-baixa',
-      match: 'all',
-      conditions: [isNot('investimento', '2500a5000', '5000a10000', '10000mais')],
-      resultIds: ['a'],
-    },
-  ],
-  appearance: { accent: '#22ced2' },
-  settings: {
-    tags: ['quiz-planejados'],
-    submittingText: 'Montando seu resultado…',
-    privacyNote: 'Seus dados ficam só com a Harpium. Nada de spam.',
-  },
+interface ModelSource extends Omit<QuizModel, 'definition'> {
+  definition: unknown
 }
 
-const FORMULARIO_CONTATO = {
-  version: 1,
-  intro: { enabled: false, headline: '', cta: 'Começar', bullets: [] },
-  steps: [
-    {
-      id: 'contato',
-      type: 'fields',
-      label: 'Contato',
-      title: 'Fale com a gente',
-      note: 'Preencha os dados e a nossa equipe chama você no WhatsApp.',
-      cta: 'Enviar',
-      fields: [
-        { id: 'nome', kind: 'name', label: 'Nome', placeholder: 'Seu nome', required: true },
-        { id: 'whatsapp', kind: 'phone', label: 'WhatsApp', placeholder: '(11) 91234-5678', required: true },
-        { id: 'email', kind: 'email', label: 'E-mail', placeholder: 'voce@email.com', required: false },
-        { id: 'mensagem', kind: 'longtext', label: 'Como podemos ajudar?', required: false },
-      ],
-    },
-  ],
-  results: [
-    {
-      id: 'obrigado',
-      name: 'Obrigado',
-      route: 'B',
-      tags: [],
-      pixel: { kind: 'standard', name: 'Lead' },
-      icon: 'check',
-      title: 'Recebemos, {nome}.',
-      blocks: [
-        { id: 'o1', type: 'text', text: 'Nossa equipe vai chamar você no WhatsApp **{whatsapp}** em breve.' },
-      ],
-    },
-  ],
-  rules: [],
-  defaultResultId: 'obrigado',
-  tagRules: [],
-  appearance: { accent: '#22ced2' },
-  settings: { tags: ['formulario'], submittingText: 'Enviando…' },
-}
-
-const EM_BRANCO = {
-  version: 1,
-  intro: {
-    enabled: true,
-    headline: 'Escreva aqui a pergunta que faz a pessoa querer começar',
-    sub: 'Uma linha dizendo o que ela ganha ao responder.',
-    cta: 'Começar',
-    bullets: [],
-  },
-  steps: [
-    {
-      id: 'nome',
-      type: 'fields',
-      label: 'Nome',
-      title: 'Como posso te chamar?',
-      cta: 'Continuar',
-      fields: [{ id: 'primeiro_nome', kind: 'name', label: 'Nome', placeholder: 'Seu primeiro nome', required: true }],
-    },
-    {
-      id: 'pergunta1',
-      type: 'choice',
-      label: 'Primeira pergunta',
-      title: 'Prazer, {nome}. Qual é a sua primeira pergunta?',
-      options: options([
-        ['a', 'Primeira opção'],
-        ['b', 'Segunda opção'],
-      ]),
-    },
-    {
-      id: 'contato',
-      type: 'fields',
-      label: 'Contato',
-      title: 'Pronto, {nome}. Para onde enviamos o resultado?',
-      cta: 'Ver meu resultado',
-      fields: [{ id: 'whatsapp', kind: 'phone', label: 'WhatsApp', placeholder: '(11) 91234-5678', required: true }],
-    },
-  ],
-  results: [
-    {
-      id: 'obrigado',
-      name: 'Obrigado',
-      route: 'B',
-      tags: [],
-      pixel: { kind: 'standard', name: 'Lead' },
-      icon: 'check',
-      title: 'Recebemos suas respostas, {nome}.',
-      blocks: [{ id: 'o1', type: 'text', text: 'Nossa equipe vai falar com você em breve.' }],
-    },
-  ],
-  rules: [],
-  defaultResultId: 'obrigado',
-  tagRules: [],
-  appearance: { accent: '#22ced2' },
-  settings: { tags: [], submittingText: 'Montando seu resultado…' },
-}
-
-export const QUIZ_MODELS: QuizModel[] = [
+const SOURCES: ModelSource[] = [
+  // ---- By niche ----
   {
-    key: 'moveis-planejados',
-    name: 'Móveis planejados',
+    key: 'clinica-medica',
+    name: 'Agendamento de consulta',
+    segment: 'Clínica médica',
     description:
-      'Quiz de qualificação para lojas de móveis planejados: 9 perguntas, três resultados (qualificado, morno e desqualificado) e a regra pronta.',
-    definition: sanitizeDefinition(MOVEIS_PLANEJADOS),
+      'Motivo da consulta, urgência, particular ou convênio e o melhor período. Quem está com dor chega marcado como urgente e vê o aviso do pronto-socorro.',
+    group: 'nicho',
+    niche: 'medical_clinic',
+    icon: 'stethoscope',
+    definition: CLINICA_MEDICA,
   },
+  {
+    key: 'odontologia',
+    name: 'Avaliação odontológica',
+    segment: 'Odontologia',
+    description:
+      'Tratamento de interesse, prazo e forma de pagamento. Implante, estética e aparelho com prazo curto chegam como qualificados.',
+    group: 'nicho',
+    niche: 'dental_aesthetic',
+    icon: 'smile',
+    definition: ODONTOLOGIA,
+  },
+  {
+    key: 'estetica',
+    name: 'Avaliação estética',
+    segment: 'Clínica de estética',
+    description:
+      'Área de interesse, experiência, prazo e investimento. Separa quem quer começar já de quem ainda está pesquisando.',
+    group: 'nicho',
+    niche: 'dental_aesthetic',
+    icon: 'sparkles',
+    definition: ESTETICA,
+  },
+  {
+    key: 'academia',
+    name: 'Aula experimental',
+    segment: 'Academia e studio',
+    description:
+      'Objetivo, experiência, frequência, horário e quando quer começar. Cada objetivo vira uma etiqueta para a abordagem do time.',
+    group: 'nicho',
+    niche: 'gym',
+    icon: 'dumbbell',
+    definition: ACADEMIA,
+  },
+  {
+    key: 'imobiliaria',
+    name: 'Encontre seu imóvel',
+    segment: 'Imobiliária',
+    description:
+      'Comprar, alugar, investir ou vender: cada caminho faz as próprias perguntas. Quem quer vender cai num resultado de captação.',
+    group: 'nicho',
+    niche: 'real_estate',
+    icon: 'house',
+    definition: IMOBILIARIA,
+  },
+  {
+    key: 'advocacia',
+    name: 'Triagem do caso',
+    segment: 'Advocacia',
+    description:
+      'Área do direito, situação e urgência. Linguagem informativa, sem promessa de resultado, como pede a OAB (Provimento 205/2021).',
+    group: 'nicho',
+    niche: 'law',
+    icon: 'scale',
+    definition: ADVOCACIA,
+  },
+  {
+    key: 'educacao',
+    name: 'Descubra o curso ideal',
+    segment: 'Escola e cursos',
+    description:
+      'Objetivo, área, formato, turno e orçamento. Quem quer a próxima turma e não precisa de bolsa chega como qualificado.',
+    group: 'nicho',
+    niche: 'education',
+    icon: 'graduation',
+    definition: EDUCACAO,
+  },
+  {
+    key: 'varejo',
+    name: 'Presente ideal + cupom',
+    segment: 'Loja e e-commerce',
+    description:
+      'Recomendação de presente com cupom no final. Troque o cupom PRESENTE10 pelo da sua loja antes de publicar.',
+    group: 'nicho',
+    niche: 'retail',
+    icon: 'shopping',
+    definition: VAREJO,
+  },
+  {
+    key: 'servicos-b2b',
+    name: 'Diagnóstico para empresas',
+    segment: 'Serviços para empresas',
+    description:
+      'Cargo, porte, faturamento, desafio, prazo e investimento. Qualificação A, B e C para qualquer serviço vendido a empresas.',
+    group: 'nicho',
+    niche: 'services',
+    icon: 'briefcase',
+    definition: SERVICOS_B2B,
+  },
+  {
+    key: 'energia-solar',
+    name: 'Simulação de economia',
+    segment: 'Energia solar',
+    description:
+      'Onde instalar, valor da conta de luz, imóvel próprio e forma de pagamento. Conta alta e prazo curto chegam como qualificados.',
+    group: 'nicho',
+    icon: 'sun',
+    definition: ENERGIA_SOLAR,
+  },
+  // ---- General ----
   {
     key: 'formulario-contato',
     name: 'Formulário de contato',
-    description: 'Uma tela só: nome, WhatsApp, e-mail e uma mensagem. Para sites e links de bio.',
-    definition: sanitizeDefinition(FORMULARIO_CONTATO),
+    segment: null,
+    description: 'Uma tela só: nome, WhatsApp, e-mail e uma mensagem. Para o site e o link da bio.',
+    group: 'geral',
+    icon: 'mail',
+    definition: FORMULARIO_CONTATO,
+  },
+  {
+    key: 'pesquisa-satisfacao',
+    name: 'Pesquisa de satisfação',
+    segment: null,
+    description:
+      'NPS de 0 a 10, o motivo da nota e um contato opcional. Separa promotores, neutros e detratores, e convida os promotores a avaliar no Google.',
+    group: 'geral',
+    icon: 'star',
+    definition: PESQUISA_NPS,
   },
   {
     key: 'em-branco',
     name: 'Em branco',
+    segment: null,
     description: 'Entrada, nome, uma pergunta de exemplo e o contato. O resto é com você.',
-    definition: sanitizeDefinition(EM_BRANCO),
+    group: 'geral',
+    icon: 'blank',
+    definition: EM_BRANCO,
+  },
+  // ---- Harpium's own, always last ----
+  {
+    key: 'moveis-planejados',
+    name: 'Diagnóstico móveis planejados',
+    segment: 'Móveis planejados',
+    description:
+      'O quiz que a Harpium usa para qualificar lojas de móveis planejados para a assessoria. Uso interno: não é um modelo para os clientes.',
+    group: 'interno',
+    icon: 'sofa',
+    definition: MOVEIS_PLANEJADOS,
   },
 ]
 
+export const QUIZ_MODELS: QuizModel[] = SOURCES.map((source) => ({
+  ...source,
+  definition: sanitizeDefinition(source.definition),
+}))
+
 export function findQuizModel(key: string): QuizModel | undefined {
   return QUIZ_MODELS.find((m) => m.key === key)
+}
+
+export function summarizeModel(model: QuizModel): QuizModelSummary {
+  return {
+    key: model.key,
+    name: model.name,
+    segment: model.segment,
+    description: model.description,
+    group: model.group,
+    niche: model.niche ?? null,
+    icon: model.icon,
+    questions: model.definition.steps.length,
+    results: model.definition.results.map((r) => ({ name: r.name, route: r.route })),
+  }
 }
