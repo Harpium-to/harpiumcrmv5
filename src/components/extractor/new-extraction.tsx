@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { ChevronLeft, Loader2, Search, X } from "lucide-react";
 
 import type { ExtractionSource } from "@/lib/extractor/types";
-import { UFS } from "@/lib/extractor/types";
+import { MAX_PER_EXTRACTION, UFS } from "@/lib/extractor/types";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -310,7 +310,7 @@ export function NewExtraction() {
     [uf],
   );
 
-  const max = setup?.maxPerExtraction?.[source] ?? 500;
+  const max = setup?.maxPerExtraction?.[source] ?? MAX_PER_EXTRACTION[source];
   const left = setup?.usage ? Math.max(0, setup.usage.limit - setup.usage.used) : max;
   const ceiling = Math.min(max, left);
 
