@@ -133,6 +133,10 @@ Em **Site configuration › Environment variables**:
 | `GOOGLE_CLIENT_ID` | Google Cloud › projeto `harpium-crm` › Google Auth Platform › Clientes › "Harpium CRM (web)" | só para o Google Agenda |
 | `GOOGLE_CLIENT_SECRET` | o mesmo cliente › chave secreta (só aparece ao criar; dá para gerar outra) | só para o Google Agenda |
 | `GOOGLE_OAUTH_REDIRECT_URI` | `https://harpium.com.br/google/retorno` | só para o Google Agenda |
+| `CNPJ_BASE_URL` | o segundo projeto do Supabase, o da base de CNPJ › Project URL | só para o Extrator de leads (fonte CNPJ) |
+| `CNPJ_BASE_KEY` | esse mesmo projeto › `service_role` (secreta) | só para o Extrator de leads (fonte CNPJ) |
+| `OUTSCRAPER_API_KEY` | conta da Harpium no Outscraper › Profile › API key (secreta) | só para o Extrator de leads (fonte Google Maps) |
+| `OUTSCRAPER_USD_PER_1000` | quanto o Outscraper cobra por mil locais; padrão `3` | não; só ajusta o custo mostrado |
 
 **Sobre o Google Agenda:** com as três variáveis `GOOGLE_*`, cada
 agenda ganha, na engrenagem, o botão **Conectar com o Google** (migration
@@ -150,6 +154,11 @@ cria a instância no servidor da Harpium e configura o webhook sozinho.
 O token de administrador fica só no Netlify, nunca no banco. Sem elas,
 o caminho não oficial aparece, mas diz ao cliente para falar com a
 agência. Ver `docs/plano-whatsapp-dois-caminhos.md`.
+
+**Sobre o Extrator de leads:** a fonte CNPJ lê uma base separada,
+carregada uma vez por mês com os arquivos públicos da Receita; o passo a
+passo está em `docs/extrator-leads.md`. Sem as variáveis de uma fonte, a
+tela do Extrator mostra que ela ainda não foi conectada.
 
 **Sobre a `ENCRYPTION_KEY`:** ela cifra os tokens de WhatsApp e as
 chaves de IA guardadas no banco. Como o seu computador e o Netlify usam
