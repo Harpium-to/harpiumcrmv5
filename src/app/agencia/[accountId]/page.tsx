@@ -259,6 +259,14 @@ export default async function AgenciaAccountPage({
         <Empty>Visitas, conclusão e leads de cada quiz deste CRM.</Empty>
       </Section>
 
+      {/* Extrator de leads (073): numbers and the monthly ceiling. */}
+      <Section
+        title="Extrator de leads"
+        action={{ href: `/agencia/${account.id}/extrator`, label: 'Ver uso →' }}
+      >
+        <Empty>Extrações, leads do mês, custo e o limite mensal deste CRM.</Empty>
+      </Section>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent contacts */}
         <Section

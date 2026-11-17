@@ -62,6 +62,17 @@ export interface IngestOptions {
   mappings?: FieldMappings
   /** The named ingest token the lead arrived with (migration 068). */
   tokenId?: string | null
+  /**
+   * Rule 9 off: no card in the funnel. The lead extractor writes cold
+   * leads by the hundred; their card opens when they reply
+   * (src/lib/extractor/import.ts).
+   */
+  skipDeal?: boolean
+  /**
+   * `backfill`: an existing contact only has its empty columns and
+   * fields filled. Default `replace` (a new lead is the freshest data).
+   */
+  patchMode?: 'replace' | 'backfill'
 }
 
 /** Contact columns a field may be mapped to. */
@@ -117,7 +128,8 @@ export async function ingestLead(
     }
   }
 
-  const contact = await resolveContact(admin, account, lead, 'replace')
+  const patchMode = options.patchMode ?? 'replace'
+  const contact = await resolveContact(admin, account, lead, patchMode)
 
   const row: Record<string, unknown> = {
     account_id: account.id,
@@ -145,10 +157,11 @@ export async function ingestLead(
       leadId: leadRow.id,
       receivedAt: new Date(leadRow.created_at ?? Date.now()),
       mappings: options.mappings ?? {},
+      mode: patchMode,
     })
     // Rule 9: the lead lands in the funnel (deal.ts). After the contact
     // has the lead's name, so the card is titled with it.
-    await openLeadDeal(admin, account, contact.id, lead)
+    if (!options.skipDeal) await openLeadDeal(admin, account, contact.id, lead)
   }
 
   return {

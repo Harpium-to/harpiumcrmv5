@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe'
+import { handleProspectReply } from '@/lib/bulk/prospect-reply'
 import { openFirstContactDeal } from '@/lib/deals/first-contact'
 import type { UazapiInboundMessage } from './parse'
 
@@ -243,6 +244,10 @@ export async function ingestUazapiInbound(
     console.error('[uazapi inbound] message insert failed:', insertErr.message)
     return null
   }
+
+  // A reply to a prospecting send: SAIR, the card in the funnel, "lead
+  // recebido" (lib/bulk/prospect-reply.ts). Never throws.
+  if (!msg.fromMe) await handleProspectReply(admin, account, contactId, msg.text)
 
   // A customer message counts as unread, like on the Meta path.
   let unread: number | undefined

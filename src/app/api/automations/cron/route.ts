@@ -9,6 +9,9 @@ import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { resolvePublicOrigin } from '@/lib/http/base-url'
 import { sweepQuizVisits } from '@/lib/quiz/sweep'
+import { applyProspectingBrakes } from '@/lib/bulk/prospect-brake'
+import { runPendingExtractions } from '@/lib/extractor/run'
+import { cleanUpUnusedResults } from '@/lib/extractor/store'
 
 /**
  * Drain due `automation_pending_executions` rows. Meant to be hit
@@ -45,6 +48,8 @@ export async function GET(request: Request) {
 
   const admin = supabaseAdmin()
   const task_reminders = await emitTaskReminders(admin)
+  // Prospecting sends that tripped the brake stop before anything goes (073).
+  const prospect_brakes = await applyProspectingBrakes(admin)
   const scheduled_messages = await processScheduledMessages(admin)
   const agenda_messages = await processCalendarNotifications(admin)
   const google_agenda = await processGoogleCalendarSync(admin, {
@@ -54,6 +59,9 @@ export async function GET(request: Request) {
   const google_busy = await refreshGoogleBusy(admin)
   // Quiz visits that left a contact and stopped, and leads to retry (072).
   const quiz_visits = await sweepQuizVisits(admin)
+  // Lead extractions nobody is watching, and old unused results (073).
+  const lead_extractions = await runPendingExtractions(admin)
+  const extractor_cleanup = await cleanUpUnusedResults(admin)
 
   const { data: due, error } = await admin
     .from('automation_pending_executions')
@@ -65,7 +73,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0) {
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup })
   }
 
   let processed = 0
@@ -96,5 +104,5 @@ export async function GET(request: Request) {
     processed++
   }
 
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup })
 }

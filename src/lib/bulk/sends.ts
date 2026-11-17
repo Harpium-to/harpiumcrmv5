@@ -5,6 +5,9 @@ import { isQuickReplyMediaKind } from '@/lib/quick-replies/media';
 import { fillQuickReply } from '@/lib/quick-replies/variables';
 import { equivalentPhoneKeys } from '@/lib/whatsapp/phone-utils';
 import { isOptedOut } from '@/lib/contacts/opt-out';
+import { whatsappCheckAvailability } from '@/lib/extractor/whatsapp';
+import { checkUazapiNumbers, type UazapiServer } from '@/lib/uazapi/api';
+import { normalizePhone } from '@/lib/whatsapp/phone-utils';
 
 import {
   BULK_DAILY_LIMIT,
@@ -14,6 +17,12 @@ import {
   dayKey,
   planSendTimes,
 } from './plan';
+import {
+  PROSPECT_MAX_RECIPIENTS,
+  VariationError,
+  parseVariations,
+  planProspectTimes,
+} from './prospect';
 
 // ============================================================
 // Bulk sends through the QR-code number (migration 065; Fase 8 of
@@ -40,12 +49,21 @@ export class BulkError extends Error {
 
 export type Audience = { tagId: string } | { phones: string[] };
 
+export type BulkMode = 'normal' | 'prospeccao';
+
 export interface BulkInput {
   name: string;
   text: string | null;
   quickReplyId: string | null;
   audience: Audience;
   riskAccepted: boolean;
+  /**
+   * 'prospeccao': people who never talked to the company (073). Slower,
+   * business hours only, a text drawn from `variations` per contact,
+   * numbers checked on WhatsApp first (prospect.ts).
+   */
+  mode?: BulkMode;
+  variations?: string[];
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -59,8 +77,20 @@ export function parseBulkInput(body: unknown): BulkInput {
   if (!name || name.length > 120) {
     throw new BulkError('bad_request', 'Dê um nome ao disparo (até 120 caracteres).', 400);
   }
-  const text = typeof b.text === 'string' && b.text.trim() ? b.text : null;
-  const quickReplyId = typeof b.quick_reply_id === 'string' && UUID.test(b.quick_reply_id) ? b.quick_reply_id : null;
+  const mode: BulkMode = b.mode === 'prospeccao' ? 'prospeccao' : 'normal';
+  let variations: string[] = [];
+  if (mode === 'prospeccao') {
+    try {
+      variations = parseVariations(b.variations);
+    } catch (err) {
+      if (err instanceof VariationError) throw new BulkError('bad_request', err.message, 400);
+      throw err;
+    }
+  }
+  // A prospecting send is text only: its first text stands for the rest.
+  const text = mode === 'prospeccao' ? variations[0] : typeof b.text === 'string' && b.text.trim() ? b.text : null;
+  const quickReplyId =
+    mode === 'normal' && typeof b.quick_reply_id === 'string' && UUID.test(b.quick_reply_id) ? b.quick_reply_id : null;
   if (!text && !quickReplyId) {
     throw new BulkError('bad_request', 'Escreva a mensagem ou escolha uma resposta rápida.', 400);
   }
@@ -83,7 +113,7 @@ export function parseBulkInput(body: unknown): BulkInput {
     throw new BulkError('bad_request', 'Escolha uma etiqueta ou cole uma lista de números.', 400);
   }
 
-  return { name, text, quickReplyId, audience, riskAccepted: b.risk_accepted === true };
+  return { name, text, quickReplyId, audience, riskAccepted: b.risk_accepted === true, mode, variations };
 }
 
 /** Whether this CRM can bulk-send through the QR code, and why not. */
@@ -106,6 +136,7 @@ interface Recipient {
   id: string;
   name: string | null;
   company: string | null;
+  phone?: string | null;
 }
 
 /**
@@ -132,7 +163,7 @@ export async function resolveAudience(
       for (const c of (data ?? []) as (Recipient & { phone: string | null; opted_out_at?: unknown })[]) {
         if (!c.phone) continue;
         if (isOptedOut(c)) optedOutIds.add(c.id);
-        else found.set(c.id, { id: c.id, name: c.name, company: c.company });
+        else found.set(c.id, { id: c.id, name: c.name, company: c.company, phone: c.phone });
       }
     }
     return { contacts: [...found.values()], notFound: 0, optedOut: optedOutIds.size };
@@ -155,7 +186,7 @@ export async function resolveAudience(
       const phone = keyToPhone.get(c.phone_normalized);
       if (phone) matched.add(phone);
       if (isOptedOut(c)) optedOutIds.add(c.id);
-      else found.set(c.id, { id: c.id, name: c.name, company: c.company });
+      else found.set(c.id, { id: c.id, name: c.name, company: c.company, phone: c.phone });
     }
   }
   notFound = audience.phones.filter((p) => !matched.has(p)).length;
@@ -170,14 +201,88 @@ export interface BulkPlanSummary {
   first_at: string | null;
   last_at: string | null;
   used_today: number;
+  mode: BulkMode;
+  /** Prospecting: numbers WhatsApp says do not exist, left out. */
+  no_whatsapp: number;
+  /** Prospecting: contacts a previous prospecting send already reached, left out. */
+  already_prospected: number;
+  /** Prospecting: the working days the send spreads over. */
+  days: number;
 }
 
 export interface BulkDeps {
   now: () => number;
   random: () => number;
+  /** Asks WhatsApp which numbers exist (prospecting). */
+  check?: (server: UazapiServer, numbers: string[]) => Promise<Map<string, boolean>>;
+  /** The QR-code number that can answer `check`, or why not. */
+  checker?: (
+    admin: SupabaseClient,
+    accountId: string,
+  ) => Promise<{ available: true; server: UazapiServer } | { available: false; reason: string }>;
 }
 
-const defaultDeps: BulkDeps = { now: () => Date.now(), random: Math.random };
+const defaultDeps: BulkDeps = {
+  now: () => Date.now(),
+  random: Math.random,
+  check: checkUazapiNumbers,
+  checker: whatsappCheckAvailability,
+};
+
+const CHECK_CHUNK = 50;
+
+/** Prospecting sends already planned, per Brasília day, and the first day ever. */
+async function prospectHistory(
+  db: SupabaseClient,
+  accountId: string,
+  fromMs: number,
+): Promise<{ byDay: Record<string, number>; firstDay: string | null }> {
+  const { data: bulks, error } = await db
+    .from('bulk_sends')
+    .select('id, created_at')
+    .eq('account_id', accountId)
+    .eq('mode', 'prospeccao')
+    .order('created_at', { ascending: true });
+  if (error) {
+    throw new BulkError('unavailable', 'O modo prospecção precisa da atualização 073 do CRM.', 503);
+  }
+  const rows = (bulks ?? []) as { id: string; created_at: string }[];
+  const byDay: Record<string, number> = {};
+  if (rows.length === 0) return { byDay, firstDay: null };
+  const startOfDay = Date.parse(`${dayKey(fromMs)}T00:00:00-03:00`);
+  const ids = rows.map((r) => r.id);
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { data } = await db
+      .from('scheduled_messages')
+      .select('send_at')
+      .in('bulk_send_id', ids.slice(i, i + CHUNK))
+      .in('status', ['scheduled', 'sending', 'sent'])
+      .gte('send_at', new Date(startOfDay).toISOString());
+    for (const r of (data ?? []) as { send_at: string }[]) {
+      const day = dayKey(Date.parse(r.send_at));
+      byDay[day] = (byDay[day] ?? 0) + 1;
+    }
+  }
+  return { byDay, firstDay: dayKey(Date.parse(rows[0].created_at)) };
+}
+
+/** Contacts that any earlier prospecting send of this CRM reached or will reach. */
+async function alreadyProspected(db: SupabaseClient, accountId: string, contactIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  const { data: bulks } = await db.from('bulk_sends').select('id').eq('account_id', accountId).eq('mode', 'prospeccao');
+  const ids = ((bulks ?? []) as { id: string }[]).map((b) => b.id);
+  if (ids.length === 0) return out;
+  for (let i = 0; i < contactIds.length; i += CHUNK) {
+    const { data } = await db
+      .from('scheduled_messages')
+      .select('contact_id')
+      .in('bulk_send_id', ids)
+      .in('status', ['scheduled', 'sending', 'sent'])
+      .in('contact_id', contactIds.slice(i, i + CHUNK));
+    for (const r of (data ?? []) as { contact_id: string }[]) out.add(r.contact_id);
+  }
+  return out;
+}
 
 /** Sends already on the calendar, per Brasília day, from `fromMs` on. */
 async function bulkCountsByDay(
@@ -256,7 +361,42 @@ export async function createBulkSend(
     if (!text && !media) throw new BulkError('bad_request', 'Essa resposta rápida não tem texto.', 400);
   }
 
-  const { contacts, notFound, optedOut } = await resolveAudience(db, accountId, input.audience);
+  const prospect = input.mode === 'prospeccao';
+  const variations = input.variations ?? [];
+  const resolved = await resolveAudience(db, accountId, input.audience);
+  const { notFound, optedOut } = resolved;
+  let contacts = resolved.contacts;
+  let noWhatsapp = 0;
+  let already = 0;
+  if (prospect && contacts.length > 0) {
+    // Never twice to the same cold contact, from any prospecting send.
+    const reached = await alreadyProspected(db, accountId, contacts.map((c) => c.id));
+    already = contacts.filter((c) => reached.has(c.id)).length;
+    contacts = contacts.filter((c) => !reached.has(c.id));
+    if (contacts.length > PROSPECT_MAX_RECIPIENTS) {
+      throw new BulkError(
+        'too_many',
+        `São ${contacts.length} contatos: uma prospecção vai até ${PROSPECT_MAX_RECIPIENTS}. Divida a lista.`,
+        400,
+      );
+    }
+    // Only numbers that exist on WhatsApp.
+    const checker = await (deps.checker ?? whatsappCheckAvailability)(admin, accountId);
+    if (!checker.available) throw new BulkError('unavailable', checker.reason, 409);
+    const numbers = contacts.map((c) => normalizePhone(c.phone ?? '')).filter(Boolean);
+    const answers = new Map<string, boolean>();
+    try {
+      for (let i = 0; i < numbers.length; i += CHECK_CHUNK) {
+        for (const [k, v] of await (deps.check ?? checkUazapiNumbers)(checker.server, numbers.slice(i, i + CHECK_CHUNK))) answers.set(k, v);
+      }
+    } catch {
+      throw new BulkError('check_failed', 'Não consegui conferir os números no WhatsApp. Confira a conexão e tente de novo.', 502);
+    }
+    const before = contacts.length;
+    // A number WhatsApp did not answer for is left out too: unknown is not "yes".
+    contacts = contacts.filter((c) => answers.get(normalizePhone(c.phone ?? '')) === true);
+    noWhatsapp = before - contacts.length;
+  }
   if (contacts.length === 0) {
     throw new BulkError(
       'empty',
@@ -266,7 +406,7 @@ export async function createBulkSend(
       400,
     );
   }
-  if (contacts.length > BULK_MAX_RECIPIENTS) {
+  if (!prospect && contacts.length > BULK_MAX_RECIPIENTS) {
     throw new BulkError(
       'too_many',
       `São ${contacts.length} contatos: um disparo vai até ${BULK_MAX_RECIPIENTS}, o limite do dia.`,
@@ -276,8 +416,21 @@ export async function createBulkSend(
 
   const now = deps.now();
   const after = Math.max(now + BULK_START_DELAY_S * 1000, (await lastPendingBulkSend(db, accountId)) ?? 0);
-  const times = planSendTimes(contacts.length, after, deps.random);
   const counts = await bulkCountsByDay(db, accountId, now);
+  let times: number[];
+  if (prospect) {
+    const history = await prospectHistory(db, accountId, now);
+    times = planProspectTimes({
+      n: contacts.length,
+      afterMs: after,
+      firstDay: history.firstDay ?? dayKey(now),
+      prospectByDay: history.byDay,
+      allByDay: counts,
+      random: deps.random,
+    });
+  } else {
+    times = planSendTimes(contacts.length, after, deps.random);
+  }
   const fits = checkDailyLimit(times, counts, BULK_DAILY_LIMIT);
   const summary: BulkPlanSummary = {
     total: contacts.length,
@@ -286,6 +439,10 @@ export async function createBulkSend(
     first_at: new Date(times[0]).toISOString(),
     last_at: new Date(times[times.length - 1]).toISOString(),
     used_today: counts[dayKey(now)] ?? 0,
+    mode: input.mode ?? 'normal',
+    no_whatsapp: noWhatsapp,
+    already_prospected: already,
+    days: new Set(times.map((t) => dayKey(t))).size,
   };
   if (!fits.ok) {
     throw new BulkError(
@@ -317,6 +474,7 @@ export async function createBulkSend(
         : { phones: input.audience.phones.length },
       total: contacts.length,
       risk_accepted_at: new Date(now).toISOString(),
+      ...(prospect ? { mode: 'prospeccao', variations } : {}),
     })
     .select('id')
     .single();
@@ -324,24 +482,32 @@ export async function createBulkSend(
     if (error?.code === '42P01' || error?.code === 'PGRST205') {
       throw new BulkError('unavailable', 'Disparos pelo QR code precisam da atualização 065 do CRM.', 503);
     }
+    if (prospect && (error?.code === '42703' || error?.code === 'PGRST204')) {
+      throw new BulkError('unavailable', 'O modo prospecção precisa da atualização 073 do CRM.', 503);
+    }
     throw new BulkError('internal', 'Não consegui criar o disparo.', 500);
   }
   const bulkId = (bulk as { id: string }).id;
 
-  const rows = contacts.map((c, i) => ({
+  const textFor = () =>
+    prospect && variations.length ? variations[Math.min(Math.floor(deps.random() * variations.length), variations.length - 1)] : text;
+  const rows = contacts.map((c, i) => {
+    const body = textFor();
+    return {
     account_id: accountId,
     contact_id: c.id,
     created_by: createdBy,
     // Each one with its own name filled in.
     content_text:
-      media?.kind === 'audio' ? null : text ? fillQuickReply(text, { name: c.name, company: c.company }).text : null,
+      media?.kind === 'audio' ? null : body ? fillQuickReply(body, { name: c.name, company: c.company }).text : null,
     media_kind: media?.kind ?? null,
     media_url: media?.url ?? null,
     media_filename: media?.filename ?? null,
     send_at: new Date(times[i]).toISOString(),
     only_if_no_reply: false,
     bulk_send_id: bulkId,
-  }));
+    };
+  });
   for (let i = 0; i < rows.length; i += CHUNK) {
     const { error: insertError } = await db.from('scheduled_messages').insert(rows.slice(i, i + CHUNK));
     if (insertError) {
@@ -360,13 +526,20 @@ export interface BulkSendView {
   created_at: string;
   stopped_at: string | null;
   counts: Record<'scheduled' | 'sending' | 'sent' | 'skipped' | 'cancelled' | 'failed', number>;
+  mode: BulkMode;
+  /** Why it stopped by itself (the prospecting brake). */
+  stopped_reason: string | null;
+  /** Prospecting: how many wrote back, and how many of them said SAIR. */
+  replied: number;
+  opted_out: number;
 }
 
 /** The latest bulk sends with how far each got. */
 export async function listBulkSends(db: SupabaseClient, accountId: string): Promise<BulkSendView[]> {
+  // `*`: mode and stopped_reason (073) are read once they exist.
   const { data, error } = await db
     .from('bulk_sends')
-    .select('id, name, total, created_at, stopped_at')
+    .select('*')
     .eq('account_id', accountId)
     .order('created_at', { ascending: false })
     .limit(20);
@@ -376,20 +549,54 @@ export async function listBulkSends(db: SupabaseClient, accountId: string): Prom
     }
     throw new BulkError('internal', 'Falha ao listar os disparos.', 500);
   }
-  const bulks = (data ?? []) as Omit<BulkSendView, 'counts'>[];
+  const bulks = ((data ?? []) as Record<string, unknown>[]).map((b) => ({
+    id: b.id as string,
+    name: b.name as string,
+    total: b.total as number,
+    created_at: b.created_at as string,
+    stopped_at: (b.stopped_at as string | null) ?? null,
+    mode: (b.mode === 'prospeccao' ? 'prospeccao' : 'normal') as BulkMode,
+    stopped_reason: (b.stopped_reason as string | null) ?? null,
+  }));
   if (bulks.length === 0) return [];
-  const { data: rows } = await db
+  const ids = bulks.map((b) => b.id);
+  const withReplies = await db
     .from('scheduled_messages')
-    .select('bulk_send_id, status')
-    .in('bulk_send_id', bulks.map((b) => b.id));
+    .select('bulk_send_id, status, contact_id, replied_at')
+    .in('bulk_send_id', ids);
+  // Before 073 there is no replied_at.
+  const rows: unknown[] | null = withReplies.error
+    ? (await db.from('scheduled_messages').select('bulk_send_id, status, contact_id').in('bulk_send_id', ids)).data
+    : withReplies.data;
   const empty = () => ({ scheduled: 0, sending: 0, sent: 0, skipped: 0, cancelled: 0, failed: 0 });
   const counts = new Map<string, BulkSendView['counts']>();
-  for (const r of (rows ?? []) as { bulk_send_id: string; status: keyof BulkSendView['counts'] }[]) {
+  const replied = new Map<string, string[]>();
+  for (const r of (rows ?? []) as {
+    bulk_send_id: string;
+    status: keyof BulkSendView['counts'];
+    contact_id: string;
+    replied_at?: string | null;
+  }[]) {
     const c = counts.get(r.bulk_send_id) ?? empty();
     if (r.status in c) c[r.status] += 1;
     counts.set(r.bulk_send_id, c);
+    if (r.replied_at) replied.set(r.bulk_send_id, [...(replied.get(r.bulk_send_id) ?? []), r.contact_id]);
   }
-  return bulks.map((b) => ({ ...b, counts: counts.get(b.id) ?? empty() }));
+  const repliedIds = [...new Set([...replied.values()].flat())];
+  const optedOut = new Set<string>();
+  for (let i = 0; i < repliedIds.length; i += CHUNK) {
+    const { data: people } = await db.from('contacts').select('*').in('id', repliedIds.slice(i, i + CHUNK));
+    for (const p of (people ?? []) as { id: string; opted_out_at?: unknown }[]) if (isOptedOut(p)) optedOut.add(p.id);
+  }
+  return bulks.map((b) => {
+    const who = replied.get(b.id) ?? [];
+    return {
+      ...b,
+      counts: counts.get(b.id) ?? empty(),
+      replied: who.length,
+      opted_out: who.filter((id) => optedOut.has(id)).length,
+    };
+  });
 }
 
 /** Stop what is left of a bulk send. Returns how many messages were cancelled. */

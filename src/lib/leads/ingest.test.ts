@@ -375,3 +375,29 @@ describe('reprocessLead', () => {
     expect(t.contacts[0]).toMatchObject({ company: 'Nova Empresa', city: 'Palmas' })
   })
 })
+
+describe('ingestLead — the lead extractor\'s silent entry', () => {
+  it('skipDeal writes the contact and the lead, and no card in the funnel', async () => {
+    const t = world()
+    const raw = quiz({ origem: 'Extrator · CNPJ', id_externo: 'ex-1:123' })
+    const r = await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw, { skipDeal: true })
+    expect(r.contactCreated).toBe(true)
+    expect(t.leads).toHaveLength(1)
+    expect(t.deals ?? []).toHaveLength(0)
+
+    const t2 = world()
+    await ingestLead(fakeDb(t2), ACC, normalizeLead(raw), raw)
+    expect(t2.deals ?? []).toHaveLength(1)
+  })
+
+  it('backfill only fills what is empty on an existing contact', async () => {
+    const t = world({
+      contacts: [
+        { id: 'c-1', account_id: ACC.id, phone: '+5563999990000', phone_normalized: '5563999990000', name: 'Ana', company: 'Nome antigo', city: null },
+      ],
+    })
+    const raw = quiz({ id_externo: 'ex-1:9' })
+    await ingestLead(fakeDb(t), ACC, normalizeLead(raw), raw, { skipDeal: true, patchMode: 'backfill' })
+    expect(t.contacts[0]).toMatchObject({ company: 'Nome antigo', city: 'Palmas' })
+  })
+})
