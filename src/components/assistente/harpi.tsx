@@ -560,7 +560,7 @@ function NotReady({
         <Link
           href={reason === "no_key" ? "/agents?tab=setup" : "/settings?tab=assistente"}
           onClick={onNavigate}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline decoration-foreground/35 underline-offset-2 hover:decoration-foreground"
         >
           <Settings2 className="size-4" />
           {reason === "no_key" ? "Cadastrar a chave de IA" : "Abrir as configurações do Harpi"}
