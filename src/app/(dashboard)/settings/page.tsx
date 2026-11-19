@@ -20,6 +20,7 @@ import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { AgencyAccessPanel } from '@/components/settings/agency-access-panel';
 import { ExtensionPanel } from '@/components/settings/extension-panel';
+import { AssistenteSettings } from '@/components/settings/assistente-settings';
 import {
   resolveSection,
   type SettingsSection,
@@ -68,6 +69,7 @@ export default function SettingsPage() {
     deals: <DealsSettings />,
     members: <MembersTab />,
     agencia: <AgencyAccessPanel />,
+    assistente: <AssistenteSettings />,
     api: <ApiKeysSettings />,
   };
 

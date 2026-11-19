@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { Bell, CalendarCheck, CalendarDays, CheckCheck, ListTodo, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { Bell, Bot, CalendarCheck, CalendarDays, CheckCheck, ListTodo, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { openHarpi } from "@/components/assistente/harpi";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   task_due: ListTodo,
   agenda_booking: CalendarDays,
   agenda_google: CalendarCheck,
+  assistente: Bot,
 };
 
 export default function NotificationsPage() {
@@ -118,7 +120,10 @@ export default function NotificationsPage() {
   const handleClick = useCallback(
     (n: Notification) => {
       if (!n.read_at) markRead(n.id);
-      if (n.type === "agency_access_request") {
+      if (n.type === "assistente") {
+        // A routine's report lives in its Harpi conversation.
+        openHarpi({ view: "history" });
+      } else if (n.type === "agency_access_request") {
         router.push("/settings?tab=agencia");
       } else if (n.type === "agenda_booking" || n.type === "agenda_google") {
         // The agenda lists what is waiting for approval at the top.
