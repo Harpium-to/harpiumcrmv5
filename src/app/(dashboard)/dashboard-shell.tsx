@@ -11,6 +11,7 @@ import { PresenceHeartbeat } from "@/components/presence/presence-heartbeat";
 import { CrmContextBanner } from "@/components/layout/crm-context-banner";
 import { WaitingConversationsProvider } from "@/hooks/use-waiting-conversations";
 import { WaitingAlert } from "@/components/inbox/waiting-alert";
+import { Harpi } from "@/components/assistente/harpi";
 
 // Auth-gated dashboard shell. Extracted from the layout so the layout
 // itself can stay a server component and export metadata (noindex) —
@@ -98,6 +99,8 @@ function DashboardShellInner({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <WaitingAlert />
+      {/* Harpi, the CRM assistant, in the bottom-right corner (074). */}
+      <Harpi />
     </div>
     </WaitingConversationsProvider>
   );

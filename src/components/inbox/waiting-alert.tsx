@@ -13,6 +13,8 @@ import { formatWait, waitInfo } from "@/lib/inbox/handoff-wait";
  * conversation the AI handed off has no answer yet. Amber while
  * waiting, red and pulsing once the wait is late.
  *
+ * Sits just above Harpi's face (the assistant in the corner).
+ *
  * Not drawn in the inbox: there the list pins those conversations on
  * top with the same colours, and a floating box would cover the
  * composer's send button.
@@ -33,7 +35,7 @@ export function WaitingAlert() {
       role="status"
       aria-live="polite"
       data-print="hide"
-      className="pointer-events-none fixed inset-x-4 bottom-4 z-40 flex justify-end sm:inset-x-auto sm:right-6 sm:bottom-6"
+      className="pointer-events-none fixed inset-x-4 bottom-20 z-40 flex justify-end sm:inset-x-auto sm:right-6 sm:bottom-24"
     >
       <Link
         href={`/inbox?c=${oldest.id}`}

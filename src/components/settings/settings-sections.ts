@@ -1,4 +1,5 @@
 import {
+  Bot,
   Coins,
   FileText,
   KeyRound,
@@ -36,6 +37,7 @@ export const SETTINGS_SECTIONS = [
   'deals',
   'members',
   'agencia',
+  'assistente',
   'api',
 ] as const;
 
@@ -64,6 +66,7 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   deals: { id: 'deals', label: 'Negócios e moeda', icon: Coins, group: 'workspace' },
   members: { id: 'members', label: 'Membros da equipe', icon: UsersRound, group: 'workspace' },
   agencia: { id: 'agencia', label: 'Acesso da agência', icon: ShieldCheck, group: 'workspace' },
+  assistente: { id: 'assistente', label: 'Harpi (assistente)', icon: Bot, group: 'workspace' },
   api: { id: 'api', label: 'Chaves de API', icon: KeyRound, group: 'workspace' },
 };
 
