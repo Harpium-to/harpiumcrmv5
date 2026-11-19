@@ -9,6 +9,18 @@ import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { resolvePublicOrigin } from '@/lib/http/base-url'
 import { sweepQuizVisits } from '@/lib/quiz/sweep'
+import { processRoutines } from '@/lib/assistente/routines'
+
+// Harpi's routines call the AI from here (one model call per step), so
+// this tick may take longer than the bookkeeping above.
+export const maxDuration = 60
+
+/**
+ * Time the routines may use, counted from the start of the request.
+ * Kept under the 30 s an external pinger (cron-job.org) waits, so the
+ * job never shows as failed; a run that needs more continues next tick.
+ */
+const ROUTINES_DEADLINE_MS = 25_000
 
 /**
  * Drain due `automation_pending_executions` rows. Meant to be hit
@@ -43,6 +55,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
   const admin = supabaseAdmin()
   const task_reminders = await emitTaskReminders(admin)
   const scheduled_messages = await processScheduledMessages(admin)
@@ -65,7 +78,9 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0) {
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits })
+    // Harpi's routines last: nothing above waits on the AI (074).
+    const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, routines })
   }
 
   let processed = 0
@@ -96,5 +111,6 @@ export async function GET(request: Request) {
     processed++
   }
 
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits })
+  const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, routines })
 }
