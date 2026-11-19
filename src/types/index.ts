@@ -363,7 +363,9 @@ export type NotificationType =
   /** A customer booked through an agenda's public link (067). */
   | 'agenda_booking'
   /** Google Agenda: an appointment changed there, or the connection dropped (071). */
-  | 'agenda_google';
+  | 'agenda_google'
+  /** Harpi: a routine's report, or changes waiting for an OK (074). */
+  | 'assistente';
 
 export interface Notification {
   id: string;
