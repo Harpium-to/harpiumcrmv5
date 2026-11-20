@@ -6,8 +6,16 @@ Documento de planejamento. Escrito em 20/11/2026 a partir do `main` do CRM
 **Andamento:**
 
 - 20/11/2026: plano **aprovado** pelo dono, com todas as decisões do §8
-  conforme a recomendação. Nenhum código escrito ainda; a execução
-  começa pela Fase 0.
+  conforme a recomendação.
+- 20/11/2026: **Fases 1 a 7 implementadas** (a 8 e a 9 ficaram de fora:
+  opcional e decisão futura). CRM: ramo `feat/integracao-agency-os`,
+  migration **075**, `docs/api-plataforma.md`. AOS: ramo
+  `feat/integracao-crm` (pasta `APP Harpium/.worktrees/integracao-crm`).
+  Ajuste de segurança feito na execução: só a equipe da agência passa
+  pela API da plataforma, e o "e-mail alternativo" saiu (ver §5.2).
+  **Nada publicado ainda**: falta aplicar a 075, fazer o merge, gerar a
+  chave, publicar o AOS, colar a regra do Firebase e pôr
+  `AGENCY_OS_WEBHOOK_URL` no Netlify do CRM (§7).
 
 Neste documento, **CRM** = esta pasta (`harpiumcrmv5`, o Harpium CRM) e
 **AOS** = a pasta `APP Harpium` (o Agency OS, sistema interno da agência).
