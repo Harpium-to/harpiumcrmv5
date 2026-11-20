@@ -130,7 +130,7 @@ export function HarpiActionCard({
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.75rem]">
           <span className="text-muted-foreground">{statusLine(action)}</span>
           {action.link && action.status === "done" && (
-            <Link href={action.link.href} onClick={onNavigate} className="font-medium text-primary hover:underline">
+            <Link href={action.link.href} onClick={onNavigate} className="font-medium text-foreground underline decoration-foreground/35 underline-offset-2 hover:decoration-foreground">
               {action.link.label}
             </Link>
           )}

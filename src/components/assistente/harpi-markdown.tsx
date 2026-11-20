@@ -83,7 +83,9 @@ function inline(text: string, onNavigate?: () => void): ReactNode[] {
       const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
       const target = link ? safeHref(link[2]) : null;
       if (link && target) {
-        const cls = "font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary";
+        // Foreground + underline, not the accent colour: in the default "sand"
+        // theme the accent is a light cream that disappears on a white panel.
+        const cls = "font-medium text-foreground underline decoration-foreground/35 underline-offset-2 hover:decoration-foreground";
         out.push(
           target.internal ? (
             <Link key={key} href={target.href} className={cls} onClick={onNavigate}>
