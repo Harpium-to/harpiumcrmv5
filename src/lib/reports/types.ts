@@ -156,6 +156,11 @@ export interface ReportBundle {
   /** Null until migration 048 adds `report_first_response`. */
   firstResponse: FirstResponseSummary | null
   /**
+   * Per person and per setor, from the conversations' history (076/077).
+   * Null on a database without it.
+   */
+  atendimento?: import('./atendimento').AtendimentoReport | null
+  /**
    * Null when the agent tables are not there yet (044/045 unapplied).
    * The section is then absent rather than zeroed.
    */

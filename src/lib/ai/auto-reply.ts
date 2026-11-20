@@ -8,6 +8,7 @@ import { loadContactProfile, renderContactProfile } from '@/lib/contacts/profile
 import { findBusinessGreeting } from './greeting'
 import {
   DEFAULT_HANDOFF_NOTICE,
+  buildHandoffNote,
   buildHandoffSummary,
   type HandoffReason,
 } from './handoff'
@@ -26,6 +27,15 @@ import {
   type StartRunArgs,
 } from '@/lib/agents/runtime'
 import type { Agent } from '@/lib/agents/types'
+import {
+  effectiveHandoff,
+  loadHandoffContext,
+  resolveHandoffTarget,
+  teamFromCode,
+  teamsPrompt,
+  type HandoffContext,
+} from '@/lib/atendimento/destino'
+import { transferirConversa } from '@/lib/atendimento/transferir'
 import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { decide, toAutonomy, type ApprovalReason } from '@/lib/agents/autonomy'
@@ -90,8 +100,29 @@ interface DispatchArgs {
  * reacting to a customer message that just landed — so no separate
  * window check is needed.
  */
+/**
+ * What the AI did with an inbound message — what the arrival rule
+ * (lib/atendimento/chegada.ts) needs to know:
+ *   off      — no AI answers this channel of this CRM
+ *   no_route — there are agents, and none of them claims this message
+ *   engaged  — anything else: it answered, handed off, or stood down on
+ *              purpose (a person owns the thread, it is paused, a cap…)
+ */
+export type AiDispatchOutcome = 'off' | 'no_route' | 'engaged'
+
 export async function dispatchInboundToAiReply(
   args: DispatchArgs,
+): Promise<AiDispatchOutcome> {
+  let outcome: AiDispatchOutcome = 'engaged'
+  await runAutoReply(args, (o) => {
+    outcome = o
+  })
+  return outcome
+}
+
+async function runAutoReply(
+  args: DispatchArgs,
+  report: (outcome: AiDispatchOutcome) => void,
 ): Promise<void> {
   const { accountId, conversationId, contactId, configOwnerUserId } = args
 
@@ -99,7 +130,10 @@ export async function dispatchInboundToAiReply(
     const db = supabaseAdmin()
 
     const config = await loadAiConfig(db, accountId)
-    if (!config) return
+    if (!config) {
+      report('off')
+      return
+    }
 
     // The whole team, if there is one. Which of it may answer *this*
     // thread depends on the thread's channel, narrowed below.
@@ -112,7 +146,10 @@ export async function dispatchInboundToAiReply(
       console.error('[ai auto-reply] could not load agents:', err)
     }
     // Nobody could answer on any channel — skip the thread reads.
-    if (team.length === 0 && !config.autoReplyEnabled) return
+    if (team.length === 0 && !config.autoReplyEnabled) {
+      report('off')
+      return
+    }
 
     const { data: conv, error: convErr } = await db
       .from('conversations')
@@ -135,7 +172,10 @@ export async function dispatchInboundToAiReply(
         ? agentsForChannel(team, await channelOf(conversationId, db))
         : []
     const agentMode = agents.length > 0
-    if (!agentMode && !config.autoReplyEnabled) return
+    if (!agentMode && !config.autoReplyEnabled) {
+      report('off')
+      return
+    }
 
     const messages = await buildConversationContext(db, conversationId)
     if (messages.length === 0) return
@@ -165,7 +205,11 @@ export async function dispatchInboundToAiReply(
         agent = owner
       } else {
         const route = pickAgent(agents, inbound)
-        if (!route) return // nobody claims it — leave the thread to a human
+        if (!route) {
+          // Nobody claims it — the arrival rule decides who gets it.
+          report('no_route')
+          return
+        }
         agent = route.agent
         matchedKeyword = route.matchedKeyword
       }
@@ -187,14 +231,34 @@ export async function dispatchInboundToAiReply(
     }
 
     /**
+     * Who receives a handed-off conversation, and the setores the AI may
+     * name. Loaded once, on first need (the prompt or a handoff), and
+     * best-effort: without it the handoff still pauses the bot and
+     * leaves the note, as before.
+     */
+    let handoffCtxPromise: Promise<HandoffContext | null> | null = null
+    const getHandoffCtx = () =>
+      (handoffCtxPromise ??= loadHandoffContext(db, {
+        accountId,
+        accountUserId: config.handoffAgentId,
+        agentId: agent?.id ?? null,
+        agentUserId: agent?.handoffAgentId ?? null,
+      }).catch((err) => {
+        console.error('[ai auto-reply] could not load the handoff settings:', err)
+        return null
+      }))
+
+    /**
      * Stop auto-replying on this thread and hand it to a human: (a)
-     * pause the bot here (sticky until someone hits "Resume AI"), (b)
-     * route the conversation to the handoff target — null leaves it in
-     * the shared queue — and (c) leave a short internal note so
-     * whoever picks it up has context. Assigning fires the
-     * `on_conversation_assigned` trigger, which notifies the agent.
+     * pause the bot here (sticky until someone hits "Resume AI") and
+     * leave a short internal note so whoever picks it up has context,
+     * then (b) give the conversation to whoever should take it — the
+     * setor the AI chose, the agent's or the account's "Passar para",
+     * the entry setor, or nobody (the shared queue). The transfer goes
+     * through the one path (lib/atendimento/transferir.ts), which
+     * records it and notifies the person who receives it.
      *
-     * The write only lands while the bot is still on
+     * The pause only lands while the bot is still on
      * (`ai_autoreply_disabled = false`), so two inbounds racing past
      * the cap — or a human hitting "Take over" mid-generation — hand
      * off once, not twice. Returns whether *this* call flipped it.
@@ -202,27 +266,18 @@ export async function dispatchInboundToAiReply(
     const handOff = async (
       reason: HandoffReason,
       replyCount: number,
+      chosenTeamCode: string | null = null,
     ): Promise<boolean> => {
-      const update: Record<string, unknown> = {
-        ai_autoreply_disabled: true,
-        ai_handoff_summary: buildHandoffSummary({
-          messages,
-          replyCount,
-          reason,
-        }),
-      }
-      // An agent's own handoff target wins; the account-level one is
-      // the default for agents that don't name someone.
-      const handoffTarget = agent?.handoffAgentId ?? config.handoffAgentId
-      // Only set the assignee when a target is configured AND the
-      // thread isn't already owned — never stomp an existing human
-      // assignment.
-      if (handoffTarget && !conv.assigned_agent_id) {
-        update.assigned_agent_id = handoffTarget
-      }
       const { data, error } = await db
         .from('conversations')
-        .update(update)
+        .update({
+          ai_autoreply_disabled: true,
+          ai_handoff_summary: buildHandoffSummary({
+            messages,
+            replyCount,
+            reason,
+          }),
+        })
         .eq('id', conversationId)
         .eq('ai_autoreply_disabled', false)
         .select('id')
@@ -230,7 +285,38 @@ export async function dispatchInboundToAiReply(
         console.error('[ai auto-reply] handoff update failed:', error)
         return false
       }
-      return Array.isArray(data) && data.length > 0
+      const flipped = Array.isArray(data) && data.length > 0
+      // Never stomp an existing human assignment.
+      if (!flipped || conv.assigned_agent_id) return flipped
+
+      try {
+        const ctx = await getHandoffCtx()
+        const settings = effectiveHandoff(
+          ctx?.agent ?? (agent ? { mode: null, teamId: null, userId: agent.handoffAgentId } : null),
+          ctx?.account ?? { mode: null, teamId: null, userId: config.handoffAgentId },
+          (ctx?.teams.length ?? 0) > 0,
+        )
+        const target = resolveHandoffTarget({
+          settings,
+          chosenTeamId: teamFromCode(chosenTeamCode, ctx?.teams ?? [])?.id ?? null,
+          entryTeamId: ctx?.entryTeamId ?? null,
+          activeTeamIds: (ctx?.teams ?? []).map((t) => t.id),
+        })
+        if (target) {
+          await transferirConversa(db, {
+            conversationId,
+            target,
+            source: 'ia',
+            note: buildHandoffNote({ messages, reason }),
+            onlyIfUnassigned: true,
+          })
+        }
+      } catch (err) {
+        // The bot is paused and the note is there: the conversation is
+        // in the shared queue, which is where it would be without a target.
+        console.error('[ai auto-reply] handoff transfer failed:', err)
+      }
+      return true
     }
 
     /**
@@ -443,15 +529,29 @@ export async function dispatchInboundToAiReply(
         console.error('[ai auto-reply] could not read the contact profile:', err)
       }
 
+      // The setores, when the AI may choose where a handoff goes
+      // (lib/atendimento/destino.ts). Best-effort, like the agenda.
+      let teamsBlock: string | null = null
+      const handoffCtx = await getHandoffCtx()
+      if (handoffCtx && handoffCtx.teams.length > 0) {
+        const settings = effectiveHandoff(handoffCtx.agent, handoffCtx.account, true)
+        if (settings.mode === 'ia_escolhe') teamsBlock = teamsPrompt(handoffCtx.teams)
+      }
+
+      const capabilities = [
+        scheduling
+          ? agendaPrompt(scheduling.agenda, { needsApproval: scheduling.needsApproval })
+          : null,
+        teamsBlock,
+      ].filter((c): c is string => !!c)
+
       const systemPrompt = buildSystemPrompt({
         userPrompt: composePrompt(config, agent),
         mode: 'auto_reply',
         knowledge,
         customerProfile,
         priorGreeting: findBusinessGreeting(messages),
-        capabilities: scheduling
-          ? [agendaPrompt(scheduling.agenda, { needsApproval: scheduling.needsApproval })]
-          : undefined,
+        capabilities: capabilities.length > 0 ? capabilities : undefined,
       })
 
       // An agent may run on its own model (a cheap one for the FAQ, a
@@ -546,7 +646,11 @@ export async function dispatchInboundToAiReply(
       if (handoff || !text) {
         // The model can't (or shouldn't) answer — stop auto-replying on
         // this thread and hand it to a human (see `handOff`).
-        const flipped = await handOff('model', conv.ai_reply_count ?? 0)
+        const flipped = await handOff(
+          'model',
+          conv.ai_reply_count ?? 0,
+          generated.handoffTeam ?? null,
+        )
         if (!flipped) {
           // Someone paused the bot while the model was thinking (a
           // human hit "Take over") — it was already handed off, and the

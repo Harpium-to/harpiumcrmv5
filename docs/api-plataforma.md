@@ -77,6 +77,18 @@ da v1. O formato do resumo está em `src/lib/plataforma/resumo.ts`
 (`CrmSummary`), o do funil em `funil.ts`, o das novidades em
 `novidades.ts`.
 
+O resumo traz `teams`, um item por setor do CRM (migrations 077/078):
+`{ name, members, queued, waiting, overdue }`. São só contagens:
+- `queued`: na fila do setor, sem ninguém;
+- `waiting`: esperando uma pessoa;
+- `overdue`: passou do prazo do setor.
+
+A lista vem vazia quando o CRM não tem setores. `alerts` ganha três tipos:
+- `overdue`: conversas que passaram do prazo do setor;
+- `team_queue`: 5 ou mais conversas na fila dos setores sem ninguém;
+- `radar`: o alerta mais grave do Radar do cliente na semana (079/080),
+  por exemplo "Radar: Leads do Instagram caíram 60% (+1)".
+
 ## Aviso de lead novo
 
 `POST /crms/{id}/aviso-agency-os` cria (ou reativa, com segredo novo) um

@@ -17,7 +17,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   'login', 'signup', 'forgot-password', 'reset-password', 'join', 'marcar', 'privacidade',
   'dashboard', 'inbox', 'contacts', 'leads', 'canais', 'pipelines', 'agenda', 'broadcasts',
   'automations', 'flows', 'agents', 'relatorios', 'ferramentas', 'notifications', 'settings',
-  'agencia', 'aguardando', 'ajuda', 'conectar-google', 'abrir',
+  'agencia', 'aguardando', 'ajuda', 'conectar-google', 'abrir', 'radar',
 ])
 const RESERVED = RESERVED_SLUGS
 

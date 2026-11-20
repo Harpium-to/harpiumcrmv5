@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/automations/admin-client'
 import { parseInstagramWebhook } from '@/lib/instagram/parse'
 import { ingestInstagramInbound } from '@/lib/instagram/inbound'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { aplicarChegada, aplicarRetorno } from '@/lib/atendimento/chegada'
 
 // ============================================================
 // Meta's app-level Instagram messaging webhook.
@@ -91,11 +92,22 @@ export async function POST(request: Request) {
       // Instagram being a channel rather than a separate product: one
       // team of agents, one set of rules, two doors.
       // `dispatchInboundToAiReply` owns its gates and never throws.
-      await dispatchInboundToAiReply({
+      // A customer coming back to a closed conversation, then the AI,
+      // then — nobody answering — the arrival rule. None of them throws.
+      await aplicarRetorno(admin, {
+        accountId: cfg.account_id,
+        conversationId: result.conversationId,
+      })
+      const aiOutcome = await dispatchInboundToAiReply({
         accountId: cfg.account_id,
         conversationId: result.conversationId,
         contactId: result.contactId,
         configOwnerUserId: account.owner_user_id,
+      })
+      await aplicarChegada(admin, {
+        accountId: cfg.account_id,
+        conversationId: result.conversationId,
+        aiOutcome,
       })
     } catch (err) {
       console.error('[instagram webhook] ingest failed:', err)

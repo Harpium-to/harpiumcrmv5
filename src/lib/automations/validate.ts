@@ -146,6 +146,12 @@ function validateOne(step: StepLike, path: string, issues: ValidationIssue[]): v
           message: 'informe o atendente quando o modo for "específico"',
         })
       }
+      if (c.mode === 'team' && !nonEmpty(c.team_id)) {
+        issues.push({
+          path: `${path}.team_id`,
+          message: 'informe o setor quando o modo for "setor"',
+        })
+      }
       break
     case 'update_contact_field':
       if (!nonEmpty(c.field)) {

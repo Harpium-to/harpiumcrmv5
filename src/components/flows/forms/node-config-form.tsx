@@ -49,6 +49,8 @@ import { cn } from "@/lib/utils";
 import { uploadAccountMedia, MEDIA_MAX_BYTES } from "@/lib/storage/upload-media";
 import { slugify, type BuilderNode } from "../shared";
 import { NextNodeRow, NodeKeySelect, TextRow } from "./fields";
+import { OptionSelect } from "@/components/agenda/option-select";
+import { useMembers, useTeams } from "@/hooks/use-atendimento";
 
 interface NodeConfigFormProps {
   node: BuilderNode;
@@ -197,11 +199,10 @@ export function NodeConfigForm({
 
     case "handoff":
       return (
-        <TextRow
-          label={t("internalNote")}
-          value={(cfg as { note?: string }).note ?? ""}
-          onChange={(v) => onUpdateConfig({ note: v })}
-          rows={2}
+        <HandoffNodeForm
+          cfg={cfg as { note?: string; assign_to?: string; assign_team?: string }}
+          noteLabel={t("internalNote")}
+          onUpdateConfig={onUpdateConfig}
         />
       );
 
@@ -1060,5 +1061,72 @@ function SendMediaForm({
         label={t("advanceAfterSending")}
       />
     </>
+  );
+}
+
+// ============================================================
+// handoff — who receives the conversation, and the note they read
+// ============================================================
+
+function HandoffNodeForm({
+  cfg,
+  noteLabel,
+  onUpdateConfig,
+}: {
+  cfg: { note?: string; assign_to?: string; assign_team?: string };
+  noteLabel: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const { members } = useMembers();
+  const { teams } = useTeams();
+  const activeTeams = teams.filter((tm) => tm.active || tm.id === cfg.assign_team);
+  const people = members.filter((m) => m.role !== "viewer" || m.user_id === cfg.assign_to);
+  const target = cfg.assign_team ? "setor" : cfg.assign_to ? "pessoa" : "fila";
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">Para quem vai a conversa</label>
+        <OptionSelect
+          ariaLabel="Para quem vai a conversa"
+          value={target}
+          onChange={(v) => {
+            if (v === "fila") onUpdateConfig({ assign_to: undefined, assign_team: undefined });
+            if (v === "pessoa") onUpdateConfig({ assign_team: undefined, assign_to: people[0]?.user_id });
+            if (v === "setor") onUpdateConfig({ assign_to: undefined, assign_team: activeTeams[0]?.id });
+          }}
+          options={[
+            { value: "fila", label: "Fila geral (quem pegar)" },
+            { value: "pessoa", label: "Uma pessoa" },
+            ...(activeTeams.length > 0 ? [{ value: "setor", label: "Um setor (a regra dele escolhe)" }] : []),
+          ]}
+        />
+      </div>
+      {target === "pessoa" && (
+        <OptionSelect
+          ariaLabel="Pessoa"
+          value={cfg.assign_to ?? ""}
+          onChange={(v) => onUpdateConfig({ assign_to: v })}
+          options={people.map((m) => ({ value: m.user_id, label: m.full_name || m.email || "Sem nome" }))}
+        />
+      )}
+      {target === "setor" && (
+        <OptionSelect
+          ariaLabel="Setor"
+          value={cfg.assign_team ?? ""}
+          onChange={(v) => onUpdateConfig({ assign_team: v })}
+          options={activeTeams.map((tm) => ({ value: tm.id, label: tm.name, color: tm.color }))}
+        />
+      )}
+      <TextRow
+        label={`${noteLabel} — quem recebe lê na conversa e no aviso`}
+        value={cfg.note ?? ""}
+        onChange={(v) => onUpdateConfig({ note: v })}
+        rows={2}
+      />
+      <p className="text-xs text-muted-foreground">
+        A conversa fica pendente, em Aguardando, e a IA não responde nela até alguém retomar.
+      </p>
+    </div>
   );
 }

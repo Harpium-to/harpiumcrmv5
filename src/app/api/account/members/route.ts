@@ -33,6 +33,8 @@ interface MemberRow {
   avatar_url: string | null;
   role: string;
   joined_at: string;
+  /** 076: off = out of every rotation. Absent (older database) = receives. */
+  receives_conversations?: boolean;
 }
 
 export async function GET() {
@@ -62,6 +64,7 @@ export async function GET() {
           avatar_url: row.avatar_url,
           role: row.role,
           joined_at: row.joined_at,
+          receives_conversations: row.receives_conversations !== false,
         },
       ];
     });
@@ -79,11 +82,30 @@ async function loadMembers(
   supabase: Client,
   accountId: string,
 ): Promise<MemberRow[] | null> {
-  const { data: memberships, error } = await supabase
+  // receives_conversations comes from 076; a database without it gets
+  // the old select (everyone receives).
+  type Membership = {
+    user_id: string;
+    role: string;
+    created_at: string;
+    receives_conversations?: boolean;
+  };
+  const first = await supabase
     .from("account_members")
-    .select("user_id, role, created_at")
+    .select("user_id, role, created_at, receives_conversations")
     .eq("account_id", accountId)
     .order("created_at", { ascending: true });
+  let memberships = first.data as Membership[] | null;
+  let error = first.error;
+  if (error && (error.code === "42703" || error.code === "PGRST204")) {
+    const legacy = await supabase
+      .from("account_members")
+      .select("user_id, role, created_at")
+      .eq("account_id", accountId)
+      .order("created_at", { ascending: true });
+    memberships = legacy.data as Membership[] | null;
+    error = legacy.error;
+  }
 
   if (error && isMissingTable(error)) {
     return loadMembersFromProfiles(supabase, accountId);
@@ -117,6 +139,7 @@ async function loadMembers(
       avatar_url: p?.avatar_url ?? null,
       role: m.role,
       joined_at: m.created_at,
+      receives_conversations: m.receives_conversations !== false,
     };
   });
 }

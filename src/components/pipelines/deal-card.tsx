@@ -4,6 +4,7 @@ import type { Deal, PipelineStage } from "@/types";
 import { Calendar, Check, X } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
+import { useChanceVisible } from "@/hooks/use-radar";
 
 interface DealCardProps {
   deal: Deal;
@@ -30,6 +31,13 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
   const t = useTranslations("Pipelines.card");
   const contactLabel = deal.contact?.name || deal.contact?.phone || t("noContact");
   const assigneeLabel = deal.assignee?.full_name || null;
+  // The Radar's chance of closing (080), only once the history backs it.
+  const showChance = useChanceVisible();
+  const chance =
+    showChance && deal.status !== "won" && deal.status !== "lost" &&
+    deal.win_probability_basis === "historico" && typeof deal.win_probability === "number"
+      ? Math.round(Number(deal.win_probability) * 100)
+      : null;
 
   return (
     <button
@@ -81,8 +89,24 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
       </div>
 
       <div className="mt-2 flex items-center justify-between">
-        <span className="text-sm font-bold text-primary">
-          {formatCurrency(deal.value, deal.currency)}
+        <span className="flex items-center gap-1.5">
+          <span className="text-sm font-bold text-primary">
+            {formatCurrency(deal.value, deal.currency)}
+          </span>
+          {chance !== null && (
+            <span
+              title="Chance de fechar, pelo histórico deste CRM (Radar)"
+              className={`rounded-full px-1.5 py-px text-[10px] font-semibold ${
+                chance >= 60
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  : chance >= 30
+                    ? "bg-amber-400/15 text-amber-700 dark:text-amber-300"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {chance}%
+            </span>
+          )}
         </span>
         {deal.expected_close_date && (
           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">

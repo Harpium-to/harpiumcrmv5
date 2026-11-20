@@ -17,6 +17,10 @@ const inserts: Array<Record<string, unknown>> = []
 const eqCalls: Array<[string, unknown]> = []
 let sourceRow: Record<string, unknown> | null = null
 let readError: unknown = null
+/** The separate read of where its handoffs go (077). */
+let handoffRow: Record<string, unknown> | null = null
+let handoffError: unknown = null
+const HANDOFF_COLUMNS = 'handoff_mode, handoff_team_id'
 let insertError: unknown = null
 
 /** Column defaults the database would apply, for mapAgentRow's benefit. */
@@ -35,8 +39,12 @@ function makeSupabaseMock() {
   return {
     from() {
       let payload: Record<string, unknown> | null = null
+      let selected: string | undefined
       const b: Record<string, unknown> = {}
-      b.select = () => b
+      b.select = (columns?: string) => {
+        selected = columns
+        return b
+      }
       b.eq = (column: string, value: unknown) => {
         eqCalls.push([column, value])
         return b
@@ -46,7 +54,10 @@ function makeSupabaseMock() {
         inserts.push(values)
         return b
       }
-      b.maybeSingle = async () => ({ data: sourceRow, error: readError })
+      b.maybeSingle = async () =>
+        selected === HANDOFF_COLUMNS
+          ? { data: handoffRow, error: handoffError }
+          : { data: sourceRow, error: readError }
       b.single = async () => ({
         data: payload ? { ...ROW_DEFAULTS, ...payload } : null,
         error: insertError,
@@ -112,6 +123,8 @@ describe('POST /api/agents/:id/duplicate', () => {
     eqCalls.length = 0
     sourceRow = { ...SOURCE }
     readError = null
+    handoffRow = { handoff_mode: 'setor', handoff_team_id: 'team-fin' }
+    handoffError = null
     insertError = null
     supabaseMock = makeSupabaseMock()
   })
@@ -124,6 +137,24 @@ describe('POST /api/agents/:id/duplicate', () => {
     const { name, ...config } = SOURCE
     expect(name).toBe('Clara')
     expect(inserts[0]).toMatchObject(config)
+  })
+
+  it('keeps where its handoffs go: the mode, the setor and the person', async () => {
+    await duplicate()
+    expect(inserts[0]).toMatchObject({
+      handoff_mode: 'setor',
+      handoff_team_id: 'team-fin',
+      handoff_agent_id: 'user-9',
+    })
+  })
+
+  it('still duplicates on a database before 077', async () => {
+    handoffRow = null
+    handoffError = { code: '42703', message: 'column agents.handoff_mode does not exist' }
+    const res = await duplicate()
+    expect(res.status).toBe(201)
+    expect(inserts[0]).not.toHaveProperty('handoff_mode')
+    expect(inserts[0]).not.toHaveProperty('handoff_team_id')
   })
 
   it('marks the copy in its name', async () => {

@@ -3,6 +3,7 @@ import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { AGENT_COLUMNS, mapAgentRow } from '@/lib/agents/store'
 import { parseAgentPayload, bad } from '@/lib/agents/payload'
+import { validateHandoffRefs } from '@/lib/atendimento/destino'
 
 /**
  * PATCH /api/agents/:id  (admin+)
@@ -24,6 +25,11 @@ export async function PATCH(
     const body = await request.json().catch(() => null)
     const parsed = parseAgentPayload(body, { partial: true })
     if ('error' in parsed) return bad(parsed.error)
+    const refError = await validateHandoffRefs(supabase, accountId, {
+      teamId: parsed.values.handoff_team_id,
+      userId: parsed.values.handoff_agent_id,
+    })
+    if (refError) return bad(refError)
     if (Object.keys(parsed.values).length === 0) {
       return bad('Nada para atualizar')
     }

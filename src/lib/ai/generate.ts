@@ -52,17 +52,35 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
 }
 
 /**
- * Split the raw model output into `{ text, handoff, usage }`. The
- * sentinel can appear alone or trailing a partial reply; either way we
- * treat the turn as a handoff and strip the marker from any remaining
- * text. `usage` is passed straight through (null when the provider
- * didn't report it).
+ * `[[HANDOFF]]`, or `[[HANDOFF financeiro]]` naming the setor the
+ * conversation should go to (see lib/atendimento/destino.ts). Whatever
+ * sits inside the brackets is captured, so a marker the model
+ * misspells (`[[HANDOFF: Dra. Ana]]`) is still stripped and never
+ * reaches the customer.
+ */
+const HANDOFF_MARKER = /\[\[\s*HANDOFF\b([^\]]*)\]\]/gi
+
+/**
+ * Split the raw model output into `{ text, handoff, handoffTeam?, usage }`.
+ * The sentinel can appear alone or trailing a partial reply; either way
+ * we treat the turn as a handoff and strip the marker from any remaining
+ * text. `handoffTeam` is what the model wrote after HANDOFF (a setor
+ * code), present only when it wrote one. `usage` is passed straight
+ * through (null when the provider didn't report it).
  */
 export function parseGeneration(
   raw: string,
   usage: AiUsage | null = null,
 ): GenerateResult {
-  const handoff = raw.includes(HANDOFF_SENTINEL)
-  const text = raw.split(HANDOFF_SENTINEL).join('').trim()
-  return { text, handoff, usage }
+  let handoff = raw.includes(HANDOFF_SENTINEL)
+  let handoffTeam: string | undefined
+  const text = raw
+    .replace(HANDOFF_MARKER, (_marker, rest: string) => {
+      handoff = true
+      const code = rest.replace(/^[\s:=-]+/, '').trim()
+      if (code && handoffTeam === undefined) handoffTeam = code
+      return ''
+    })
+    .trim()
+  return handoffTeam ? { text, handoff, handoffTeam, usage } : { text, handoff, usage }
 }

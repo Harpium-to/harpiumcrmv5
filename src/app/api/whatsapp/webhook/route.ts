@@ -9,6 +9,7 @@ import { matchesAppVerifyToken } from '@/lib/whatsapp/webhook-verify-token'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { aplicarChegada, aplicarRetorno } from '@/lib/atendimento/chegada'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
 import { openFirstContactDeal } from '@/lib/deals/first-contact'
 import {
@@ -749,13 +750,16 @@ async function processMessage(
     return
   }
 
-  // Update conversation
+  // Update conversation. A customer writing reopens a closed (or
+  // pending) conversation, as UAZAPI, Evolution and Instagram already
+  // do — otherwise a returning patient's message sat in "Fechadas".
   const { error: convError } = await supabaseAdmin()
     .from('conversations')
     .update({
       last_message_text: contentText || `[${message.type}]`,
       last_message_at: new Date().toISOString(),
       unread_count: (conversation.unread_count || 0) + 1,
+      status: 'open',
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversation.id)
@@ -863,12 +867,22 @@ async function processMessage(
   // the account has enabled it. Awaited inside `after()` (same reason as
   // the webhook dispatch below); `dispatchInboundToAiReply` owns its
   // eligibility gates + try/catch and never throws.
+  //
+  // Before it, a customer writing to a closed conversation gets the
+  // return rule; after it, a message nobody answers gets the CRM's
+  // arrival rule (lib/atendimento/chegada.ts). Neither throws.
+  await aplicarRetorno(supabaseAdmin(), { accountId, conversationId: conversation.id })
   if (!flowConsumed && !interactiveReplyId && inboundText.trim()) {
-    await dispatchInboundToAiReply({
+    const aiOutcome = await dispatchInboundToAiReply({
       accountId,
       conversationId: conversation.id,
       contactId: contactRecord.id,
       configOwnerUserId,
+    })
+    await aplicarChegada(supabaseAdmin(), {
+      accountId,
+      conversationId: conversation.id,
+      aiOutcome,
     })
   }
 

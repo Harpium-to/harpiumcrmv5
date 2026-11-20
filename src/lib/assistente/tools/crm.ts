@@ -1,4 +1,5 @@
 import { findExistingContact } from '@/lib/contacts/dedupe'
+import { transferirConversa, type TransferTarget } from '@/lib/atendimento/transferir'
 import { resolveImportTagIds } from '@/lib/contacts/resolve-import-tags'
 import { findOrCreateContact, parseContactPatch } from '@/lib/api/v1/contacts'
 import { parseDealCreate, resolveDealPlacement } from '@/lib/api/v1/deals'
@@ -727,57 +728,95 @@ async function loadConversation(ctx: ToolContext, id: string): Promise<Row> {
 
 const atribuirConversa: ToolDef = {
   name: 'atribuir_conversa',
-  label: 'Preparou uma atribuição',
+  label: 'Preparou uma transferência',
   risk: 'pequena',
   minRole: 'agent',
-  description: 'Passa uma conversa para uma pessoa da equipe (ID de listar_equipe), ou tira de todos (pessoa_id vazio).',
+  description:
+    'Passa uma conversa para uma pessoa da equipe (ID de listar_equipe) ou para um setor (ID de listar_setores, que escolhe a pessoa pela regra dele), com uma nota opcional que quem recebe lê. Sem pessoa nem setor, devolve para a fila geral.',
   parameters: {
     type: 'object',
-    properties: { conversa_id: UUID, pessoa_id: UUID },
+    properties: {
+      conversa_id: UUID,
+      pessoa_id: UUID,
+      setor_id: UUID,
+      nota: { type: 'string', description: 'Recado curto para quem recebe (até 500 caracteres).' },
+    },
     required: ['conversa_id'],
   },
   async prepare(ctx, input) {
     const conv = await loadConversation(ctx, String(input.conversa_id))
     let who = 'ninguém (fila da equipe)'
-    if (input.pessoa_id) {
+    if (input.setor_id) {
+      const { data: team } = await ctx.db
+        .from('teams')
+        .select('name')
+        .eq('account_id', ctx.accountId)
+        .eq('id', String(input.setor_id))
+        .eq('active', true)
+        .maybeSingle()
+      if (!team) return { error: 'esse setor não existe neste CRM (veja listar_setores)' }
+      who = `setor ${(team as Row).name as string} (a regra do setor escolhe a pessoa)`
+    } else if (input.pessoa_id) {
       const { data } = await ctx.db
         .from('account_members')
-        .select('user_id')
+        .select('user_id, role')
         .eq('account_id', ctx.accountId)
         .eq('user_id', String(input.pessoa_id))
         .maybeSingle()
       if (!data) return { error: 'essa pessoa não é da equipe deste CRM' }
+      if ((data as Row).role === 'viewer') return { error: 'essa pessoa só tem acesso de leitura e não atende conversas' }
       const { data: p } = await ctx.admin.from('profiles').select('full_name').eq('user_id', String(input.pessoa_id)).maybeSingle()
       who = ((p as Row | null)?.full_name as string) || 'pessoa da equipe'
     }
+    const nota = typeof input.nota === 'string' ? input.nota.trim().slice(0, 500) : ''
     return {
       preview: {
-        title: `Atribuir conversa de ${(conv.contact as Row | null)?.name ?? 'contato'}`,
-        lines: [`Para: ${who}`],
+        title: `Transferir conversa de ${(conv.contact as Row | null)?.name ?? 'contato'}`,
+        lines: [`Para: ${who}`, ...(nota ? [`Nota: ${nota}`] : [])],
       },
       input,
     }
   },
   async execute(ctx, input) {
     const conv = await loadConversation(ctx, String(input.conversa_id))
-    const { error } = await ctx.db
-      .from('conversations')
-      .update({ assigned_agent_id: (input.pessoa_id as string) ?? null })
-      .eq('id', String(input.conversa_id))
-      .eq('account_id', ctx.accountId)
-    if (error) throw new ToolError(`Não consegui atribuir: ${error.message}`)
+    const target: TransferTarget = input.setor_id
+      ? { kind: 'setor', teamId: String(input.setor_id) }
+      : input.pessoa_id
+        ? { kind: 'pessoa', userId: String(input.pessoa_id) }
+        : { kind: 'ninguem' }
+    let result
+    try {
+      result = await transferirConversa(ctx.db, {
+        conversationId: String(input.conversa_id),
+        target,
+        source: 'harpi',
+        note: typeof input.nota === 'string' ? input.nota : null,
+      })
+    } catch (err) {
+      throw new ToolError(`Não consegui transferir: ${err instanceof Error ? err.message : 'erro'}`)
+    }
+    if (!result.ok && result.reason === 'nobody_available') {
+      return {
+        summary: 'Ninguém do setor está disponível agora: a conversa ficou na fila do setor.',
+        link: { href: LINKS.conversation(String(input.conversa_id)), label: 'Abrir conversa' },
+        undo: { conversation_id: input.conversa_id, assigned: conv.assigned_agent_id ?? null },
+      }
+    }
     return {
-      summary: 'Conversa atribuída.',
+      summary: 'Conversa transferida.',
       link: { href: LINKS.conversation(String(input.conversa_id)), label: 'Abrir conversa' },
       undo: { conversation_id: input.conversa_id, assigned: conv.assigned_agent_id ?? null },
     }
   },
   async undo(ctx, data) {
-    await ctx.db
-      .from('conversations')
-      .update({ assigned_agent_id: data.assigned ?? null })
-      .eq('id', String(data.conversation_id))
-      .eq('account_id', ctx.accountId)
+    const before = (data.assigned as string | null) ?? null
+    await transferirConversa(ctx.db, {
+      conversationId: String(data.conversation_id),
+      target: before ? { kind: 'pessoa', userId: before } : { kind: 'ninguem' },
+      source: 'harpi',
+      note: 'Desfeito pela Harpi',
+      fireIntegrations: false,
+    })
   },
 }
 

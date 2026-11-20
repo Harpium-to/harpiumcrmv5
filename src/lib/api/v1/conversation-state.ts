@@ -16,6 +16,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { transferirConversa } from '@/lib/atendimento/transferir';
+
 /**
  * `answering` — the bot replies to this conversation
  * `paused`    — the account has the bot on, but not here: someone took
@@ -175,10 +177,11 @@ export async function getContactConversationState(
  * belongs to a person, make them its owner. `null` when the account
  * has no such conversation.
  *
- * Assigning through the service role makes the assignment trigger (027)
- * notify the new owner that "someone" gave them the conversation. Here
- * that someone is themselves, so the notification is marked read on
- * the spot rather than left as noise in their bell.
+ * The owner change goes through the one transfer path
+ * (lib/atendimento/transferir.ts), recorded as coming from the API and
+ * by this person — who is therefore not notified of it. Before
+ * migration 076 the old trigger did notify them ("someone gave you…"),
+ * so that notification is still marked read on the spot.
  */
 export async function takeOverConversation(
   db: SupabaseClient,
@@ -189,10 +192,7 @@ export async function takeOverConversation(
   const startedAt = new Date().toISOString();
   const { data, error } = await db
     .from('conversations')
-    .update({
-      ai_autoreply_disabled: true,
-      ...(personId ? { assigned_agent_id: personId } : {}),
-    })
+    .update({ ai_autoreply_disabled: true })
     .eq('id', conversationId)
     .eq('account_id', accountId)
     .select('*')
@@ -203,18 +203,30 @@ export async function takeOverConversation(
     throw error;
   }
   if (!data) return null;
+  if (!personId) return project(db, accountId, data as Record<string, unknown>, personId);
 
-  if (personId) {
-    await db
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('user_id', personId)
-      .eq('conversation_id', conversationId)
-      .eq('type', 'conversation_assigned')
-      .is('read_at', null)
-      .gte('created_at', startedAt);
-  }
-  return project(db, accountId, data as Record<string, unknown>, personId);
+  await transferirConversa(db, {
+    conversationId,
+    target: { kind: 'pessoa', userId: personId },
+    source: 'api',
+    actorUserId: personId,
+  });
+  await db
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('user_id', personId)
+    .eq('conversation_id', conversationId)
+    .eq('type', 'conversation_assigned')
+    .is('read_at', null)
+    .gte('created_at', startedAt);
+
+  const { data: after } = await db
+    .from('conversations')
+    .select('*')
+    .eq('id', conversationId)
+    .eq('account_id', accountId)
+    .maybeSingle();
+  return project(db, accountId, (after ?? data) as Record<string, unknown>, personId);
 }
 
 /**
@@ -233,7 +245,6 @@ export async function handBackConversation(
     .from('conversations')
     .update({
       ai_autoreply_disabled: false,
-      assigned_agent_id: null,
       ai_reply_count: 0,
       ai_handoff_summary: null,
     })
@@ -246,7 +257,18 @@ export async function handBackConversation(
     throw error;
   }
   if (!data) return null;
-  return project(db, accountId, data as Record<string, unknown>, personId);
+  const row = data as Record<string, unknown>;
+  if (!row.assigned_agent_id) return project(db, accountId, row, personId);
+
+  // Release whoever owned it: the bot stands down while a person does.
+  await transferirConversa(db, {
+    conversationId,
+    target: { kind: 'ninguem', leaveTeam: true },
+    source: 'api',
+    actorUserId: personId,
+    note: 'Devolvida para a IA',
+  });
+  return project(db, accountId, { ...row, assigned_agent_id: null }, personId);
 }
 
 /**

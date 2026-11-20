@@ -642,14 +642,17 @@ export async function nameMaps(ctx: ToolContext): Promise<{
   tags: Map<string, string>
   stages: Map<string, string>
   pipelines: Map<string, string>
+  teams: Map<string, string>
 }> {
-  const [tags, pipes] = await Promise.all([
+  const [tags, pipes, teams] = await Promise.all([
     ctx.db.from('tags').select('id, name').eq('account_id', ctx.accountId).limit(500),
     ctx.db
       .from('pipelines')
       .select('id, name, pipeline_stages(id, name)')
       .eq('account_id', ctx.accountId)
       .limit(50),
+    // Setores (077): an error before it just means none.
+    ctx.db.from('teams').select('id, name').eq('account_id', ctx.accountId).limit(100),
   ])
   const stages = new Map<string, string>()
   const pipelines = new Map<string, string>()
@@ -661,6 +664,7 @@ export async function nameMaps(ctx: ToolContext): Promise<{
     tags: new Map(((tags.data ?? []) as Row[]).map((t) => [t.id as string, t.name as string])),
     stages,
     pipelines,
+    teams: new Map(((teams.error ? [] : teams.data ?? []) as Row[]).map((t) => [t.id as string, t.name as string])),
   }
 }
 
@@ -924,6 +928,52 @@ const listarEquipe: ToolDef = {
   },
 }
 
+const listarSetores: ToolDef = {
+  name: 'listar_setores',
+  label: 'Viu os setores',
+  risk: 'leitura',
+  minRole: 'viewer',
+  description:
+    'Os setores de atendimento deste CRM (Recepção, Financeiro…): ID, o que cada um resolve, como distribui as conversas e quem está nele — para transferir conversas para um setor.',
+  parameters: { type: 'object', properties: {} },
+  async run(ctx) {
+    const [teamsRes, membersRes] = await Promise.all([
+      ctx.db
+        .from('teams')
+        .select('id, name, description, mode, online_only, is_entry, active')
+        .eq('account_id', ctx.accountId)
+        .order('position', { ascending: true })
+        .limit(100),
+      ctx.db.from('team_members').select('team_id, user_id').eq('account_id', ctx.accountId),
+    ])
+    if (teamsRes.error) return { setores: [], aviso: 'Este CRM ainda não tem setores.' }
+    const ids = [...new Set(((membersRes.data ?? []) as Row[]).map((m) => m.user_id as string))]
+    const { data: profiles } = ids.length
+      ? await ctx.admin.from('profiles').select('user_id, full_name').in('user_id', ids)
+      : { data: [] }
+    const names = new Map(((profiles ?? []) as Row[]).map((p) => [p.user_id as string, p.full_name as string]))
+    const MODO: Record<string, string> = {
+      rodizio: 'rodízio',
+      menos_ocupado: 'quem tem menos conversas',
+      fila: 'fila (quem pegar primeiro)',
+    }
+    return {
+      setores: ((teamsRes.data ?? []) as Row[]).map((t) => ({
+        id: t.id,
+        nome: t.name,
+        resolve: t.description ?? undefined,
+        distribui: MODO[String(t.mode)] ?? t.mode,
+        so_online: t.online_only === true ? true : undefined,
+        entrada: t.is_entry === true ? true : undefined,
+        ativo: t.active === false ? false : undefined,
+        pessoas: ((membersRes.data ?? []) as Row[])
+          .filter((m) => m.team_id === t.id)
+          .map((m) => names.get(m.user_id as string) || 'sem nome'),
+      })),
+    }
+  },
+}
+
 const ajuda: ToolDef = {
   name: 'ajuda',
   label: 'Consultou a ajuda',
@@ -986,5 +1036,6 @@ export const READ_TOOLS: ToolDef[] = [
   verAgenda,
   listarTarefas,
   listarEquipe,
+  listarSetores,
   ajuda,
 ]

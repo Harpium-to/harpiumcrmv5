@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   CONVERSATION_SELECT,
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { Conversation, ConversationStatus, Tag } from "@/types";
 import { AtSign, ChevronDown, Hand, Search, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { initials as initialsOf, useMembers, useTeams } from "@/hooks/use-atendimento";
 import { useNow } from "@/hooks/use-now";
 import {
   formatWait,
@@ -53,7 +54,39 @@ const STATUS_COLORS: Record<ConversationStatus, string> = {
 
 
 
-type InboxFilter = ConversationStatus | "all" | "unread" | "waiting";
+type InboxFilter =
+  | ConversationStatus
+  | "all"
+  | "unread"
+  | "waiting"
+  | "mine"
+  | "unassigned"
+  | "myteams";
+
+const FILTER_STORAGE_KEY = "harpium.inbox.filter";
+const TEAM_STORAGE_KEY = "harpium.inbox.team";
+
+function readStored(key: string): string | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+// The saved choice is read after hydration (the server has no storage):
+// useSyncExternalStore renders the server snapshot (null) first, so the
+// first paint matches the server's, then the saved filter.
+const noSubscribe = () => () => {};
+
+function writeStored(key: string, value: string | null) {
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+  } catch {
+    // private window / blocked storage: the filter just isn't remembered
+  }
+}
 
 export function ConversationList({
   activeConversationId,
@@ -68,17 +101,57 @@ export function ConversationList({
   // Keeps "esperando há N min" counting between realtime events.
   const now = useNow(30_000);
 
+  const { members } = useMembers();
+  const { teams } = useTeams();
+  const userId = user?.id ?? null;
+  const myTeamIds = useMemo(
+    () =>
+      userId
+        ? teams.filter((tm) => tm.active && tm.members.includes(userId)).map((tm) => tm.id)
+        : [],
+    [teams, userId],
+  );
+  const activeTeams = useMemo(() => teams.filter((tm) => tm.active), [teams]);
+
   const FILTER_OPTIONS: { label: string; value: InboxFilter }[] = useMemo(() => [
     { label: t("filterAll"), value: "all" },
+    { label: t("filterMine"), value: "mine" },
+    { label: t("filterUnassigned"), value: "unassigned" },
+    ...(myTeamIds.length > 0 ? [{ label: t("filterMyTeams"), value: "myteams" as const }] : []),
     { label: t("filterWaiting"), value: "waiting" },
     { label: t("filterUnread"), value: "unread" },
     { label: t("filterOpen"), value: "open" },
     { label: t("filterPending"), value: "pending" },
     { label: t("filterClosed"), value: "closed" },
-  ], [t]);
+  ], [t, myTeamIds.length]);
 
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<InboxFilter>("all");
+  // The last filter and setor each person used, remembered on this device.
+  const storedFilter = useSyncExternalStore(
+    noSubscribe,
+    () => readStored(FILTER_STORAGE_KEY),
+    () => null,
+  );
+  const storedTeam = useSyncExternalStore(
+    noSubscribe,
+    () => readStored(TEAM_STORAGE_KEY),
+    () => null,
+  );
+  const [chosenFilter, setChosenFilter] = useState<InboxFilter | null>(null);
+  const [chosenTeam, setChosenTeam] = useState<string | null | undefined>(undefined);
+  const wanted = chosenFilter ?? (storedFilter as InboxFilter | null) ?? "all";
+  // A saved filter that no longer applies (out of every setor) shows everything.
+  const filter: InboxFilter =
+    FILTER_OPTIONS.some((o) => o.value === wanted) ? wanted : "all";
+  const teamFilter = chosenTeam === undefined ? storedTeam : chosenTeam;
+  const setFilter = useCallback((next: InboxFilter) => {
+    setChosenFilter(next);
+    writeStored(FILTER_STORAGE_KEY, next);
+  }, []);
+  const setTeamFilter = useCallback((next: string | null) => {
+    setChosenTeam(next);
+    writeStored(TEAM_STORAGE_KEY, next);
+  }, []);
   const [loading, setLoading] = useState(true);
   // Contact-based filters (issue #272). Tags use OR logic (a conversation
   // matches if its contact carries any selected tag), consistent with
@@ -172,15 +245,48 @@ export function ConversationList({
     return m;
   }, [tags]);
 
-  const filtered = useMemo(() => {
-    let result = conversations;
+  const matchesFilter = useCallback(
+    (c: Conversation, f: InboxFilter): boolean => {
+      switch (f) {
+        case "all":
+          return true;
+        case "unread":
+          return c.unread_count > 0;
+        case "waiting":
+          return !!c.needs_human_since;
+        case "mine":
+          return !!userId && c.assigned_agent_id === userId && c.status !== "closed";
+        case "unassigned":
+          return !c.assigned_agent_id && c.status !== "closed";
+        case "myteams":
+          return (
+            !c.assigned_agent_id &&
+            c.status !== "closed" &&
+            !!c.team_id &&
+            myTeamIds.includes(c.team_id)
+          );
+        default:
+          return c.status === f;
+      }
+    },
+    [userId, myTeamIds],
+  );
 
-    if (filter === "unread") {
-      result = result.filter((c) => c.unread_count > 0);
-    } else if (filter === "waiting") {
-      result = result.filter((c) => c.needs_human_since);
-    } else if (filter !== "all") {
-      result = result.filter((c) => c.status === filter);
+  // How many each filter holds, for the counters next to them.
+  const filterCounts = useMemo(() => {
+    const counts: Partial<Record<InboxFilter, number>> = {};
+    for (const opt of ["mine", "unassigned", "myteams", "waiting"] as InboxFilter[]) {
+      counts[opt] = conversations.filter((c) => matchesFilter(c, opt)).length;
+    }
+    return counts;
+  }, [conversations, matchesFilter]);
+
+  const filtered = useMemo(() => {
+    let result = conversations.filter((c) => matchesFilter(c, filter));
+
+    // A setor picked in the "Setor" menu (and still existing).
+    if (teamFilter && activeTeams.some((tm) => tm.id === teamFilter)) {
+      result = result.filter((c) => c.team_id === teamFilter);
     }
 
     // Contact-based filters (tags via OR logic, exact company match).
@@ -205,7 +311,14 @@ export function ConversationList({
 
     // Someone has to answer these: always on top, longest wait first.
     return waitingFirst(result);
-  }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+  }, [conversations, filter, matchesFilter, teamFilter, activeTeams, search, selectedTagIds, selectedCompany]);
+
+  const memberName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const member of members) m.set(member.user_id, member.full_name || member.email || "");
+    return m;
+  }, [members]);
+  const teamById = useMemo(() => new Map(teams.map((tm) => [tm.id, tm])), [teams]);
 
   const waitingSummary = useMemo(() => {
     let count = 0;
@@ -286,11 +399,62 @@ export function ConversationList({
                       : "text-popover-foreground"
                   )}
                 >
-                  {opt.label}
+                  <span className="flex-1">{opt.label}</span>
+                  {filterCounts[opt.value] !== undefined && (
+                    <span className="ml-3 text-[11px] tabular-nums text-muted-foreground">
+                      {filterCounts[opt.value]}
+                    </span>
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {activeTeams.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
+                  teamFilter && teamById.has(teamFilter)
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {teamFilter && teamById.get(teamFilter) ? (
+                  <>
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: teamById.get(teamFilter)!.color }}
+                    />
+                    <span className="max-w-[7rem] truncate">{teamById.get(teamFilter)!.name}</span>
+                  </>
+                ) : (
+                  t("team")
+                )}
+                <ChevronDown className="h-3 w-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-64 w-56 border-border bg-popover">
+                <DropdownMenuItem
+                  onClick={() => setTeamFilter(null)}
+                  className={cn("text-sm", !teamFilter ? "text-primary" : "text-popover-foreground")}
+                >
+                  {t("allTeams")}
+                </DropdownMenuItem>
+                {activeTeams.map((tm) => (
+                  <DropdownMenuItem
+                    key={tm.id}
+                    onClick={() => setTeamFilter(tm.id)}
+                    className={cn("text-sm", teamFilter === tm.id ? "text-primary" : "text-popover-foreground")}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: tm.color }} />
+                      <span className="truncate">{tm.name}</span>
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {tags.length > 0 && (
             <DropdownMenu>
@@ -469,6 +633,10 @@ export function ConversationList({
                 t={t}
                 wait={waitInfo(conv.needs_human_since, now)}
                 currentUserId={user?.id ?? null}
+                ownerName={
+                  conv.assigned_agent_id ? memberName.get(conv.assigned_agent_id) ?? null : null
+                }
+                team={conv.team_id ? teamById.get(conv.team_id) ?? null : null}
               />
             ))}
           </div>
@@ -485,6 +653,10 @@ interface ConversationItemProps {
   t: ReturnType<typeof useTranslations>;
   wait: WaitInfo;
   currentUserId: string | null;
+  /** Who has it, for the initials chip. */
+  ownerName?: string | null;
+  /** The setor it is in, for the colour chip. */
+  team?: { name: string; color: string } | null;
 }
 
 export function ConversationItem({
@@ -494,6 +666,8 @@ export function ConversationItem({
   t,
   wait,
   currentUserId,
+  ownerName,
+  team,
 }: ConversationItemProps) {
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
@@ -571,6 +745,28 @@ export function ConversationItem({
             {conversation.last_message_text || t("noMessagesYet")}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
+            {team && (
+              <span
+                className="inline-flex max-w-[5.5rem] items-center gap-1 rounded-full border border-border/70 px-1.5 py-px text-[10px] text-muted-foreground"
+                title={team.name}
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: team.color }} />
+                <span className="truncate">{team.name}</span>
+              </span>
+            )}
+            {owner && (
+              <span
+                className={cn(
+                  "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-semibold",
+                  owner === currentUserId
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground",
+                )}
+                title={owner === currentUserId ? "Com você" : ownerName ? `Com ${ownerName}` : "Atribuída"}
+              >
+                {owner === currentUserId ? "eu" : initialsOf(ownerName)}
+              </span>
+            )}
             {conversation.unread_count > 0 && (
               <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                 {conversation.unread_count}

@@ -64,3 +64,24 @@ function truncate(text: string, max: number): string {
   if (collapsed.length <= max) return collapsed
   return `${collapsed.slice(0, max - 1).trimEnd()}…`
 }
+
+/**
+ * The one-line note that travels with the transfer — shown in the
+ * conversation's history and in the notification of whoever receives
+ * it ("A IA passou para você a conversa com João · “posso parcelar?”").
+ * Shorter than the summary: the person reads it in a bell.
+ */
+export function buildHandoffNote(args: {
+  messages: ChatMessage[]
+  reason?: HandoffReason
+}): string | null {
+  const { messages, reason = 'model' } = args
+  const lastCustomer = [...messages]
+    .reverse()
+    .find((m) => m.role === 'user' && m.content.trim())
+  const quote = lastCustomer ? `“${truncate(lastCustomer.content.trim(), 120)}”` : null
+  if (reason === 'reply_cap') {
+    return quote ? `Limite de respostas da IA · ${quote}` : 'Limite de respostas da IA'
+  }
+  return quote
+}

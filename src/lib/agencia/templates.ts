@@ -63,6 +63,14 @@ export interface TemplateCalendar {
   slot_minutes?: number
   hours: TemplateCalendarHours[]
 }
+/** A setor a template suggests (078): never its people. */
+export interface TemplateTeam {
+  name: string
+  description?: string
+  color?: string
+  mode?: 'rodizio' | 'menos_ocupado' | 'fila'
+  is_entry?: boolean
+}
 export interface TemplateContent {
   pipelines: TemplatePipeline[]
   tags: TemplateTag[]
@@ -71,6 +79,8 @@ export interface TemplateContent {
   automations: TemplateAutomation[]
   /** Present only when the template has agendas. */
   calendars?: TemplateCalendar[]
+  /** Present only when the template suggests setores. */
+  teams?: TemplateTeam[]
 }
 
 export const TEMPLATE_TRIGGERS = [
@@ -300,6 +310,32 @@ export function parseTemplateContent(value: unknown): Result {
   })
   dupes(calendars.map((c) => c.name).filter(Boolean), 'Agenda')
 
+  const teams: TemplateTeam[] = list('teams').map((tm, i) => {
+    if (!isObj(tm) || !str(tm.name)) {
+      errors.push(`Setor ${i + 1}: precisa de nome.`)
+      return { name: '' }
+    }
+    const name = str(tm.name)
+    const where = `Setor "${name}"`
+    if (name.length > 60) errors.push(`${where}: o nome pode ter até 60 caracteres.`)
+    const mode = tm.mode === undefined ? undefined : str(tm.mode)
+    if (mode !== undefined && mode !== 'rodizio' && mode !== 'menos_ocupado' && mode !== 'fila') {
+      errors.push(`${where}: "mode" é rodizio, menos_ocupado ou fila.`)
+    }
+    const description = str(tm.description)
+    if (description.length > 500) errors.push(`${where}: a descrição pode ter até 500 caracteres.`)
+    const tint = color(tm.color, where)
+    return {
+      name,
+      ...(description ? { description } : {}),
+      ...(tint ? { color: tint } : {}),
+      ...(mode ? { mode: mode as TemplateTeam['mode'] } : {}),
+      ...(tm.is_entry === true ? { is_entry: true } : {}),
+    }
+  })
+  dupes(teams.map((tm) => tm.name).filter(Boolean), 'Setor')
+  if (teams.filter((tm) => tm.is_entry).length > 1) errors.push('Só um setor pode ser o de entrada.')
+
   if (errors.length > 0) return { ok: false, errors }
   return {
     ok: true,
@@ -312,6 +348,7 @@ export function parseTemplateContent(value: unknown): Result {
       // Left out when empty, so a template with no agenda stores
       // exactly what it did before agendas existed.
       ...(calendars.length > 0 ? { calendars } : {}),
+      ...(teams.length > 0 ? { teams } : {}),
     },
   }
 }
@@ -325,6 +362,8 @@ export interface TemplateCounts {
   automations: number
   /** Agendas (migration 067). Absent on counts taken before them. */
   calendars?: number
+  /** Setores (migration 078). */
+  teams?: number
 }
 
 /** Counts for a stored template — tolerant of any JSON shape. */
@@ -342,6 +381,7 @@ export function templateCounts(content: unknown): TemplateCounts {
     quickReplies: arr('quick_replies').length,
     automations: arr('automations').length,
     calendars: arr('calendars').length,
+    teams: arr('teams').length,
   }
 }
 
@@ -356,6 +396,7 @@ export function describeCounts(c: TemplateCounts): string {
     p(c.automations, 'automação', 'automações'),
     // Most templates have no agenda: say so only when there is one.
     ...(c.calendars ? [p(c.calendars, 'agenda', 'agendas')] : []),
+    ...(c.teams ? [p(c.teams, 'setor', 'setores')] : []),
   ].join(', ')
 }
 

@@ -17,6 +17,8 @@ import { QuickRepliesManager } from '@/components/settings/quick-replies-manager
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
 import { DealsSettings } from '@/components/settings/deals-settings';
 import { MembersTab } from '@/components/settings/members-tab';
+import { AtendimentoSettings } from '@/components/settings/atendimento-settings';
+import { RadarSettings } from '@/components/settings/radar-settings';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { AgencyAccessPanel } from '@/components/settings/agency-access-panel';
 import { ExtensionPanel } from '@/components/settings/extension-panel';
@@ -68,6 +70,8 @@ export default function SettingsPage() {
     fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
     members: <MembersTab />,
+    atendimento: <AtendimentoSettings />,
+    radar: <RadarSettings />,
     agencia: <AgencyAccessPanel />,
     assistente: <AssistenteSettings />,
     api: <ApiKeysSettings />,
