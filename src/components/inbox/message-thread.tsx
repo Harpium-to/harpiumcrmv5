@@ -1127,9 +1127,9 @@ export function MessageThread({
                     if (item.kind === "transfer") {
                       return (
                         <div key={`t-${item.event.id}`} className="flex justify-center px-6">
-                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/60 bg-card/80 px-3 py-1 text-[11px] text-muted-foreground">
-                            <ArrowRightLeft className="h-3 w-3 shrink-0" />
-                            <span className="truncate">
+                          <span className="inline-flex max-w-full items-start gap-1.5 rounded-2xl border border-border/60 bg-card/80 px-3 py-1 text-left text-[11px] leading-snug text-muted-foreground">
+                            <ArrowRightLeft className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span className="min-w-0 break-words">
                               {describeTransfer(item.event, nameOf, teamNameOf)}
                             </span>
                             <span className="shrink-0 opacity-70">

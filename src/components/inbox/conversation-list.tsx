@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   CONVERSATION_SELECT,
@@ -74,6 +74,11 @@ function readStored(key: string): string | null {
   }
 }
 
+// The saved choice is read after hydration (the server has no storage):
+// useSyncExternalStore renders the server snapshot (null) first, so the
+// first paint matches the server's, then the saved filter.
+const noSubscribe = () => () => {};
+
 function writeStored(key: string, value: string | null) {
   try {
     if (value === null) window.localStorage.removeItem(key);
@@ -98,9 +103,13 @@ export function ConversationList({
 
   const { members } = useMembers();
   const { teams } = useTeams();
+  const userId = user?.id ?? null;
   const myTeamIds = useMemo(
-    () => teams.filter((tm) => tm.active && user?.id && tm.members.includes(user.id)).map((tm) => tm.id),
-    [teams, user?.id],
+    () =>
+      userId
+        ? teams.filter((tm) => tm.active && tm.members.includes(userId)).map((tm) => tm.id)
+        : [],
+    [teams, userId],
   );
   const activeTeams = useMemo(() => teams.filter((tm) => tm.active), [teams]);
 
@@ -118,16 +127,29 @@ export function ConversationList({
 
   const [search, setSearch] = useState("");
   // The last filter and setor each person used, remembered on this device.
-  const [filter, setFilterState] = useState<InboxFilter>(
-    () => (readStored(FILTER_STORAGE_KEY) as InboxFilter | null) ?? "all",
+  const storedFilter = useSyncExternalStore(
+    noSubscribe,
+    () => readStored(FILTER_STORAGE_KEY),
+    () => null,
   );
+  const storedTeam = useSyncExternalStore(
+    noSubscribe,
+    () => readStored(TEAM_STORAGE_KEY),
+    () => null,
+  );
+  const [chosenFilter, setChosenFilter] = useState<InboxFilter | null>(null);
+  const [chosenTeam, setChosenTeam] = useState<string | null | undefined>(undefined);
+  const wanted = chosenFilter ?? (storedFilter as InboxFilter | null) ?? "all";
+  // A saved filter that no longer applies (out of every setor) shows everything.
+  const filter: InboxFilter =
+    FILTER_OPTIONS.some((o) => o.value === wanted) ? wanted : "all";
+  const teamFilter = chosenTeam === undefined ? storedTeam : chosenTeam;
   const setFilter = useCallback((next: InboxFilter) => {
-    setFilterState(next);
+    setChosenFilter(next);
     writeStored(FILTER_STORAGE_KEY, next);
   }, []);
-  const [teamFilter, setTeamFilterState] = useState<string | null>(() => readStored(TEAM_STORAGE_KEY));
   const setTeamFilter = useCallback((next: string | null) => {
-    setTeamFilterState(next);
+    setChosenTeam(next);
     writeStored(TEAM_STORAGE_KEY, next);
   }, []);
   const [loading, setLoading] = useState(true);
@@ -233,7 +255,7 @@ export function ConversationList({
         case "waiting":
           return !!c.needs_human_since;
         case "mine":
-          return !!user?.id && c.assigned_agent_id === user.id && c.status !== "closed";
+          return !!userId && c.assigned_agent_id === userId && c.status !== "closed";
         case "unassigned":
           return !c.assigned_agent_id && c.status !== "closed";
         case "myteams":
@@ -247,7 +269,7 @@ export function ConversationList({
           return c.status === f;
       }
     },
-    [user?.id, myTeamIds],
+    [userId, myTeamIds],
   );
 
   // How many each filter holds, for the counters next to them.

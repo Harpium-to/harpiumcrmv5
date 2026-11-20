@@ -112,6 +112,27 @@ export function buildDigest(bundle: ReportBundle): string {
       `Por segmento — ${breakdown(bundle.contactsBySegment)}.`,
   )
 
+  const at = bundle.atendimento
+  if (at && at.people.length > 0) {
+    lines.push(
+      `ATENDIMENTO POR PESSOA (no período; "abertas" é agora): ${at.people
+        .map((p) => `${p.name}: recebeu ${p.received}, passou ${p.passedOn}, abertas ${p.openNow}`)
+        .join('; ')}.`,
+    )
+  }
+  if (at && at.teams.length > 0) {
+    lines.push(
+      `SETORES: ${at.teams
+        .map(
+          (t) =>
+            `${t.name}: ${t.entries} entrada(s), espera mediana na fila ${
+              t.medianQueueMinutes === null ? 'n/d' : `${t.medianQueueMinutes} min`
+            }, ${t.overdueMoves} passada(s) por prazo estourado`,
+        )
+        .join('; ')}.`,
+    )
+  }
+
   const received = bundle.messagesByDay.reduce((sum, p) => sum + p.a, 0)
   const sent = bundle.messagesByDay.reduce((sum, p) => sum + p.b, 0)
   lines.push(

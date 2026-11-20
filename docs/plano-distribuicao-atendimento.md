@@ -5,7 +5,33 @@ Documento de planejamento. Escrito em 20/11/2026 a partir do `main` do CRM
 
 **Andamento:**
 
-- 20/11/2026: plano escrito, **aguardando aprovação** (decisões no §8).
+- 20/11/2026: plano escrito e **aprovado** pelo dono ("pode ir fazendo tudo"),
+  com todas as decisões do §8 conforme a recomendação.
+- 20/11/2026: **Fases 1 a 5 implementadas** no ramo
+  `feat/distribuicao-atendimento` (a 6 ficou de fora: decisão separada).
+  Migrations **076**, **077** e **078**. **Nada publicado ainda**: falta
+  aplicar as três migrations em produção, nesta ordem, e fazer o merge
+  (ver "Para pôr no ar", no fim).
+
+### O que mudou em relação ao plano
+
+- **"Retomar IA" tira a conversa do setor.** A função de transferência
+  ganhou `p_leave_team`, e um gatilho faz o mesmo quando a IA volta numa
+  conversa sem responsável. Assim, a conversa nunca aparece na fila de um
+  setor enquanto o robô responde.
+- **A distribuição na chegada só roda depois que a IA decide** (mensagem de
+  texto, fora de fluxo). Mensagem só de mídia não dispara a regra de
+  chegada; a próxima mensagem de texto dispara.
+- **A reabertura é marcada pelo banco** (`reopened_pending`), só quando quem
+  reabre é a mensagem do cliente. Assim a regra de retorno vale igual nos
+  quatro canais, e reabrir a conversa na caixa de entrada não conta como
+  retorno.
+- **O modelo de nicho com setores foi junto na 078**, não numa migration à
+  parte.
+- **Não feito:** "sem atendente" e "prazo estourado" por setor no painel da
+  agência e no Agency OS (Fase 5). Isso pede mudar as funções de uso da
+  plataforma (052/056) e o Agency OS. O prazo estourado já avisa o dono e os
+  administradores do CRM.
 
 ---
 
@@ -613,3 +639,34 @@ Juntar as fases em poucas publicações também economiza créditos do Netlify.
 | 4. Chegada, retorno e prazo | M | 078 |
 | 5. Números e modelos | M | talvez uma pequena, para o modelo de nicho |
 | 6. Visibilidade restrita | G | decisão separada |
+
+## 12. Para pôr no ar
+
+1. Aplicar no SQL editor do Supabase, **nesta ordem**, uma de cada vez:
+   `076_distribuicao_atendimento.sql`, `077_setores.sql`,
+   `078_chegada_retorno_prazo.sql`.
+2. Conferir: tabelas `conversation_transfers`, `teams`, `team_members` e
+   `inbox_settings` com RLS; as funções `transfer_conversation`,
+   `pick_next_attendant`, `claim_reopened` e `atendimento_tick`; e
+   `notifications_type_check` com `team_queue`, `conversation_overdue` e
+   `conversation_returned`.
+3. Fazer o merge e conferir que o Netlify publicou.
+4. Num CRM de teste, criar dois setores, colocar pessoas e transferir uma
+   conversa para cada um.
+
+Sem as migrations, o código novo não quebra o que já existe:
+- a transferência cai na gravação antiga;
+- os setores ficam vazios;
+- as regras de chegada e de retorno não rodam.
+
+## 13. Testes
+
+- **Banco** (`supabase/tests/distribuicao.test.ts`): 30 testes. Cobrem o
+  rodízio justo, "Recebe conversas", o histórico, a notificação em
+  português, o "Pegar" disputado, os setores (rodízio, só online, fila,
+  menos ocupado, limite, aviso de fila, RLS), a reabertura, o prazo, a
+  varredura das filas e as regras do CRM.
+- **Unidade**: destino da IA, leitura do `[[HANDOFF setor]]`, regras de
+  chegada e retorno, texto do histórico, relatório de atendimento e a IA
+  passando para o setor escolhido.
+- **Suíte inteira**: 2.654 testes passando, `tsc` e `eslint` limpos.

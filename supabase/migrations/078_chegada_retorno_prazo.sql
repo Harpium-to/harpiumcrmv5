@@ -27,6 +27,9 @@
 --      Returns what it moved, so the app fires the "Conversa atribuída"
 --      automations and webhook for those too.
 --   4. Notification types 'conversation_overdue' and 'conversation_returned'.
+--   5. Niche templates (053/067) may bring setores ("teams": name,
+--      description, mode, color, is_entry — never people), and the
+--      built-in clinic template suggests four.
 --
 -- Idempotent — safe to run more than once.
 -- ============================================================
@@ -307,3 +310,159 @@ BEGIN
      FROM (SELECT DISTINCT unnest(v_types) AS t) AS distinct_types)
   );
 END $$;
+
+
+-- ------------------------------------------------------------
+-- 5. Setores in niche templates
+--
+-- A template's content may carry "teams":
+--   { "name": "Financeiro", "description": "boletos, parcelamento",
+--     "mode": "rodizio", "color": "#10b981", "is_entry": false }
+-- Like everything a template brings, a setor whose name the CRM already
+-- has is left as it is. People are never part of a template: the
+-- agency puts them in after applying it.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.apply_crm_template_teams(
+  p_account_id UUID,
+  p_content    JSONB
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item     JSONB;
+  v_name     TEXT;
+  v_code     TEXT;
+  v_n        INT;
+  v_created  INT := 0;
+  v_skipped  INT := 0;
+  v_position INT;
+BEGIN
+  SELECT COALESCE(max(position) + 1, 0) INTO v_position FROM teams WHERE account_id = p_account_id;
+
+  FOR v_item IN
+    SELECT * FROM jsonb_array_elements(COALESCE(p_content -> 'teams', '[]'::jsonb))
+  LOOP
+    v_name := btrim(COALESCE(v_item ->> 'name', ''));
+    IF v_name = '' OR EXISTS (
+      SELECT 1 FROM teams WHERE account_id = p_account_id AND lower(name) = lower(v_name)
+    ) THEN
+      v_skipped := v_skipped + 1;
+      CONTINUE;
+    END IF;
+
+    -- The same code the app makes from a name (slugifyTeamCode), unique in the CRM.
+    v_code := left(btrim(regexp_replace(
+      lower(translate(v_name,
+        'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ',
+        'aaaaaeeeeiiiiooooouuuucnaaaaaeeeeiiiiooooouuuucn')),
+      '[^a-z0-9]+', '-', 'g'), '-'), 40);
+    IF v_code = '' THEN v_code := 'setor'; END IF;
+    v_n := 1;
+    WHILE EXISTS (SELECT 1 FROM teams WHERE account_id = p_account_id AND code = v_code) LOOP
+      v_n := v_n + 1;
+      v_code := left(regexp_replace(v_code, '-[0-9]+$', ''), 36) || '-' || v_n;
+    END LOOP;
+
+    INSERT INTO teams (account_id, name, code, description, color, mode, is_entry, position)
+    VALUES (
+      p_account_id,
+      left(v_name, 60),
+      v_code,
+      NULLIF(left(btrim(COALESCE(v_item ->> 'description', '')), 500), ''),
+      CASE WHEN COALESCE(v_item ->> 'color', '') ~ '^#[0-9a-fA-F]{6}$' THEN v_item ->> 'color' ELSE '#6366f1' END,
+      CASE WHEN v_item ->> 'mode' IN ('rodizio', 'menos_ocupado', 'fila') THEN v_item ->> 'mode' ELSE 'rodizio' END,
+      -- One entry setor per CRM: only when the CRM has none yet.
+      COALESCE((v_item ->> 'is_entry')::BOOLEAN, false)
+        AND NOT EXISTS (SELECT 1 FROM teams WHERE account_id = p_account_id AND is_entry),
+      v_position
+    );
+    v_position := v_position + 1;
+    v_created := v_created + 1;
+  END LOOP;
+
+  RETURN jsonb_build_object('teams', v_created, 'skipped', v_skipped);
+END;
+$$;
+
+ALTER FUNCTION public.apply_crm_template_teams(UUID, JSONB) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.apply_crm_template_teams(UUID, JSONB) FROM PUBLIC, anon, authenticated;
+
+-- agencia_apply_template (053, 067), unchanged except that it also
+-- creates the template's setores and counts them in the summary.
+CREATE OR REPLACE FUNCTION public.agencia_apply_template(
+  p_account_id UUID,
+  p_template_id UUID
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_role TEXT := require_agencia_operator(p_account_id);
+  v_status TEXT;
+  v_tpl crm_templates%ROWTYPE;
+  v_summary JSONB;
+  v_calendars JSONB;
+  v_teams JSONB;
+BEGIN
+  SELECT status INTO v_status FROM accounts WHERE id = p_account_id;
+  IF v_status IS NULL OR v_status = 'archived' THEN
+    RAISE EXCEPTION 'CRM não encontrado' USING ERRCODE = '22023';
+  END IF;
+
+  -- Writing into a client's CRM is operating it: only while the agency
+  -- is still setting it up, or with the owner's full consent.
+  IF v_status <> 'onboarding' AND agency_access_level(p_account_id) <> 'full' THEN
+    RAISE EXCEPTION 'Aplicar um modelo altera o CRM do cliente: só em implantação ou com acesso Total liberado pelo dono'
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_tpl FROM crm_templates WHERE id = p_template_id;
+  IF NOT FOUND OR NOT v_tpl.active THEN
+    RAISE EXCEPTION 'Modelo não encontrado' USING ERRCODE = '22023';
+  END IF;
+
+  v_summary := apply_crm_template_content(p_account_id, v_tpl.content);
+  v_calendars := apply_crm_template_calendars(p_account_id, v_tpl.content);
+  v_teams := apply_crm_template_teams(p_account_id, v_tpl.content);
+  v_summary := v_summary || jsonb_build_object(
+    'calendars', (v_calendars ->> 'calendars')::INT,
+    'teams', (v_teams ->> 'teams')::INT,
+    'skipped', (v_summary ->> 'skipped')::INT
+               + (v_calendars ->> 'skipped')::INT
+               + (v_teams ->> 'skipped')::INT
+  );
+
+  INSERT INTO crm_template_applications (account_id, template_id, template_name, applied_by, summary)
+  VALUES (p_account_id, v_tpl.id, v_tpl.name, auth.uid(), v_summary);
+
+  INSERT INTO agencia_auditoria (actor_user_id, account_id, action)
+  VALUES (auth.uid(), p_account_id, 'apply_template');
+
+  RETURN v_summary;
+END;
+$$;
+
+ALTER FUNCTION public.agencia_apply_template(UUID, UUID) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.agencia_apply_template(UUID, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.agencia_apply_template(UUID, UUID) TO authenticated;
+
+-- The built-in clinic template suggests setores — unless someone has
+-- already given it setores of their own.
+UPDATE crm_templates
+SET content = content || $json${
+  "teams": [
+    { "name": "Recepção", "color": "#6366f1", "mode": "rodizio", "is_entry": true,
+      "description": "dúvidas gerais, horário, endereço, convênios aceitos, primeira consulta" },
+    { "name": "Agendamento", "color": "#0ea5e9", "mode": "rodizio",
+      "description": "marcar, remarcar ou cancelar consulta, encaixe, confirmação de horário" },
+    { "name": "Financeiro", "color": "#10b981", "mode": "rodizio",
+      "description": "boletos, pagamentos, parcelamento, nota fiscal, reembolso, valores em aberto" },
+    { "name": "Orçamentos", "color": "#f59e0b", "mode": "menos_ocupado",
+      "description": "preço de tratamentos e procedimentos, orçamento, condições de pagamento antes de fechar" }
+  ]
+}$json$::jsonb
+WHERE slug = 'clinica-medica'
+  AND NOT (content ? 'teams');
