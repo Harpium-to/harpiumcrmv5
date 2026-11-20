@@ -31,6 +31,10 @@ publicado).
   24 h, com a última mensagem sendo do cliente. Negócio "parado" é o que
   tem chance de 40% ou mais e está parado há mais que o ritmo normal do
   funil.
+- **O botão de cada alerta abre o período do alerta.** A lista de contatos
+  ainda não filtra por origem e data, então "ver os leads" abre os
+  Relatórios daquele dia ou semana (com os leads por origem e os prazos por
+  setor), e os alertas da agenda abrem a Agenda no dia.
 - **O resumo tem conferidor.** Se a IA escrever um número que não está no
   pacote de dados, o texto dela é descartado e sai o texto montado pelo
   sistema.
@@ -184,7 +188,12 @@ publicado).
 - **Atualização:** o agendador atualiza o dia corrente a cada tick (leve) e
   fecha o dia anterior de madrugada.
 - **Histórico inicial:** na primeira vez, calcula as últimas 12 semanas a
-  partir das tabelas que já existem.
+  partir das tabelas que já existem, em pedaços de 2 semanas por chamada.
+  Cada pedaço guarda o progresso, então um CRM grande nunca estoura o tempo
+  do agendador: o tick seguinte continua de onde parou.
+- **Só analisa com o histórico completo:** um dia que falta no livro-caixa
+  conta como zero. Por isso alertas, chances e resumo esperam o histórico do
+  CRM chegar até ontem; antes disso dariam alarme falso.
 
 ### 5.2 Anomalias (sem IA)
 
@@ -363,8 +372,10 @@ publicado).
 2. Fazer o merge deste PR no ramo do atendimento e depois o merge do PR #50
    na `main`. Assim é uma publicação só no Netlify.
 3. O histórico de 12 semanas de cada CRM se preenche sozinho nos primeiros
-   ticks do agendador, alguns CRMs por tick. A chance de fechar sai na
-   primeira madrugada; o primeiro resumo, na segunda seguinte às 8h.
+   ticks do agendador, 2 semanas por chamada e um CRM depois do outro. Assim
+   que o histórico de um CRM fica completo, saem a chance de fechar e a
+   análise de ontem (depois das 3h). O primeiro resumo sai na segunda
+   seguinte às 8h.
 
 ## 12. Testes
 
@@ -379,5 +390,7 @@ publicado).
 - **Chance e previsão**: 6 testes, incluindo uma simulação retroativa de 200
   meses que confere se a receita real cai dentro da faixa.
 - **Resumo**: 6 testes, incluindo o conferidor de número inventado.
-- **Agendador e datas**: 6 testes.
+- **Agendador e datas**: 11 testes. Cobrem o histórico em pedaços, o prazo
+  cortando no meio e o tick seguinte continuando, a espera pelo histórico
+  completo, uma etapa diária que falha e um banco sem a 080.
 - **Painel da agência**: 2 testes.

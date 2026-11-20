@@ -1,6 +1,7 @@
 import {
   METRICS,
   RATES,
+  alertHref,
   dimensionLabel,
   formatValue,
   type GoodDirection,
@@ -206,7 +207,7 @@ function finding(
     score: Math.abs(z),
     title,
     detail,
-    href: def.href,
+    href: alertHref(def.href, start, end),
   }
 }
 
@@ -335,7 +336,7 @@ export function detectRate(
     score: Math.abs(z),
     title: `${rate.label} ${verb(plural, direction)}: ${pct(p)} na semana (normal: ${pct(p0)})`,
     detail: `${num} de ${n} de ${ddmm(start)} a ${ddmm(end)}; nas semanas anteriores, ${pct(p0)}.`,
-    href: rate.href,
+    href: alertHref(rate.href, start, end),
   }
 }
 

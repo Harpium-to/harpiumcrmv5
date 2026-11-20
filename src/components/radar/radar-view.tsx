@@ -146,7 +146,12 @@ export function RadarPanelView({
                   <div className="mt-2 flex flex-wrap justify-end gap-1">
                     {a.href && (
                       <Link href={a.href} className={buttonVariants({ size: "sm", variant: "ghost" })}>
-                        Ver <ArrowRight className="size-3.5" />
+                        {a.href.startsWith("/agenda")
+                          ? "Ver na agenda"
+                          : a.href.startsWith("/relatorios")
+                            ? "Ver nos relatórios"
+                            : "Ver"}{" "}
+                        <ArrowRight className="size-3.5" />
                       </Link>
                     )}
                     {a.status === "aberto" && (

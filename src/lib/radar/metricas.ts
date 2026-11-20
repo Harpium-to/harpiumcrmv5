@@ -26,8 +26,8 @@ export interface MetricDef {
   zeroWhenMissing: boolean
   /** Has a breakdown by `dimension` (lead origin) worth watching too. */
   byDimension?: boolean
-  /** Where the alert's button leads. */
-  href: string
+  /** The screen the alert's button opens, on the alert's period (`alertHref`). */
+  href: '/relatorios' | '/agenda'
 }
 
 export const METRICS: readonly MetricDef[] = [
@@ -41,7 +41,7 @@ export const METRICS: readonly MetricDef[] = [
     daily: true,
     zeroWhenMissing: true,
     byDimension: true,
-    href: '/contacts',
+    href: '/relatorios',
   },
   {
     key: 'conversas_novas',
@@ -52,7 +52,7 @@ export const METRICS: readonly MetricDef[] = [
     minVolume: 5,
     daily: true,
     zeroWhenMissing: true,
-    href: '/inbox',
+    href: '/relatorios',
   },
   {
     key: 'mensagens_recebidas',
@@ -63,7 +63,7 @@ export const METRICS: readonly MetricDef[] = [
     minVolume: 30,
     daily: true,
     zeroWhenMissing: true,
-    href: '/inbox',
+    href: '/relatorios',
   },
   {
     key: 'primeira_resposta_min',
@@ -86,7 +86,7 @@ export const METRICS: readonly MetricDef[] = [
     minVolume: 4,
     daily: false,
     zeroWhenMissing: true,
-    href: '/pipelines',
+    href: '/relatorios',
   },
   {
     key: 'negocios_ganhos',
@@ -97,7 +97,7 @@ export const METRICS: readonly MetricDef[] = [
     minVolume: 4,
     daily: false,
     zeroWhenMissing: true,
-    href: '/pipelines',
+    href: '/relatorios',
   },
   {
     key: 'negocios_ganhos_valor',
@@ -119,7 +119,7 @@ export const METRICS: readonly MetricDef[] = [
     minVolume: 4,
     daily: false,
     zeroWhenMissing: true,
-    href: '/pipelines',
+    href: '/relatorios',
   },
   {
     key: 'consultas_marcadas',
@@ -141,7 +141,7 @@ export const METRICS: readonly MetricDef[] = [
     minVolume: 3,
     daily: true,
     zeroWhenMissing: true,
-    href: '/inbox',
+    href: '/relatorios',
   },
 ]
 
@@ -159,7 +159,7 @@ export interface RateDef {
   good: GoodDirection
   /** Fewer events than this in the week: no verdict. */
   minEvents: number
-  href: string
+  href: '/relatorios' | '/agenda'
 }
 
 export const RATES: readonly RateDef[] = [
@@ -181,9 +181,19 @@ export const RATES: readonly RateDef[] = [
     denominator: ['negocios_ganhos', 'negocios_perdidos'],
     good: 'up',
     minEvents: 8,
-    href: '/pipelines',
+    href: '/relatorios',
   },
 ]
+
+/**
+ * The link of an alert's button: the period the alert talks about, on
+ * the screen that shows it — the agenda on that day, or the reports for
+ * that day or week (they split leads by origin, and prazos by setor).
+ */
+export function alertHref(screen: '/relatorios' | '/agenda', periodStart: string, periodEnd: string): string {
+  if (screen === '/agenda') return `/agenda?data=${periodStart}`
+  return `/relatorios?period=custom&from=${periodStart}&to=${periodEnd}`
+}
 
 export const METRIC_BY_KEY: ReadonlyMap<string, MetricDef> = new Map(METRICS.map((m) => [m.key, m]))
 export const RATE_BY_KEY: ReadonlyMap<string, RateDef> = new Map(RATES.map((r) => [r.key, r]))

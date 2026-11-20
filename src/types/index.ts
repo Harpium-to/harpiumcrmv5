@@ -377,7 +377,9 @@ export type NotificationType =
   /** A conversation went past its setor's reply deadline (078). */
   | 'conversation_overdue'
   /** A customer wrote again to a closed conversation (078). */
-  | 'conversation_returned';
+  | 'conversation_returned'
+  /** Radar: new alerts, or the week's digest (080). */
+  | 'radar';
 
 export interface Notification {
   id: string;

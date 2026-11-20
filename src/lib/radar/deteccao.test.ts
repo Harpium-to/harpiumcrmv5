@@ -62,6 +62,8 @@ describe('detectDay', () => {
       title: 'Leads novos caíram 56%',
     })
     expect(f.detail).toBe('8 na terça, 17/11; o normal das terças é 18.')
+    // The button opens that day in the reports, which split leads by origin.
+    expect(f.href).toBe(`/relatorios?period=custom&from=${YESTERDAY}&to=${YESTERDAY}`)
   })
 
   it('ordinary noise says nothing', () => {
@@ -119,6 +121,8 @@ describe('detectWeek', () => {
     const rows = series('leads', SUNDAY, (_d, i) => (i < 7 ? 6 : 10))
     const found = detectWeek(new Ledger(rows), SUNDAY, opts)
     expect(found.map((f) => f.title)).toContain('Leads novos caíram 40% na semana')
+    expect(found[0].href).toBe(`/relatorios?period=custom&from=${found[0].periodStart}&to=${SUNDAY}`)
+    expect(found[0].periodStart).toBe(addDays(SUNDAY, -6))
     const day = detectDay(new Ledger(rows), SUNDAY, opts)
     expect(day).toEqual([])
   })
@@ -132,6 +136,7 @@ describe('detectWeek', () => {
     const rate = found.find((f) => f.metric === 'taxa_faltas')
     expect(rate).toMatchObject({ tone: 'ruim', direction: 'alta' })
     expect(rate?.title).toBe('Faltas na agenda subiram: 30% na semana (normal: 7%)')
+    expect(rate?.href).toBe(`/agenda?data=${addDays(SUNDAY, -6)}`)
   })
 })
 
