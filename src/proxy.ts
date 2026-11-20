@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { LOGIN_NEXT_PREFIXES, safeNextPath } from '@/lib/http/next-path'
 import { isValidSlug, quizHostUrl } from '@/lib/quiz/slug'
 
 /**
@@ -103,17 +104,30 @@ export async function proxy(request: NextRequest) {
       url.pathname = `/join/${encodeURIComponent(inviteToken)}`
       url.search = ''
     } else {
-      url.pathname = '/dashboard'
-      url.search = ''
+      // Signed in already: go where the login was meant to lead
+      // (`next`, e.g. an "Abrir no CRM" link), else the dashboard.
+      const next = safeNextPath(request.nextUrl.searchParams.get('next'), {
+        prefixes: LOGIN_NEXT_PREFIXES,
+        fallback: '/dashboard',
+      })
+      const target = new URL(next, request.nextUrl.origin)
+      url.pathname = target.pathname
+      url.search = target.search
     }
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/leads', '/canais', '/pipelines', '/agenda', '/broadcasts', '/automations', '/flows', '/agents', '/relatorios', '/ferramentas', '/notifications', '/settings', '/agencia', '/aguardando', '/ajuda']
+  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/leads', '/canais', '/pipelines', '/agenda', '/broadcasts', '/automations', '/flows', '/agents', '/relatorios', '/ferramentas', '/notifications', '/settings', '/agencia', '/aguardando', '/ajuda', '/abrir']
   if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    // Come back here after signing in (only known screens; see next-path.ts).
+    const back = safeNextPath(`${request.nextUrl.pathname}${request.nextUrl.search}`, {
+      prefixes: LOGIN_NEXT_PREFIXES,
+      fallback: '',
+    })
+    url.search = back && back !== '/dashboard' ? `?next=${encodeURIComponent(back)}` : ''
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
