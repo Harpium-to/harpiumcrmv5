@@ -74,6 +74,8 @@ export type TransferReason =
   | 'not_found'
   | 'already_assigned'
   | 'nobody_available'
+  /** In a setor's queue: a "fila" setor, or nobody of it available (077). */
+  | 'queued'
   | 'not_migrated'
 
 export interface TransferResult {

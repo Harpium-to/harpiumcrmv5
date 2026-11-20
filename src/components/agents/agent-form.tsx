@@ -33,6 +33,9 @@ import {
 import type { Agent } from "@/lib/agents/types";
 import { AGENT_ICONS, FALLBACK_AGENT_ICON, TOOL_ICONS } from "./agent-icon";
 import { AgentFace } from "./agent-face";
+import { HandoffTargetField, type HandoffTargetValue } from "@/components/atendimento/handoff-target-field";
+import { useMembers, useTeams } from "@/hooks/use-atendimento";
+import { isHandoffMode } from "@/lib/atendimento/destino";
 
 // The `avatars` bucket caps size and mime type itself (migration 008),
 // so these two are only here to turn a rejection into a sentence the
@@ -140,6 +143,38 @@ export function AgentForm({
   // then has nothing to clean up in storage.
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // "Quando passar para uma pessoa" (077). Read on its own — not in the
+  // agents' column list, which the AI runtime also uses — and only sent
+  // when changed, so a database without 077 still saves the agent.
+  const { members } = useMembers();
+  const { teams } = useTeams();
+  const [handoff, setHandoff] = useState<HandoffTargetValue>({ mode: null, teamId: null, userId: null });
+  const [handoffDirty, setHandoffDirty] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setHandoffDirty(false);
+    setHandoff({ mode: null, teamId: null, userId: agent?.handoffAgentId ?? null });
+    if (!agent) return;
+    let cancelled = false;
+    supabase
+      .from("agents")
+      .select("handoff_mode, handoff_team_id")
+      .eq("id", agent.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return;
+        const row = data as { handoff_mode: string | null; handoff_team_id: string | null };
+        setHandoff({
+          mode: isHandoffMode(row.handoff_mode) ? row.handoff_mode : null,
+          teamId: row.handoff_team_id ?? null,
+          userId: agent.handoffAgentId ?? null,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, agent?.id]);
 
   // Reload whenever the dialog opens, so reopening after a cancel
   // never shows the abandoned edits of a previous session.
@@ -376,6 +411,13 @@ export function AgentForm({
         timezone: form.timezone,
         is_fallback: form.isFallback,
         is_active: form.isActive,
+        ...(handoffDirty
+          ? {
+              handoff_mode: handoff.mode,
+              handoff_team_id: handoff.mode === "setor" ? handoff.teamId : null,
+              handoff_agent_id: handoff.mode === "pessoa" ? handoff.userId : null,
+            }
+          : {}),
       };
       const res = await fetch(
         agent ? `/api/agents/${agent.id}` : "/api/agents",
@@ -665,6 +707,21 @@ export function AgentForm({
                   <p className="text-xs text-muted-foreground">
                     {t("formKeywordsHint")}
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Quando passar para uma pessoa</Label>
+                  <HandoffTargetField
+                    idPrefix="agent-handoff"
+                    allowInherit
+                    value={handoff}
+                    onChange={(next) => {
+                      setHandoff(next);
+                      setHandoffDirty(true);
+                    }}
+                    members={members}
+                    teams={teams}
+                  />
                 </div>
 
                 <div className="space-y-2">

@@ -11,6 +11,8 @@ interface Turn {
   content: string;
   /** assistant-only: the agent signalled a human handoff on this turn. */
   handoff?: boolean;
+  /** Where the handoff would go: "setor Financeiro", a person, "fila geral". */
+  handoffTo?: string | null;
 }
 
 export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
@@ -61,6 +63,7 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
               ? data.reply
               : '',
           handoff: Boolean(data.handoff),
+          handoffTo: typeof data.handoff_to === 'string' ? data.handoff_to : null,
         },
       ]);
     } catch {
@@ -152,7 +155,7 @@ export function AiPlayground({ onGoToSetup }: { onGoToSetup?: () => void }) {
                   )}
                 >
                   <UserCircle2 className="h-3.5 w-3.5" />
-                  Aqui passaria para uma pessoa
+                  {t.handoffTo ? `Aqui passaria para: ${t.handoffTo}` : 'Aqui passaria para uma pessoa'}
                 </p>
               )}
             </div>

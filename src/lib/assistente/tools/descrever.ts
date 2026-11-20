@@ -12,6 +12,8 @@ export interface NameMaps {
   stages: Map<string, string>
   pipelines: Map<string, string>
   members?: Map<string, string>
+  /** Setores (077), by id. */
+  teams?: Map<string, string>
 }
 
 type Row = Record<string, unknown>
@@ -90,7 +92,9 @@ export function describeStep(step: StepLike, names: NameMaps): string {
     case 'assign_conversation':
       return c.mode === 'specific'
         ? `Atribuir a conversa a ${names.members?.get(String(c.agent_id)) ?? 'uma pessoa específica'}`
-        : 'Atribuir a conversa em rodízio entre a equipe'
+        : c.mode === 'team'
+          ? `Passar a conversa para o setor ${quote(names.teams?.get(String(c.team_id)) ?? 'escolhido', 40)}`
+          : 'Atribuir a conversa em rodízio entre a equipe'
     case 'update_contact_field':
       return `Mudar o campo ${quote(c.field, 40)} para ${quote(c.value, 40)}`
     case 'create_deal': {

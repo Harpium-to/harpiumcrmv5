@@ -250,3 +250,36 @@ export async function loadHandoffContext(
     agent,
   }
 }
+
+/**
+ * The person and the setor a handoff points at must be this CRM's: a
+ * teammate who answers chats (never a viewer) and an existing setor.
+ * Null when fine; a message for the person otherwise.
+ */
+export async function validateHandoffRefs(
+  db: SupabaseClient,
+  accountId: string,
+  refs: { teamId?: string | null; userId?: string | null },
+): Promise<string | null> {
+  if (refs.userId) {
+    const { data } = await db
+      .from('account_members')
+      .select('role')
+      .eq('account_id', accountId)
+      .eq('user_id', refs.userId)
+      .maybeSingle()
+    if (!data || (data as { role: string }).role === 'viewer') {
+      return 'Escolha uma pessoa da equipe que atende conversas'
+    }
+  }
+  if (refs.teamId) {
+    const { data } = await db
+      .from('teams')
+      .select('id')
+      .eq('account_id', accountId)
+      .eq('id', refs.teamId)
+      .maybeSingle()
+    if (!data) return 'Esse setor não existe neste CRM'
+  }
+  return null
+}

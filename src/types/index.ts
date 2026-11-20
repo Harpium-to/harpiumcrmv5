@@ -75,6 +75,8 @@ export interface AccountMember {
   avatar_url: string | null;
   role: AccountRole;
   joined_at: string;
+  /** "Recebe conversas" (076): off takes the person out of every rotation. */
+  receives_conversations?: boolean;
 }
 
 /**
@@ -348,6 +350,10 @@ export interface Conversation {
    * triggers; null/absent means nobody is waiting.
    */
   needs_human_since?: string | null;
+  /** The setor it is in (077): its queue when nobody owns it. */
+  team_id?: string | null;
+  /** When the current owner got it (076). */
+  assigned_at?: string | null;
 }
 
 // ============================================================
@@ -365,7 +371,13 @@ export type NotificationType =
   /** Google Agenda: an appointment changed there, or the connection dropped (071). */
   | 'agenda_google'
   /** Harpi: a routine's report, or changes waiting for an OK (074). */
-  | 'assistente';
+  | 'assistente'
+  /** A conversation waits in a setor's queue with nobody to take it (077). */
+  | 'team_queue'
+  /** A conversation went past its setor's reply deadline (078). */
+  | 'conversation_overdue'
+  /** A customer wrote again to a closed conversation (078). */
+  | 'conversation_returned';
 
 export interface Notification {
   id: string;

@@ -174,6 +174,10 @@ async function buildDraft(
   const members = new Set<string>()
   const { data: team } = await ctx.db.from('account_members').select('user_id').eq('account_id', ctx.accountId)
   for (const m of (team ?? []) as Row[]) members.add(String(m.user_id))
+  // Setores (077); none before it.
+  const setores = new Set<string>()
+  const { data: teamRows } = await ctx.db.from('teams').select('id').eq('account_id', ctx.accountId)
+  for (const t of (teamRows ?? []) as Row[]) setores.add(String(t.id))
 
   walkSteps(steps, (s) => {
     const c = s.step_config
@@ -207,9 +211,12 @@ async function buildDraft(
       }
     }
     if (s.step_type === 'assign_conversation') {
-      c.mode = c.mode === 'specific' ? 'specific' : 'round_robin'
+      c.mode = c.mode === 'specific' ? 'specific' : c.mode === 'team' ? 'team' : 'round_robin'
       if (c.mode === 'specific' && !members.has(String(c.agent_id))) {
         problems.push('a pessoa do passo "atribuir conversa" não é da equipe')
+      }
+      if (c.mode === 'team' && !setores.has(String(c.team_id))) {
+        problems.push('o setor do passo "atribuir conversa" não existe (veja listar_setores)')
       }
     }
     if (s.step_type === 'agent_handoff' && !c.role) c.role = 'sdr'

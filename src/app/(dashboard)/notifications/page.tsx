@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { Bell, Bot, CalendarCheck, CalendarDays, CheckCheck, ListTodo, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { AlarmClock, Bell, Bot, CalendarCheck, CalendarDays, CheckCheck, ListTodo, Loader2, ShieldCheck, Undo2, UserPlus, Users } from "lucide-react";
 import { openHarpi } from "@/components/assistente/harpi";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -21,6 +21,9 @@ const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
   agenda_booking: CalendarDays,
   agenda_google: CalendarCheck,
   assistente: Bot,
+  team_queue: Users,
+  conversation_overdue: AlarmClock,
+  conversation_returned: Undo2,
 };
 
 export default function NotificationsPage() {

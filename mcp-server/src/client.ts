@@ -191,6 +191,13 @@ export class WacrmClient {
     return this.list(`/conversations/${encodeURIComponent(id)}/messages`, query);
   }
 
+  transferConversation(
+    id: string,
+    body: { to_user_id?: string; to_team_id?: string; to?: 'queue'; note?: string },
+  ): Promise<{ data: unknown }> {
+    return this.request('POST', `/conversations/${encodeURIComponent(id)}/transfer`, { body });
+  }
+
   // --- Broadcasts ---------------------------------------------------
 
   sendBroadcast(body: unknown): Promise<{ data: unknown }> {

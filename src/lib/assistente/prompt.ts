@@ -69,7 +69,7 @@ Passos = lista de { "tipo": ..., "config": {...} }; condição tem também "sim"
 - send_message — config: { "text": "Olá {{ contato.primeiro_nome }}, …" }
 - send_template — só API oficial: { "template_name": "nome_do_modelo", "language": "pt_BR" }
 - add_tag / remove_tag — { "etiqueta": "Nome" } (add_tag cria a etiqueta se não existir)
-- assign_conversation — { "mode": "round_robin" } ou { "mode": "specific", "agent_id": "<id da pessoa em listar_equipe>" }
+- assign_conversation — { "mode": "round_robin" } (rodízio entre quem recebe conversas), { "mode": "specific", "agent_id": "<id da pessoa em listar_equipe>" } ou { "mode": "team", "team_id": "<id do setor em listar_setores>" }
 - update_contact_field — { "field": "company", "value": "…" }. Só aceita name, email, company ou um campo personalizado como "custom:<id do campo>" (ids no mapa). Temperatura e etiquetas não: para marcar o lead, use add_tag.
 - create_deal — { "pipeline_id": "<id>", "stage_id": "<id da etapa>", "title": "Negócio de {{ contato.nome }}", "value": 0 }
 - wait — { "amount": 1, "unit": "minutes" | "hours" | "days" }

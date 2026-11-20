@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
@@ -536,24 +536,30 @@ export default function InboxPage() {
   );
 
   const handleAssignChange = useCallback(
-    (conversationId: string, assignedAgentId: string | null) => {
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === conversationId
-            ? { ...c, assigned_agent_id: assignedAgentId ?? undefined }
-            : c
-        )
-      );
+    (conversationId: string, assignedAgentId: string | null, teamId?: string | null) => {
+      const patch = (c: Conversation): Conversation => ({
+        ...c,
+        assigned_agent_id: assignedAgentId ?? undefined,
+        ...(teamId !== undefined ? { team_id: teamId } : {}),
+      });
+      setConversations((prev) => prev.map((c) => (c.id === conversationId ? patch(c) : c)));
       if (activeConversation?.id === conversationId) {
-        setActiveConversation((prev) =>
-          prev
-            ? { ...prev, assigned_agent_id: assignedAgentId ?? undefined }
-            : prev
-        );
+        setActiveConversation((prev) => (prev ? patch(prev) : prev));
       }
     },
     [activeConversation]
   );
+
+  // Open conversations each person owns — the "Transferir" dialog shows
+  // it next to every name, so nobody piles work on the busiest person.
+  const openCountByUser = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of conversations) {
+      if (c.status === "closed" || !c.assigned_agent_id) continue;
+      counts[c.assigned_agent_id] = (counts[c.assigned_agent_id] ?? 0) + 1;
+    }
+    return counts;
+  }, [conversations]);
 
   // On mobile (<lg) we show a SINGLE pane — either the list or the
   // thread — rather than cramming both side-by-side. Selecting a
@@ -619,6 +625,7 @@ export default function InboxPage() {
             onUpdateMessage={handleUpdateMessage}
             onStatusChange={handleStatusChange}
             onAssignChange={handleAssignChange}
+            openCountByUser={openCountByUser}
             onBack={handleCloseConversation}
             resyncToken={resyncToken}
             onRefresh={handleManualRefresh}

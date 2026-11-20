@@ -160,7 +160,12 @@
       "waitingShowAll": "Show all",
       "waitingNobody": "Nobody took it",
       "waitingMine": "Yours, no reply yet",
-      "waitingAssigned": "Assigned, no reply yet"
+      "waitingAssigned": "Assigned, no reply yet",
+      "filterMine": "Mine",
+      "filterUnassigned": "Unassigned",
+      "filterMyTeams": "My teams' queue",
+      "team": "Team",
+      "allTeams": "All teams"
     },
     "messageThread": {
       "backToConversations": "Back to conversations",
@@ -1021,7 +1026,8 @@
         "modeLabel": "Mode",
         "modes": {
           "round_robin": "Round-robin",
-          "specific": "Specific agent"
+          "specific": "Specific agent",
+          "team": "Team (its rule picks the person)"
         },
         "agentLabel": "Agent",
         "fieldLabel": "Field",
@@ -1070,7 +1076,8 @@
         "agentHandoffHelp": "The agent receives the contact with the lead answers and opens the conversation on WhatsApp, within its working hours. Needs an active agent with this role.",
         "leadOptOutHelp": "Contacts who opted out of automatic messages are skipped.",
         "insertVariable": "Insert contact data:",
-        "insertVariableHelp": "Works with any trigger. When the contact has no value, the variable is removed without leaving a gap (\"Hi, how are you?\" instead of \"Hi , how are you?\")."
+        "insertVariableHelp": "Works with any trigger. When the contact has no value, the variable is removed without leaving a gap (\"Hi, how are you?\" instead of \"Hi , how are you?\").",
+        "teamLabel": "Team"
       }
     }
   },

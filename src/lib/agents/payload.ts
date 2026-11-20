@@ -26,6 +26,8 @@ const MAX_KEYWORD_LENGTH = 60
 const MAX_PROMPT_LENGTH = 8000
 
 /** Column-shaped values, ready to hand to PostgREST. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export interface AgentValues {
   name?: string
   role?: string
@@ -48,6 +50,10 @@ export interface AgentValues {
   is_fallback?: boolean
   is_active?: boolean
   max_replies_per_conversation?: number
+  /** "Quando passar para uma pessoa" (077); null = the account's. */
+  handoff_mode?: 'ia_escolhe' | 'setor' | 'pessoa' | 'fila' | null
+  handoff_team_id?: string | null
+  handoff_agent_id?: string | null
 }
 
 /**
@@ -266,6 +272,27 @@ export function parseAgentPayload(
     if (!Number.isFinite(max)) return { error: 'Limite de respostas inválido' }
     values.max_replies_per_conversation = Math.min(20, Math.max(1, Math.floor(max)))
   }
+
+  // Where this agent sends a conversation it hands off. Shape only here;
+  // the routes check the person and the setor belong to the CRM.
+  if ('handoff_mode' in b) {
+    const mode = b.handoff_mode
+    if (mode !== null && mode !== 'ia_escolhe' && mode !== 'setor' && mode !== 'pessoa' && mode !== 'fila') {
+      return { error: 'Escolha para onde o agente passa as conversas' }
+    }
+    values.handoff_mode = mode as AgentValues['handoff_mode']
+  }
+  for (const key of ['handoff_team_id', 'handoff_agent_id'] as const) {
+    if (key in b) {
+      const raw = b[key]
+      if (raw !== null && (typeof raw !== 'string' || !UUID_RE.test(raw))) {
+        return { error: key === 'handoff_team_id' ? 'Setor inválido' : 'Pessoa inválida' }
+      }
+      values[key] = raw as string | null
+    }
+  }
+  if (values.handoff_mode === 'setor' && !values.handoff_team_id) return { error: 'Escolha o setor' }
+  if (values.handoff_mode === 'pessoa' && !values.handoff_agent_id) return { error: 'Escolha a pessoa' }
 
   return { values }
 }

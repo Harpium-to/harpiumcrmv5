@@ -70,15 +70,24 @@ export async function GET() {
   try {
     const { supabase, accountId } = await getCurrentAccount()
 
-    const { data, error } = await supabase
+    // `api_key` is selected only to derive `has_key` — it is stripped
+    // out below and never returned to the client. handoff_mode /
+    // handoff_team_id come from 077; a database without them gets the
+    // old columns.
+    const BASE =
+      'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key'
+    let { data, error } = await supabase
       .from('ai_configs')
-      // `api_key` is selected only to derive `has_key` — it is stripped
-      // out below and never returned to the client.
-      .select(
-        'provider, model, system_prompt, is_active, auto_reply_enabled, auto_reply_max_per_conversation, handoff_agent_id, api_key, embeddings_api_key',
-      )
+      .select(`${BASE}, handoff_mode, handoff_team_id`)
       .eq('account_id', accountId)
       .maybeSingle()
+    if (error && (error.code === '42703' || error.code === 'PGRST204')) {
+      ;({ data, error } = await supabase
+        .from('ai_configs')
+        .select(BASE)
+        .eq('account_id', accountId)
+        .maybeSingle())
+    }
 
     if (error) {
       console.error('[ai/config GET] fetch error:', error)
@@ -150,15 +159,43 @@ export async function POST(request: Request) {
     const handoffProvided = 'handoff_agent_id' in body
     let handoffAgentId: string | null = null
     if (rawHandoff) {
+      // A teammate of this CRM who answers chats (account_members, 049):
+      // never a viewer, never agency staff who are only "inside" it.
       const { data: member } = await supabase
-        .from('profiles')
-        .select('user_id')
+        .from('account_members')
+        .select('user_id, role')
         .eq('account_id', accountId)
         .eq('user_id', rawHandoff)
         .maybeSingle()
-      if (!member) return bad('handoff_agent_id must be a member of this account')
+      if (!member || (member as { role: string }).role === 'viewer') {
+        return bad('Escolha uma pessoa da equipe que atende conversas')
+      }
       handoffAgentId = rawHandoff
     }
+
+    // "Quando passar para uma pessoa" (077). Absent → unchanged.
+    const handoffModeProvided = 'handoff_mode' in body
+    const handoffMode =
+      body.handoff_mode === null || body.handoff_mode === undefined
+        ? null
+        : String(body.handoff_mode)
+    if (handoffMode !== null && !['ia_escolhe', 'setor', 'pessoa', 'fila'].includes(handoffMode)) {
+      return bad('Escolha para onde a IA passa as conversas')
+    }
+    const rawTeam = typeof body.handoff_team_id === 'string' ? body.handoff_team_id.trim() : ''
+    let handoffTeamId: string | null = null
+    if (handoffMode === 'setor') {
+      if (!rawTeam) return bad('Escolha o setor')
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('id', rawTeam)
+        .maybeSingle()
+      if (!team) return bad('Esse setor não existe neste CRM')
+      handoffTeamId = rawTeam
+    }
+    if (handoffMode === 'pessoa' && !handoffAgentId) return bad('Escolha a pessoa')
 
     const rawKey = typeof body.api_key === 'string' ? body.api_key.trim() : ''
 
@@ -255,6 +292,10 @@ export async function POST(request: Request) {
     // Only touch the handoff target when the form actually sent the field,
     // so a partial save (e.g. flipping a toggle) doesn't wipe it.
     if (handoffProvided) shared.handoff_agent_id = handoffAgentId
+    if (handoffModeProvided) {
+      shared.handoff_mode = handoffMode
+      shared.handoff_team_id = handoffTeamId
+    }
     if (rawEmbeddingsKey) {
       shared.embeddings_api_key = encrypt(rawEmbeddingsKey)
     } else if (clearEmbeddingsKey) {

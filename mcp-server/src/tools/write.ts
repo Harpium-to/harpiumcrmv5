@@ -135,4 +135,22 @@ export function registerWriteTools(server: McpServer, client: WacrmClient): void
     },
     handle(async ({ id, ...body }) => jsonResult(await client.updateDeal(id, body))),
   );
+
+  server.registerTool(
+    'transfer_conversation',
+    {
+      title: 'Transfer conversation',
+      description:
+        'Give a conversation to a teammate (to_user_id), to a setor/team (to_team_id — the setor picks the person by its own rule, or keeps it in its queue when nobody is available), or back to the queue (to: "queue"), with an optional note the person who receives it reads. The person is notified and the conversation history records it. Pass exactly one target.',
+      inputSchema: {
+        id: z.string().describe('Conversation id.'),
+        to_user_id: z.string().optional().describe('Teammate (user id) who receives it.'),
+        to_team_id: z.string().optional().describe('Setor (team id) that receives it.'),
+        to: z.literal('queue').optional().describe('"queue" sends it back to the queue.'),
+        note: z.string().max(500).optional().describe('Short note for the person who receives it.'),
+      },
+      annotations: { title: 'Transfer conversation', readOnlyHint: false, openWorldHint: false },
+    },
+    handle(async ({ id, ...body }) => jsonResult(await client.transferConversation(id, body))),
+  );
 }

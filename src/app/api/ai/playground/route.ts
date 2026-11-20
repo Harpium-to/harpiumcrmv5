@@ -6,6 +6,13 @@ import { retrieveKnowledge } from '@/lib/ai/knowledge'
 import { generateReply } from '@/lib/ai/generate'
 import { buildSystemPrompt } from '@/lib/ai/defaults'
 import { DEFAULT_HANDOFF_NOTICE } from '@/lib/ai/handoff'
+import {
+  effectiveHandoff,
+  loadHandoffContext,
+  resolveHandoffTarget,
+  teamFromCode,
+  teamsPrompt,
+} from '@/lib/atendimento/destino'
 import { latestUserMessage } from '@/lib/ai/query'
 import { AiError, type ChatMessage } from '@/lib/ai/types'
 
@@ -79,19 +86,59 @@ export async function POST(request: Request) {
       config,
       latestUserMessage(messages),
     )
+    // The setores, as the live auto-reply gives them to the AI when it
+    // may choose (lib/atendimento/destino.ts), so the test shows where
+    // the conversation would go.
+    const handoffCtx = await loadHandoffContext(supabase, {
+      accountId,
+      accountUserId: config.handoffAgentId,
+      agentId: null,
+      agentUserId: null,
+    }).catch(() => null)
+    const settings = effectiveHandoff(
+      null,
+      handoffCtx?.account ?? { mode: null, teamId: null, userId: config.handoffAgentId },
+      (handoffCtx?.teams.length ?? 0) > 0,
+    )
+    const teamsBlock =
+      handoffCtx && settings.mode === 'ia_escolhe' ? teamsPrompt(handoffCtx.teams) : null
+
     const systemPrompt = buildSystemPrompt({
       userPrompt: config.systemPrompt,
       mode: 'auto_reply',
       knowledge,
+      capabilities: teamsBlock ? [teamsBlock] : undefined,
     })
 
-    const { text, handoff } = await generateReply({ config, systemPrompt, messages })
+    const { text, handoff, handoffTeam } = await generateReply({ config, systemPrompt, messages })
     // Same rule as the live auto-reply: an empty answer is a handoff, and
     // a handoff always tells the customer something.
     const handedOff = handoff || !text
+    let handoffTo: string | null = null
+    if (handedOff) {
+      const target = resolveHandoffTarget({
+        settings,
+        chosenTeamId: teamFromCode(handoffTeam ?? null, handoffCtx?.teams ?? [])?.id ?? null,
+        entryTeamId: handoffCtx?.entryTeamId ?? null,
+        activeTeamIds: (handoffCtx?.teams ?? []).map((t) => t.id),
+      })
+      if (target?.kind === 'setor') {
+        handoffTo = `setor ${handoffCtx?.teams.find((t) => t.id === target.teamId)?.name ?? ''}`.trim()
+      } else if (target?.kind === 'pessoa') {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', target.userId)
+          .maybeSingle()
+        handoffTo = (p as { full_name: string | null } | null)?.full_name || 'a pessoa escolhida'
+      } else {
+        handoffTo = 'fila geral'
+      }
+    }
     return NextResponse.json({
       reply: text || (handedOff ? DEFAULT_HANDOFF_NOTICE : ''),
       handoff: handedOff,
+      handoff_to: handoffTo,
     })
   } catch (err) {
     if (err instanceof AiError) {
