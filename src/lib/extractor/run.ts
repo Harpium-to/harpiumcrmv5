@@ -170,11 +170,13 @@ export async function runExtractionSlice(
 
 /**
  * The scheduler's side: advance the jobs still going, oldest first.
- * Returns how many slices ran, or null when it could not (migration
- * 073 pending, or an error, logged). Never throws.
+ * With a deadline, no slice starts after it (the one running finishes;
+ * the rest go on next tick). Returns how many slices ran, or null when
+ * it could not (migration 073 pending, or an error, logged). Never throws.
  */
 export async function runPendingExtractions(
   admin: SupabaseClient,
+  opts: { deadline?: number } = {},
   deps: RunDeps = defaultDeps,
 ): Promise<number | null> {
   try {
@@ -190,6 +192,7 @@ export async function runPendingExtractions(
     }
     let slices = 0
     for (const row of (data ?? []) as { id: string }[]) {
+      if (opts.deadline !== undefined && deps.now() > opts.deadline) break
       if (await runExtractionSlice(admin, row.id, deps)) slices += 1
     }
     return slices

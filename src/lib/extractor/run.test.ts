@@ -149,7 +149,27 @@ describe('runExtractionSlice', () => {
 
   it('the scheduler advances what is still going', async () => {
     const t = world()
-    expect(await runPendingExtractions(fakeDb(t), deps(pagedSource([[lead('1', '+5562999990001')]])))).toBe(1)
+    expect(await runPendingExtractions(fakeDb(t), {}, deps(pagedSource([[lead('1', '+5562999990001')]])))).toBe(1)
     expect(t.lead_extractions[0].status).toBe('done')
+  })
+
+  it('the scheduler starts no slice after its time is up', async () => {
+    const t = world()
+    t.lead_extractions.push({ ...t.lead_extractions[0], id: 'ex-2', created_at: '2026-11-17T12:30:00Z' })
+    let clock = NOW
+    // Each page takes 5 s; the scheduler has 3.
+    const slow: SourceAdapter<unknown> = {
+      available: () => ({ available: true }),
+      async fetchPage() {
+        clock += 5_000
+        return { leads: [], fetched: 0, cursor: null, costUsd: 0, waiting: false }
+      },
+    }
+    const timed: RunDeps = { sources: { cnpj: slow, google_maps: slow } as unknown as SourceRegistry, now: () => clock }
+    expect(await runPendingExtractions(fakeDb(t), { deadline: NOW + 3_000 }, timed)).toBe(1)
+    expect(t.lead_extractions.map((r) => [r.id, r.status])).toEqual([
+      ['ex-1', 'done'],
+      ['ex-2', 'queued'],
+    ])
   })
 })

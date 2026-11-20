@@ -28,6 +28,11 @@ export const maxDuration = 60
 const ROUTINES_DEADLINE_MS = 25_000
 /** The Radar's share of the tick (the rest is the routines'). */
 const RADAR_BUDGET_MS = 8_000
+/**
+ * The lead extractor's share: no new slice starts after it (the one
+ * running finishes); the jobs left go on next tick.
+ */
+const EXTRACTOR_BUDGET_MS = 5_000
 
 /**
  * Drain due `automation_pending_executions` rows. Meant to be hit
@@ -77,7 +82,7 @@ export async function GET(request: Request) {
   // Quiz visits that left a contact and stopped, and leads to retry (072).
   const quiz_visits = await sweepQuizVisits(admin)
   // Lead extractions nobody is watching, and old unused results (073).
-  const lead_extractions = await runPendingExtractions(admin)
+  const lead_extractions = await runPendingExtractions(admin, { deadline: Date.now() + EXTRACTOR_BUDGET_MS })
   const extractor_cleanup = await cleanUpUnusedResults(admin)
   // Setor deadlines and queues (078): warn or pass on what is late,
   // hand queued conversations to whoever of the setor came online.

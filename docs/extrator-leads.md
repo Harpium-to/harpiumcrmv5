@@ -120,7 +120,7 @@ No SQL Editor do Supabase do CRM, rode `supabase/migrations/073_extrator_leads.s
 
 ### 4. O agendador
 
-Nada a fazer: o mesmo agendador das automações (`/api/automations/cron`) toca as extrações que ninguém está olhando, aplica o freio da prospecção e apaga os resultados antigos.
+Nada a fazer: o mesmo agendador das automações (`/api/automations/cron`) toca as extrações que ninguém está olhando, aplica o freio da prospecção e apaga os resultados antigos. Em cada passada as extrações têm uns 5 segundos (o resto é do atendimento, do Radar e das rotinas da Harpi); o que não couber continua na passada seguinte.
 
 ## Onde está no código
 
