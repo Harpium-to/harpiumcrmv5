@@ -40,6 +40,7 @@ export function fakeDb(tables: Record<string, Row[]>) {
     let conflict: string[] = []
     let ignoreDuplicates = false
     let limit = Infinity
+    let offset = 0
 
     const matching = () => tables[table].filter((r) => filters.every((f) => f(r)))
 
@@ -74,7 +75,7 @@ export function fakeDb(tables: Record<string, Row[]>) {
         }
         return { data: out, error: null }
       }
-      return { data: matching().slice(0, limit), error: null }
+      return { data: matching().slice(offset, offset + limit), error: null }
     }
 
     const q = {
@@ -90,10 +91,31 @@ export function fakeDb(tables: Record<string, Row[]>) {
         return q
       },
       eq: (col: string, v: unknown) => (filters.push((r) => r[col] === v), q),
+      neq: (col: string, v: unknown) => (filters.push((r) => r[col] !== v), q),
+      // PostgREST's "a.is.null,b.lt.\"x\"": any of the conditions.
+      or: (expr: string) => {
+        const parts = expr.match(/(?:[^,"]|"[^"]*")+/g) ?? []
+        const tests = parts.map((part) => {
+          const [col, op, ...rest] = part.split('.')
+          const value = rest.join('.').replace(/^"|"$/g, '')
+          return (r: Row) => {
+            const cell = r[col] ?? null
+            if (op === 'is') return value === 'null' ? cell === null : String(cell) === value
+            if (op === 'eq') return String(cell) === value
+            if (op === 'lt') return cell !== null && String(cell) < value
+            if (op === 'gt') return cell !== null && String(cell) > value
+            return false
+          }
+        })
+        filters.push((r) => tests.some((t) => t(r)))
+        return q
+      },
+      range: (from: number, to: number) => ((offset = from), (limit = to - from + 1), q),
       is: (col: string, v: unknown) => (filters.push((r) => (r[col] ?? null) === v), q),
       in: (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[col])), q),
       not: (col: string, operator: string, v: unknown) => {
         if (operator === 'is') filters.push((r) => (r[col] ?? null) !== v)
+        if (operator === 'like') filters.push((r) => !likeToRegex(String(v), '').test(String(r[col] ?? '')))
         return q
       },
       contains: (col: string, vs: unknown[]) => (

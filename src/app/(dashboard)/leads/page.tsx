@@ -82,7 +82,13 @@ const SOURCE_LABEL: Record<string, string> = {
   meta: "Meta",
   google: "Google",
   other: "Outro",
+  "extrator-cnpj": "Extrator · CNPJ",
+  "extrator-google-maps": "Extrator · Google Maps",
 };
+
+/** "": every origin; "-extrator": all but the lead extractor's; else one origin. */
+type OriginFilter = string;
+const WITHOUT_EXTRACTOR = "-extrator";
 
 const META_ERROR: Record<string, string> = {
   config: "Meta não configurado no servidor (falta META_APP_ID). Veja o tutorial.",
@@ -105,6 +111,10 @@ export default function LeadsPage() {
   const [viewing, setViewing] = useState<LeadView | null>(null);
   const [reprocessing, setReprocessing] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  // Extracted cold leads come by the hundred: the filter keeps them
+  // apart from the leads that arrive by themselves (073).
+  const [origin, setOrigin] = useState<OriginFilter>("");
+  const [knownOrigins, setKnownOrigins] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteContacts, setDeleteContacts] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -150,11 +160,12 @@ export default function LeadsPage() {
 
   const loadLeads = useCallback(async () => {
     const db = createClient();
-    const { data, error } = await db
+    let query = db
       .from("leads")
-      .select("id, source, full_name, email, phone, campaign, contact_id, created_at, raw")
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .select("id, source, full_name, email, phone, campaign, contact_id, created_at, raw");
+    if (origin === WITHOUT_EXTRACTOR) query = query.not("source", "like", "extrator-%");
+    else if (origin) query = query.eq("source", origin);
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
     if (error) {
       toast.error("Falha ao carregar leads");
       setLeads([]);
@@ -162,16 +173,20 @@ export default function LeadsPage() {
     }
     const rows = data as LeadRow[];
     setLeads(rows);
+    setKnownOrigins((prev) => [...new Set([...prev, ...rows.map((r) => r.source)])].sort());
     // A lead that is gone can't stay selected.
     const present = new Set(rows.map((r) => r.id));
     setSelected((prev) => new Set([...prev].filter((id) => present.has(id))));
-  }, []);
+  }, [origin]);
 
   useEffect(() => {
     void loadConfig();
     void loadMetaPages();
+  }, [loadConfig, loadMetaPages]);
+
+  useEffect(() => {
     void loadLeads();
-  }, [loadConfig, loadMetaPages, loadLeads]);
+  }, [loadLeads]);
 
   // Deep link (/leads?lead=<id>), e.g. the "Abrir no CRM" button of the
   // agency's internal system: open that lead's detail once the list is
@@ -574,6 +589,20 @@ export default function LeadsPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Leads recebidos</h2>
           <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              aria-label="Filtrar por origem"
+              className="h-8 rounded-md border border-border bg-muted px-2 text-sm text-foreground"
+            >
+              <option value="">Todas as origens</option>
+              <option value={WITHOUT_EXTRACTOR}>Sem os do Extrator</option>
+              {[...new Set([...knownOrigins, ...(origin && origin !== WITHOUT_EXTRACTOR ? [origin] : [])])].map((s) => (
+                <option key={s} value={s}>
+                  {SOURCE_LABEL[s] ?? s}
+                </option>
+              ))}
+            </select>
             {canManage && selected.size > 0 && (
               <Button
                 type="button"

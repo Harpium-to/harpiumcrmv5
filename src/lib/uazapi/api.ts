@@ -323,3 +323,29 @@ export async function findUazapiMessages(
   const j = await res.json().catch(() => ({}))
   return Array.isArray(j?.messages) ? (j.messages as Record<string, unknown>[]) : []
 }
+
+/**
+ * Which of these numbers are on WhatsApp (POST /chat/check). Digits
+ * only, with the country code. A number the gateway did not answer for
+ * is left out of the map — "unknown", not "no".
+ */
+export async function checkUazapiNumbers(
+  srv: UazapiServer,
+  numbers: string[],
+): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>()
+  if (numbers.length === 0) return out
+  const res = await fetch(endpoint(srv.baseUrl, 'chat/check'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', token: srv.token },
+    body: JSON.stringify({ numbers }),
+  })
+  if (!res.ok) await failure(res, 'Falha ao conferir os números')
+  const list = await res.json().catch(() => [])
+  for (const item of Array.isArray(list) ? list : []) {
+    const query = typeof item?.query === 'string' ? item.query.replace(/\D/g, '') : ''
+    if (!query || typeof item?.isInWhatsapp !== 'boolean' || item?.error) continue
+    out.set(query, item.isInWhatsapp)
+  }
+  return out
+}
