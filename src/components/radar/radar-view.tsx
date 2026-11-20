@@ -11,7 +11,7 @@ import {
   EyeOff,
   Flame,
   Loader2,
-  Snowflake,
+  Thermometer,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -78,6 +78,18 @@ export function RadarView() {
     return <p className="py-16 text-sm text-muted-foreground">O Radar ainda não está ativo neste CRM.</p>;
   }
 
+  return <RadarPanelView panel={panel} onAct={act} />;
+}
+
+/** The Radar screen itself, from a loaded panel (also used by tests and previews). */
+export function RadarPanelView({
+  panel,
+  onAct,
+}: {
+  panel: RadarPanel;
+  onAct: (alert: RadarAlertView, status: "visto" | "ignorado") => void | Promise<void>;
+}) {
+  const act = onAct;
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -205,7 +217,7 @@ export function RadarView() {
                         {c.temperature === "hot" ? (
                           <Flame className="h-4 w-4 shrink-0 text-red-500" aria-label="Quente" />
                         ) : (
-                          <Snowflake className="h-4 w-4 shrink-0 text-amber-500" aria-label="Morno" />
+                          <Thermometer className="h-4 w-4 shrink-0 text-amber-500" aria-label="Morno" />
                         )}
                         <span className="min-w-0 flex-1 truncate text-foreground">{c.name}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">

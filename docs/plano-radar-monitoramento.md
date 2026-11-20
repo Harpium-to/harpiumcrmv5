@@ -6,7 +6,36 @@ publicado).
 
 **Andamento:**
 
-- 20/11/2026: plano escrito, **aguardando aprovação** (decisões no §7).
+- 20/11/2026: plano escrito e **aprovado** pelo dono ("Aprovado, pode fazer"),
+  com todas as decisões do §7 conforme a recomendação. O nome ficou Radar.
+- 20/11/2026: **Fases 1 a 5 implementadas** no ramo `feat/radar`, que sai de
+  `feat/distribuicao-atendimento` (PR #50). Migrations **079** e **080**.
+  **Nada publicado ainda**: o atendimento e o Radar vão ao ar juntos (ver
+  "Para pôr no ar", no fim).
+
+### O que mudou em relação ao plano
+
+- **Anomalias olham dias fechados.** O detector compara "ontem" com o mesmo
+  dia da semana, de madrugada, e não o dia em andamento: comparar meio dia
+  com dias inteiros dá alarme falso. A semana inteira é comparada às
+  segundas.
+- **Chance de fechar sem histórico de etapas.** O CRM não guarda por quais
+  etapas um negócio passou, então "chegou nesta etapa" usa a última etapa
+  dos negócios fechados, supondo que o funil anda para a frente. Por isso a
+  taxa de cada etapa é puxada para a média do funil quando há poucos
+  negócios.
+- **Mudar de etapa atualiza a chance na hora.** Entrou a tabela
+  `radar_stage_rates` com um gatilho: o negócio recebe na hora a taxa da
+  etapa nova, e a madrugada refina com tempo parado, temperatura e origem.
+- **Esfriando:** lead quente esperando há mais de 2 h, ou morno há mais de
+  24 h, com a última mensagem sendo do cliente. Negócio "parado" é o que
+  tem chance de 40% ou mais e está parado há mais que o ritmo normal do
+  funil.
+- **O resumo tem conferidor.** Se a IA escrever um número que não está no
+  pacote de dados, o texto dela é descartado e sai o texto montado pelo
+  sistema.
+- **Não feito:** os Relatórios continuam calculando na hora e não leem o
+  livro-caixa. Isso seria só otimização, sem mudança visível.
 
 ---
 
@@ -326,3 +355,29 @@ publicado).
 | 3. Previsões | G | (080) |
 | 4. Resumo semanal + configurações | M | — |
 | 5. Agência | P | — |
+
+## 11. Para pôr no ar (junto com o atendimento)
+
+1. Aplicar no SQL editor do Supabase, **nesta ordem**: 076, 077, 078 (PR #50),
+   depois `079_radar_metricas.sql` e `080_radar_alertas.sql`.
+2. Fazer o merge deste PR no ramo do atendimento e depois o merge do PR #50
+   na `main`. Assim é uma publicação só no Netlify.
+3. O histórico de 12 semanas de cada CRM se preenche sozinho nos primeiros
+   ticks do agendador, alguns CRMs por tick. A chance de fechar sai na
+   primeira madrugada; o primeiro resumo, na segunda seguinte às 8h.
+
+## 12. Testes
+
+- **Banco** (`supabase/tests/radar.test.ts`): 13 testes. Cobrem o
+  livro-caixa (fuso, zeros, recálculo sem duplicar, permissões), os alertas
+  e as permissões de situação, as configurações, a chance mudando com a
+  etapa, a gravação das chances só no próprio CRM e os leads esfriando.
+- **Detector**: 14 testes. Cobrem queda real, ruído normal, números
+  pequenos, CRM aprendendo, recorte por origem, pico neutro, tempo de
+  resposta com e sem volume, sensibilidade, semana inteira, taxa de faltas
+  e a seleção final.
+- **Chance e previsão**: 6 testes, incluindo uma simulação retroativa de 200
+  meses que confere se a receita real cai dentro da faixa.
+- **Resumo**: 6 testes, incluindo o conferidor de número inventado.
+- **Agendador e datas**: 6 testes.
+- **Painel da agência**: 2 testes.

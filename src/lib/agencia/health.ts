@@ -49,6 +49,8 @@ export interface CrmUsage {
    */
   overdueNow?: number
   queuedInTeams?: number
+  /** The Radar's open alerts of the week, worst first (080; lib/agencia/radar-sinais.ts). */
+  radarAlerts?: { title: string; severity: 'atencao' | 'alta' }[]
 }
 
 const n = (v: unknown): number => {
@@ -176,6 +178,7 @@ export type AlertKind =
   | 'backlog'
   | 'overdue'
   | 'team_queue'
+  | 'radar'
 
 export interface CrmAlert {
   kind: AlertKind
@@ -234,6 +237,14 @@ export function computeAlerts(
       kind: 'overdue',
       label: `${plural(overdue, 'conversa passou', 'conversas passaram')} do prazo do setor`,
       priority: 1,
+    })
+  }
+  const radar = u.radarAlerts ?? []
+  if (radar.length > 0) {
+    alerts.push({
+      kind: 'radar',
+      label: `Radar: ${radar[0].title}${radar.length > 1 ? ` (+${radar.length - 1})` : ''}`,
+      priority: radar[0].severity === 'alta' ? 1 : 2,
     })
   }
   const queued = u.queuedInTeams ?? 0
