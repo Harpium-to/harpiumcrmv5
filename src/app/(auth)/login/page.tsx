@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { LOGIN_NEXT_PREFIXES, safeNextPath } from "@/lib/http/next-path";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,17 @@ function LoginPageInner() {
 
     if (inviteToken) {
       router.push(`/join/${encodeURIComponent(inviteToken)}`);
+      return;
+    }
+
+    // Sent here from a page that needs a login (an "Abrir no CRM" link,
+    // a bookmarked screen): go back there. Only known screens pass.
+    const next = safeNextPath(searchParams.get("next"), {
+      prefixes: LOGIN_NEXT_PREFIXES,
+      fallback: "",
+    });
+    if (next) {
+      router.push(next);
       return;
     }
 

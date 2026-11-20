@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   BookOpen,
@@ -171,6 +172,35 @@ export default function LeadsPage() {
     void loadMetaPages();
     void loadLeads();
   }, [loadConfig, loadMetaPages, loadLeads]);
+
+  // Deep link (/leads?lead=<id>), e.g. the "Abrir no CRM" button of the
+  // agency's internal system: open that lead's detail once the list is
+  // in. A lead older than the 100 listed is fetched on its own.
+  const linkedLeadId = useSearchParams().get("lead");
+  const linkedLeadOpened = useRef(false);
+  useEffect(() => {
+    if (!linkedLeadId || linkedLeadOpened.current || !leadViews) return;
+    linkedLeadOpened.current = true;
+    const found = leadViews.find((l) => l.id === linkedLeadId);
+    if (found) {
+      setViewing(found);
+      return;
+    }
+    void (async () => {
+      const { data } = await createClient()
+        .from("leads")
+        .select("id, source, full_name, email, phone, campaign, contact_id, created_at, raw")
+        .eq("id", linkedLeadId)
+        .maybeSingle();
+      if (!data) {
+        toast.error("Esse lead não está neste CRM.");
+        return;
+      }
+      const row = data as LeadRow;
+      const n = normalizeLead(row.raw);
+      setViewing({ ...row, tags: leadTags(n), route: n.route });
+    })();
+  }, [leadViews, linkedLeadId]);
 
   // Surface the OAuth return, then clean the query string.
   useEffect(() => {
