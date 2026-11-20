@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 import { runAutomationsForTrigger } from '@/lib/automations/engine'
+import { aplicarChegada, aplicarRetorno } from '@/lib/atendimento/chegada'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { dispatchInboundToFlows } from '@/lib/flows/engine'
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver'
@@ -98,13 +99,26 @@ export async function dispatchInboundToEngines(m: InboundForEngines): Promise<vo
     ),
   )
 
+  // A customer writing to a closed conversation: the return rule runs
+  // before the AI (lib/atendimento/chegada.ts). Never throws.
+  await aplicarRetorno(supabaseAdmin(), {
+    accountId: m.accountId,
+    conversationId: m.conversationId,
+  })
+
   if (!flowConsumed && !m.interactiveReplyId && m.text.trim()) {
     try {
-      await dispatchInboundToAiReply({
+      const aiOutcome = await dispatchInboundToAiReply({
         accountId: m.accountId,
         conversationId: m.conversationId,
         contactId: m.contactId,
         configOwnerUserId: m.ownerUserId,
+      })
+      // Nobody answering it → the CRM's arrival rule. Never throws.
+      await aplicarChegada(supabaseAdmin(), {
+        accountId: m.accountId,
+        conversationId: m.conversationId,
+        aiOutcome,
       })
     } catch (err) {
       console.error('[inbound-dispatch] AI reply failed:', err)

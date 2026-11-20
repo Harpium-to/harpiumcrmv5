@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRole, toErrorResponse } from '@/lib/auth/account'
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
+import { TransferError, transferirConversa } from '@/lib/atendimento/transferir'
 
 type Params = { params: Promise<{ conversationId: string }> }
 
@@ -64,17 +65,15 @@ export async function POST(request: Request, { params }: Params) {
 
     const update: Record<string, unknown> = { ai_autoreply_disabled: paused }
 
-    if (paused) {
-      if (assignToMe) update.assigned_agent_id = userId
-    } else {
+    if (!paused) {
       // Resuming hands the thread *back to the bot*. Clear the pause and
       // the handoff note, and — crucially — release ANY assignment, not
-      // just the caller's own: the auto-reply eligibility gate stands
-      // down whenever a human is assigned, so leaving a stale assignee
-      // (e.g. the agent a prior handoff routed to) would silently keep
-      // the bot muted and make "Resume AI" a no-op. This is the explicit
-      // choice to let the bot own the thread again.
-      update.assigned_agent_id = null
+      // just the caller's own (below): the auto-reply eligibility gate
+      // stands down whenever a human is assigned, so leaving a stale
+      // assignee (e.g. the agent a prior handoff routed to) would
+      // silently keep the bot muted and make "Resume AI" a no-op. This
+      // is the explicit choice to let the bot own the thread again.
+      //
       // Give the bot a fresh reply budget on this thread. This is a
       // deliberate, manual, rate-limited action (not automatable), so it
       // can't be used to bypass the per-conversation cap at scale — it's
@@ -96,8 +95,29 @@ export async function POST(request: Request, { params }: Params) {
       )
     }
 
+    // The owner changes through the one transfer path, so it lands in
+    // the conversation's history (lib/atendimento/transferir.ts).
+    // "Assumir" is the caller taking it: nobody is notified.
+    if (paused && assignToMe) {
+      await transferirConversa(supabase, {
+        conversationId,
+        target: { kind: 'pessoa', userId },
+        source: 'manual',
+      })
+    } else if (!paused) {
+      await transferirConversa(supabase, {
+        conversationId,
+        target: { kind: 'ninguem', leaveTeam: true },
+        source: 'manual',
+        note: 'Devolvida para a IA',
+      })
+    }
+
     return NextResponse.json({ success: true, paused })
   } catch (err) {
+    if (err instanceof TransferError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
     return toErrorResponse(err)
   }
 }

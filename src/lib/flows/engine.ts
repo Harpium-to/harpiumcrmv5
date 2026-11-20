@@ -33,6 +33,7 @@
  */
 
 import { supabaseAdmin } from "./admin-client";
+import { transferirConversa, type TransferTarget } from "@/lib/atendimento/transferir";
 import {
   engineSendInteractiveButtons,
   engineSendInteractiveList,
@@ -48,6 +49,7 @@ import {
   type FlowNodeRow,
   type FlowRow,
   type FlowRunRow,
+  type HandoffNodeConfig,
   type ParsedInbound,
   type SendButtonsNodeConfig,
   type SendListNodeConfig,
@@ -435,21 +437,59 @@ async function executeHandoff(
   run: FlowRunRow,
   node: FlowNodeRow,
 ): Promise<void> {
-  const cfg = node.config as { assign_to?: string; note?: string };
-  const convUpdate: Record<string, unknown> = {
-    status: "pending",
-    updated_at: new Date().toISOString(),
-  };
-  if (cfg.assign_to) convUpdate.assigned_agent_id = cfg.assign_to;
+  const cfg = node.config as HandoffNodeConfig;
+  const note = cfg.note?.trim() || null;
+  const target: TransferTarget | null = cfg.assign_team
+    ? { kind: "setor", teamId: cfg.assign_team }
+    : cfg.assign_to
+      ? { kind: "pessoa", userId: cfg.assign_to }
+      : null;
+
   if (run.conversation_id) {
+    // The flow is done with this thread and a person must answer:
+    // status pending, the AI stays out (a flow handed it to the team,
+    // not to the bot), and the inbox shows it as waiting (058) — the
+    // wait keeps its start if one is already running.
+    const { data: current } = await db
+      .from("conversations")
+      .select("needs_human_since")
+      .eq("id", run.conversation_id)
+      .maybeSingle();
+    const nowIso = new Date().toISOString();
     await db
       .from("conversations")
-      .update(convUpdate)
+      .update({
+        status: "pending",
+        ai_autoreply_disabled: true,
+        ai_handoff_summary: note
+          ? `🔀 Um fluxo passou a conversa para a equipe: ${note}`
+          : "🔀 Um fluxo passou a conversa para a equipe.",
+        needs_human_since:
+          (current as { needs_human_since: string | null } | null)?.needs_human_since ?? nowIso,
+        updated_at: nowIso,
+      })
       .eq("id", run.conversation_id);
+
+    if (target) {
+      try {
+        // Never takes it from a person who already has it.
+        await transferirConversa(db, {
+          conversationId: run.conversation_id,
+          target,
+          source: "fluxo",
+          note,
+          onlyIfUnassigned: true,
+        });
+      } catch (err) {
+        // The conversation is waiting in the shared queue: still seen.
+        console.error("[flows] handoff transfer failed:", err);
+      }
+    }
   }
   await logEvent(db, run.id, "handoff", node.node_key, {
-    note: cfg.note ?? null,
+    note,
     assigned_to: cfg.assign_to ?? null,
+    assigned_team: cfg.assign_team ?? null,
   });
   await endRun(db, run.id, "handed_off", "handoff_node");
 }

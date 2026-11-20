@@ -10,6 +10,7 @@ import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { resolvePublicOrigin } from '@/lib/http/base-url'
 import { sweepQuizVisits } from '@/lib/quiz/sweep'
 import { processRoutines } from '@/lib/assistente/routines'
+import { processarAtendimento } from '@/lib/atendimento/chegada'
 
 // Harpi's routines call the AI from here (one model call per step), so
 // this tick may take longer than the bookkeeping above.
@@ -67,6 +68,12 @@ export async function GET(request: Request) {
   const google_busy = await refreshGoogleBusy(admin)
   // Quiz visits that left a contact and stopped, and leads to retry (072).
   const quiz_visits = await sweepQuizVisits(admin)
+  // Setor deadlines and queues (078): warn or pass on what is late,
+  // hand queued conversations to whoever of the setor came online.
+  const atendimento = await processarAtendimento(admin).catch((err) => {
+    console.error('[cron] atendimento failed:', err)
+    return { alerted: 0, moved: 0 }
+  })
 
   const { data: due, error } = await admin
     .from('automation_pending_executions')
@@ -80,7 +87,7 @@ export async function GET(request: Request) {
   if (!due || due.length === 0) {
     // Harpi's routines last: nothing above waits on the AI (074).
     const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, routines })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, atendimento, routines })
   }
 
   let processed = 0
@@ -112,5 +119,5 @@ export async function GET(request: Request) {
   }
 
   const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, routines })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, atendimento, routines })
 }

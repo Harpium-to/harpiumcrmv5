@@ -60,6 +60,8 @@ export interface GenerateResult {
   text: string
   /** True when the model asked to hand off to a human (auto-reply mode). */
   handoff: boolean
+  /** The setor code the model named in `[[HANDOFF codigo]]`, when it named one. */
+  handoffTeam?: string
   /** Provider token usage for this call, or null when unavailable. */
   usage: AiUsage | null
 }

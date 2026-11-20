@@ -60,6 +60,23 @@ describe('parseGeneration', () => {
     })
   })
 
+  it('reads the setor named in the marker and strips it', () => {
+    expect(parseGeneration('Vou te passar para o financeiro. [[HANDOFF financeiro]]')).toEqual({
+      text: 'Vou te passar para o financeiro.',
+      handoff: true,
+      handoffTeam: 'financeiro',
+      usage: null,
+    })
+    // A misspelt marker still never reaches the customer.
+    expect(parseGeneration('Já te passo para a doutora [[HANDOFF: Dra. Ana]]')).toEqual({
+      text: 'Já te passo para a doutora',
+      handoff: true,
+      handoffTeam: 'Dra. Ana',
+      usage: null,
+    })
+    expect(parseGeneration('[[ handoff ]]')).toEqual({ text: '', handoff: true, usage: null })
+  })
+
   it('passes usage straight through', () => {
     const usage = { promptTokens: 10, completionTokens: 5, totalTokens: 15 }
     expect(parseGeneration('Hi', usage)).toEqual({

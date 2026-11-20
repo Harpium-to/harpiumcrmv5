@@ -718,8 +718,14 @@ export interface TagStepConfig {
 }
 
 export interface AssignConversationStepConfig {
-  mode: 'specific' | 'round_robin';
+  /**
+   * round_robin — the CRM-wide rotation (online first, fair turns, 076);
+   * specific    — `agent_id`;
+   * team        — the setor `team_id`, whose own rule picks the person (077).
+   */
+  mode: 'specific' | 'round_robin' | 'team';
   agent_id?: string;
+  team_id?: string;
 }
 
 export interface UpdateContactFieldStepConfig {
