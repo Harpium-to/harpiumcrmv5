@@ -28,10 +28,14 @@ Documento de planejamento. Escrito em 20/11/2026 a partir do `main` do CRM
   retorno.
 - **O modelo de nicho com setores foi junto na 078**, não numa migration à
   parte.
-- **Não feito:** "sem atendente" e "prazo estourado" por setor no painel da
-  agência e no Agency OS (Fase 5). Isso pede mudar as funções de uso da
-  plataforma (052/056) e o Agency OS. O prazo estourado já avisa o dono e os
-  administradores do CRM.
+- **Painel da agência e Agency OS (Fase 5):** lidos direto das conversas
+  (`src/lib/agencia/atendimento.ts`), sem mexer nas funções de uso da 052/056.
+  - O painel ganhou os alertas "conversas passaram do prazo do setor" e
+    "conversas na fila dos setores sem ninguém".
+  - A página de cada CRM ganhou o cartão "Atendimento por setor".
+  - O resumo da API da plataforma ganhou `teams`.
+  - **Falta no Agency OS:** a tela que mostra esses dados é de outro
+    repositório. Os alertas já chegam pela lista de `alerts`.
 
 ---
 

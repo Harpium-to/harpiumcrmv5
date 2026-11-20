@@ -42,6 +42,13 @@ export interface CrmUsage {
   dealsMoved30d: number
   won30d: number
   wonValue30d: number
+  /**
+   * Conversations past their setor's deadline right now, and waiting in
+   * setor queues (076–078; lib/agencia/atendimento.ts). Absent when the
+   * CRM has no setores or the database is older.
+   */
+  overdueNow?: number
+  queuedInTeams?: number
 }
 
 const n = (v: unknown): number => {
@@ -167,6 +174,8 @@ export type AlertKind =
   | 'message_drop'
   | 'onboarding_stalled'
   | 'backlog'
+  | 'overdue'
+  | 'team_queue'
 
 export interface CrmAlert {
   kind: AlertKind
@@ -217,6 +226,22 @@ export function computeAlerts(
       kind: 'unanswered',
       label: `${plural(u.unanswered24h, 'conversa', 'conversas')} sem resposta há 24h+`,
       priority: 1,
+    })
+  }
+  const overdue = u.overdueNow ?? 0
+  if (overdue > 0) {
+    alerts.push({
+      kind: 'overdue',
+      label: `${plural(overdue, 'conversa passou', 'conversas passaram')} do prazo do setor`,
+      priority: 1,
+    })
+  }
+  const queued = u.queuedInTeams ?? 0
+  if (queued >= BACKLOG_THRESHOLD) {
+    alerts.push({
+      kind: 'team_queue',
+      label: `${plural(queued, 'conversa', 'conversas')} na fila dos setores sem ninguém`,
+      priority: 3,
     })
   }
   const last = u.lastActivityAt ? new Date(u.lastActivityAt).getTime() : null

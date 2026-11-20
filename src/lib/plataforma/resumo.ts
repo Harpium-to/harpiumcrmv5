@@ -15,6 +15,7 @@
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { loadTeamQueues } from '@/lib/agencia/atendimento'
 
 import { loadPlatformUsage } from '@/lib/agencia/crms'
 import { computeAlerts, computeHealth, type HealthBand } from '@/lib/agencia/health'
@@ -83,6 +84,8 @@ export interface CrmSummary {
   channels: { whatsapp: ChannelState; whatsappReason: string | null; instagram: ChannelState }
   team: { members: number | null; activeUsers7d: number | null; lastActivityAt: string | null }
   alerts: { kind: string; label: string }[]
+  /** Setores (077/078): their queues and deadlines. [] when the CRM has none. */
+  teams: { name: string; members: number; queued: number; waiting: number; overdue: number }[]
   lists: SummaryLists | null
   links: CrmPageLinks
   generatedAt: string
@@ -465,6 +468,14 @@ export async function loadResumo(
       lastActivityAt: u?.lastActivityAt ?? null,
     },
     alerts,
+    // Setores (077/078): queues and deadlines, counts only. [] without setores.
+    teams: (await loadTeamQueues(admin, accountId)).map((t) => ({
+      name: t.name,
+      members: t.members,
+      queued: t.queued,
+      waiting: t.waiting,
+      overdue: t.overdue,
+    })),
     lists:
       access.level === 'rows'
         ? await loadLists(admin, accountId, { origin: opts.origin, nowIso })

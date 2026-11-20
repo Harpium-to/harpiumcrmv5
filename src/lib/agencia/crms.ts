@@ -18,6 +18,7 @@ import {
 } from './crm'
 import { isAgenciaRole, type AgenciaRole } from './roles'
 import { parseUsageRow, type CrmUsage } from './health'
+import { addAttendanceSignals } from './atendimento'
 
 /** Postgres / PostgREST "column does not exist". */
 export function isMissingColumn(err: { code?: string } | null): boolean {
@@ -266,6 +267,8 @@ export async function loadPlatformUsage(
     const u = parseUsageRow(r)
     out.set(u.accountId, u)
   }
+  // Setor deadlines and queues (076–078), read from the conversations.
+  await addAttendanceSignals(admin, out)
   return out
 }
 
