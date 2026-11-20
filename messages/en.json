@@ -45,7 +45,8 @@
     "reports": "Reports",
     "help": "Help",
     "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}",
-    "tools": "Tools"
+    "tools": "Tools",
+    "radar": "Radar"
   },
   "TopBar": {
     "openMenu": "Open menu",

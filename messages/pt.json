@@ -45,7 +45,8 @@
     "reports": "Relatórios",
     "help": "Ajuda",
     "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}",
-    "tools": "Ferramentas"
+    "tools": "Ferramentas",
+    "radar": "Radar"
   },
   "TopBar": {
     "openMenu": "Abrir menu",

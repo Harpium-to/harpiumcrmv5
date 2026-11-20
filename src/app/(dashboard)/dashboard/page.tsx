@@ -36,6 +36,7 @@ import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
 import { OperationTimeline } from '@/components/dashboard/operation-timeline'
+import { RadarCard } from '@/components/radar/radar-card'
 
 import { useTranslations } from 'next-intl'
 
@@ -130,6 +131,9 @@ export default function DashboardPage() {
           the figures that qualify it share a baseline, so the top of
           the page reads left-to-right instead of as a title stacked
           on a row of boxes. */}
+      {/* The Radar's headline: alerts and who is cooling down (079/080). */}
+      <RadarCard />
+
       <DisplayHeading title={t('title')} subtitle={t('titleLine2')}>
         {metricsLoading || !metrics ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
