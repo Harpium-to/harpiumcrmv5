@@ -377,7 +377,9 @@ export type NotificationType =
   /** A conversation went past its setor's reply deadline (078). */
   | 'conversation_overdue'
   /** A customer wrote again to a closed conversation (078). */
-  | 'conversation_returned';
+  | 'conversation_returned'
+  /** Radar: new alerts, or the week's digest (080). */
+  | 'radar';
 
 export interface Notification {
   id: string;
@@ -566,6 +568,10 @@ export interface Deal {
   contact?: Contact;
   stage?: PipelineStage;
   assignee?: Profile;
+  /** Chance of closing, 0–1 (Radar, 080). Null until computed. */
+  win_probability?: number | null;
+  /** 'historico': enough closed deals to trust it; 'fraca': not yet. */
+  win_probability_basis?: 'historico' | 'fraca' | null;
 }
 
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
