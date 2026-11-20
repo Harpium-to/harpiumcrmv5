@@ -27,6 +27,7 @@ import { enqueueTask } from '@/lib/agents/tasks'
 import { handoffInput, leadMatchesTrigger, type LeadEventContext } from '@/lib/leads/trigger'
 import { contactVariables, loadContactProfile } from '@/lib/contacts/profile'
 import { renderTemplate, usesContactVariables } from './variables'
+import { transferirConversa, type TransferTarget } from '@/lib/atendimento/transferir'
 
 // ------------------------------------------------------------
 // Public API
@@ -540,25 +541,52 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
     case 'assign_conversation': {
       const cfg = step.step_config as AssignConversationStepConfig
       if (!args.contactId) throw new Error('Atribuir conversa precisa de um contato')
-      let agentId = cfg.agent_id
-      if (cfg.mode === 'round_robin') {
-        // Pick any member of the account. The existing implementation
-        // only ever returned the automation's author; preserving that
-        // shape until a real round-robin algorithm replaces it.
-        const { data: profiles } = await db
-          .from('profiles')
-          .select('user_id')
-          .eq('account_id', args.automation.account_id)
-          .limit(1)
-        agentId = profiles?.[0]?.user_id
-      }
-      if (!agentId) return 'no agent resolved'
-      await db
+      const target = assignTarget(cfg)
+      if (!target) return 'no agent resolved'
+
+      // Every conversation of the contact (WhatsApp, Instagram) ends up
+      // with the same person: the one that fired the automation (or the
+      // most recent) is distributed, the others follow it.
+      const { data: convs, error: convErr } = await db
         .from('conversations')
-        .update({ assigned_agent_id: agentId })
+        .select('id')
         .eq('account_id', args.automation.account_id)
         .eq('contact_id', args.contactId)
-      return `assigned to ${agentId}`
+        .order('last_message_at', { ascending: false, nullsFirst: false })
+      if (convErr) throw new Error(`falha ao buscar as conversas: ${convErr.message}`)
+      const ids = (convs ?? []).map((c) => c.id as string)
+      if (ids.length === 0) return 'contact has no conversation'
+      const fromCtx = args.context.conversation_id
+      if (fromCtx && ids.includes(fromCtx)) {
+        ids.splice(ids.indexOf(fromCtx), 1)
+        ids.unshift(fromCtx)
+      }
+
+      // A "Conversa atribuída" automation that assigns again must not
+      // set itself (or another one) off in a loop.
+      const fireIntegrations = args.triggerEvent !== 'conversation_assigned'
+      const first = await transferirConversa(db, {
+        conversationId: ids[0],
+        target,
+        source: 'automacao',
+        fireIntegrations,
+      })
+      if (!first.ok) {
+        return first.reason === 'nobody_available'
+          ? 'ninguém disponível para receber'
+          : `não atribuída (${first.reason ?? 'erro'})`
+      }
+      if (first.toUserId) {
+        for (const id of ids.slice(1)) {
+          await transferirConversa(db, {
+            conversationId: id,
+            target: { kind: 'pessoa', userId: first.toUserId },
+            source: 'automacao',
+            fireIntegrations: false,
+          })
+        }
+      }
+      return first.toUserId ? `assigned to ${first.toUserId}` : 'na fila do setor'
     }
 
     case 'update_contact_field': {
@@ -935,4 +963,22 @@ async function markPending(id: string, status: 'done' | 'failed') {
     .from('automation_pending_executions')
     .update({ status })
     .eq('id', id)
+}
+
+/**
+ * Where an "Atribuir conversa" step sends the conversation:
+ *   round_robin — the CRM-wide rotation (076): online first, fair turns;
+ *   specific    — one person;
+ *   team        — a setor, whose own rule picks the person (077).
+ * Null when the step is missing what its mode needs.
+ */
+export function assignTarget(cfg: AssignConversationStepConfig | null | undefined): TransferTarget | null {
+  const mode = cfg?.mode ?? 'round_robin'
+  if (mode === 'specific') {
+    return cfg?.agent_id ? { kind: 'pessoa', userId: cfg.agent_id } : null
+  }
+  if (mode === 'team') {
+    return cfg?.team_id ? { kind: 'setor', teamId: cfg.team_id } : null
+  }
+  return { kind: 'rodizio' }
 }

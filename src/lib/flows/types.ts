@@ -98,13 +98,23 @@ export interface SendMediaNodeConfig {
 }
 
 export interface HandoffNodeConfig {
-  /** Optional internal note written to flow_run_events.payload.note. */
+  /**
+   * Optional internal note: written to flow_run_events.payload.note and
+   * carried by the transfer, so whoever receives the conversation reads
+   * it in the history and in the notification.
+   */
   note?: string;
   /**
-   * Optional agent user_id to assign on the conversation when this
-   * node fires. Leave unset to flip the status without assignment.
+   * Optional person (user_id) to give the conversation to when this
+   * node fires.
    */
   assign_to?: string;
+  /**
+   * Optional setor (teams.id, 077) to give the conversation to; its own
+   * rule picks the person. Wins over `assign_to` when both are set.
+   * Neither set: the conversation waits in the shared queue.
+   */
+  assign_team?: string;
 }
 
 /**

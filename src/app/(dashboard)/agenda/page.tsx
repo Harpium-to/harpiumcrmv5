@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 import { AgendaView } from "@/components/agenda/agenda-view";
@@ -19,6 +20,8 @@ export default function AgendaPage() {
   const { user, accountId } = useAuth();
   const canBook = useCan("send-messages");
   const canManage = useCan("edit-settings");
+  // Deep link from the agency's internal system ("Abrir no CRM").
+  const searchParams = useSearchParams();
 
   const store = useMemo(
     () =>
@@ -45,6 +48,8 @@ export default function AgendaPage() {
       accountId={accountId}
       canBook={canBook}
       canManage={canManage}
+      linkDay={searchParams.get("data")}
+      linkEventId={searchParams.get("evento")}
     />
   );
 }

@@ -15,6 +15,7 @@ import { AgentPulseChip } from "@/components/agents/agent-pulse-chip";
 import { ModeToggle } from "@/components/layout/mode-toggle";
 import { PageHelp } from "@/components/help/page-help";
 import { CrmMenuItems } from "@/components/layout/crm-menu-items";
+import { ReceivingMenuItem } from "@/components/layout/receiving-menu-item";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -176,6 +177,7 @@ export function TopBar({ onOpenNav }: TopBarProps) {
               </div>
               <DropdownMenuSeparator className="bg-border" />
               <CrmMenuItems />
+              <ReceivingMenuItem />
               <DropdownMenuItem
                 render={
                   <Link

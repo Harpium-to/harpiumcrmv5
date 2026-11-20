@@ -66,6 +66,12 @@ export default async function AgenciaLayout({
               Membros
             </Link>
             <Link
+              href="/agencia/integracoes"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Integrações
+            </Link>
+            <Link
               href="/dashboard"
               className="text-muted-foreground hover:text-foreground"
             >

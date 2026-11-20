@@ -148,6 +148,10 @@ export const RATE_LIMITS = {
    *  instance deploy needs the Redis swap described at the top of
    *  this file (the per-key call sites don't change). */
   publicApi: { limit: 120, windowMs: 60_000 },
+  /** Platform API (`/api/plataforma/v1/*`), keyed per platform key.
+   *  One key serves the whole agency team through the Agency OS, so
+   *  the budget is wider than a single CRM key's. */
+  platformApi: { limit: 300, windowMs: 60_000 },
   /** AI draft-reply generation, per user. 20/min is generous for an
    *  agent clicking "Draft with AI" while working a thread, and bounds
    *  spend on the account's own LLM key against an accidental

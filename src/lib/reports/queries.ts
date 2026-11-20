@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { loadAtendimento } from './atendimento'
 
 import { AGENT_GOAL_METRICS } from '@/lib/agents/goals'
 import {
@@ -603,6 +604,12 @@ export async function loadReportBundle(
     loadConversationsByStatus(db, accountId, range),
     loadFirstResponse(db, accountId, range),
   ])
+  // Who answered, per person and per setor (076/077). Best-effort: the
+  // rest of the report never waits on a failure here.
+  const atendimento = await loadAtendimento(db, accountId, range).catch((err) => {
+    console.error('[reports] atendimento failed:', err)
+    return null
+  })
 
   const [dealsByOwner, agents] = await Promise.all([
     loadOwners(db, accountId, closed),
@@ -644,6 +651,7 @@ export async function loadReportBundle(
     messagesByDay,
     conversationsByStatus,
     firstResponse,
+    atendimento,
     agents,
   }
 }

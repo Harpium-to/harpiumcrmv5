@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Ban,
   CalendarClock,
@@ -61,6 +61,10 @@ interface AgendaViewProps {
   canBook: boolean;
   /** Admins and above: create agendas and set their hours. */
   canManage: boolean;
+  /** Deep link (/agenda?data=AAAA-MM-DD&evento=<id>): the day to open on… */
+  linkDay?: string | null;
+  /** …and the appointment to open once that week is loaded. */
+  linkEventId?: string | null;
 }
 
 /**
@@ -108,7 +112,14 @@ export function gridRange(columns: GridColumn[], events: AgendaEvent[]): [number
   return [from, until];
 }
 
-export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewProps) {
+export function AgendaView({
+  store,
+  accountId,
+  canBook,
+  canManage,
+  linkDay = null,
+  linkEventId = null,
+}: AgendaViewProps) {
   const [data, setData] = useState<CalendarsResult | null>(null);
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [eventsLoaded, setEventsLoaded] = useState(false);
@@ -116,7 +127,12 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
   // What is busy in the professionals' Google Agenda (071), for the window.
   const [googleBusy, setGoogleBusy] = useState<GoogleBusyBlock[]>([]);
   const [view, setView] = useState<View>('week');
-  const [anchor, setAnchor] = useState(() => dayKeyOf(new Date(), DEFAULT_TIMEZONE));
+  const [anchor, setAnchor] = useState(() =>
+    linkDay && /^\d{4}-\d{2}-\d{2}$/.test(linkDay)
+      ? linkDay
+      : dayKeyOf(new Date(), DEFAULT_TIMEZONE),
+  );
+  const linkedEventOpened = useRef(false);
   const [pickedCalendarId, setPickedCalendarId] = useState<string | null>(null);
   const [showCancelled, setShowCancelled] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -389,6 +405,15 @@ export function AgendaView({ store, accountId, canBook, canManage }: AgendaViewP
       start: zonedToUtc(column.dayKey, minute, column.calendar.timezone),
     });
   }
+
+  // Open the linked appointment once its week has loaded.
+  useEffect(() => {
+    if (!linkEventId || linkedEventOpened.current || !eventsLoaded) return;
+    const event = events.find((e) => e.id === linkEventId);
+    if (!event) return;
+    linkedEventOpened.current = true;
+    openEvent(event);
+  }, [events, eventsLoaded, linkEventId]);
 
   function openEvent(event: AgendaEvent) {
     setSeed({

@@ -37,6 +37,7 @@ import {
   Bot,
 } from "lucide-react"
 import { AGENT_ROLES } from "@/lib/agents/roles"
+import { useTeams } from "@/hooks/use-atendimento"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -417,6 +418,29 @@ function ContactFieldSelect({
 
 /** Agent dropdown by name, storing the member's user_id. Falls back to
  *  a raw id input when the member list is unavailable. */
+/** The CRM's active setores (077), for "Atribuir conversa → Setor". */
+function TeamSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { teams } = useTeams()
+  const active = teams.filter((tm) => tm.active || tm.id === value)
+  if (active.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Nenhum setor ainda. Crie em Configurações › Atendimento e setores.
+      </p>
+    )
+  }
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={SELECT_CLASS}>
+      <option value="">Escolha o setor</option>
+      {active.map((tm) => (
+        <option key={tm.id} value={tm.id}>
+          {tm.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 function AgentSelect({
   value,
   onChange,
@@ -1474,6 +1498,7 @@ function StepEditor({
             >
               <option value="round_robin">{t("config.modes.round_robin")}</option>
               <option value="specific">{t("config.modes.specific")}</option>
+              <option value="team">{t("config.modes.team")}</option>
             </select>
           </FieldBlock>
           {cfg.mode === "specific" && (
@@ -1482,6 +1507,14 @@ function StepEditor({
                 value={(cfg.agent_id as string) ?? ""}
                 onChange={(v) => set({ agent_id: v })}
                 t={t}
+              />
+            </FieldBlock>
+          )}
+          {cfg.mode === "team" && (
+            <FieldBlock label={t("config.teamLabel")}>
+              <TeamSelect
+                value={(cfg.team_id as string) ?? ""}
+                onChange={(v) => set({ team_id: v })}
               />
             </FieldBlock>
           )}

@@ -18,6 +18,8 @@ import {
 } from './crm'
 import { isAgenciaRole, type AgenciaRole } from './roles'
 import { parseUsageRow, type CrmUsage } from './health'
+import { addAttendanceSignals } from './atendimento'
+import { addRadarSignals } from './radar-sinais'
 
 /** Postgres / PostgREST "column does not exist". */
 export function isMissingColumn(err: { code?: string } | null): boolean {
@@ -266,6 +268,10 @@ export async function loadPlatformUsage(
     const u = parseUsageRow(r)
     out.set(u.accountId, u)
   }
+  // Setor deadlines and queues (076–078), read from the conversations,
+  // and the Radar's open alerts (080).
+  await addAttendanceSignals(admin, out)
+  await addRadarSignals(admin, out)
   return out
 }
 

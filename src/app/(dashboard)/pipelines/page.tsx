@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEFAULT_PIPELINE_NAME,
@@ -67,6 +68,14 @@ export default function PipelinesPage() {
 
   // Guard against double-seeding (React StrictMode double-effect in dev).
   const seedAttempted = useRef(false);
+
+  // Deep link (/pipelines?pipeline=<id>&deal=<id>), e.g. the "Abrir no
+  // CRM" button of the agency's internal system: start on that funnel
+  // and open that deal once it is on the board.
+  const searchParams = useSearchParams();
+  const linkedPipelineId = searchParams.get("pipeline");
+  const linkedDealId = searchParams.get("deal");
+  const linkedDealOpened = useRef(false);
 
   const loadPipelines = useCallback(async () => {
     const { data, error } = await supabase
@@ -148,11 +157,26 @@ export default function PipelinesPage() {
         if (seeded) list = await loadPipelines();
       }
 
+      // A linked deal without its funnel: ask which funnel it is in.
+      let wanted = linkedPipelineId;
+      if (!wanted && linkedDealId) {
+        const { data: linked } = await supabase
+          .from("deals")
+          .select("pipeline_id")
+          .eq("id", linkedDealId)
+          .maybeSingle();
+        wanted = (linked as { pipeline_id?: string } | null)?.pipeline_id ?? null;
+      }
+
       if (cancelled) return;
       setPipelines(list);
       if (list.length > 0) {
         setSelectedPipelineId((prev) =>
-          prev && list.some((p) => p.id === prev) ? prev : list[0].id,
+          prev && list.some((p) => p.id === prev)
+            ? prev
+            : wanted && list.some((p) => p.id === wanted)
+              ? wanted
+              : list[0].id,
         );
       } else {
         setSelectedPipelineId("");
@@ -162,6 +186,8 @@ export default function PipelinesPage() {
     return () => {
       cancelled = true;
     };
+    // The deep link is read once, on the first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadPipelines, seedDefaultPipeline]);
 
   // Load stages + deals whenever selected pipeline changes.
@@ -241,6 +267,15 @@ export default function PipelinesPage() {
     setDefaultStageId(deal.stage_id);
     setDealFormOpen(true);
   }, []);
+
+  // Open the linked deal as soon as the board that holds it loads.
+  useEffect(() => {
+    if (!linkedDealId || linkedDealOpened.current) return;
+    const deal = deals.find((d) => d.id === linkedDealId);
+    if (!deal) return;
+    linkedDealOpened.current = true;
+    handleEditDeal(deal);
+  }, [deals, linkedDealId, handleEditDeal]);
 
   async function handleCreatePipeline() {
     const name = newPipelineName.trim();

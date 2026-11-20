@@ -84,6 +84,7 @@ when their guard is set.
 | `create_contact`     | write     | `contacts:write`     | Create (find-or-create) a contact               |
 | `update_contact`     | write     | `contacts:write`     | Update a contact / replace its tags             |
 | `update_deal`        | write     | `deals:write`        | Move a deal's stage, mark it won/lost           |
+| `transfer_conversation` | write  | `conversations:write` | Give a conversation to a person or a setor, with a note |
 | `send_broadcast`     | broadcast | `broadcasts:send`    | Launch a template broadcast (requires `confirm`)|
 
 ## Safety model

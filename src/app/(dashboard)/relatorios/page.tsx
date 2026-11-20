@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/dashboard/skeleton";
 import { CategoryBars } from "@/components/reports/category-bars";
 import { DayBars } from "@/components/reports/day-bars";
 import { FirstResponse } from "@/components/reports/first-response";
+import { AtendimentoCard } from "@/components/reports/atendimento-card";
 import { GoalMeters } from "@/components/reports/goal-meters";
 import { ReportCard } from "@/components/reports/report-card";
 import { AnalystPanel } from "@/components/reports/analyst-panel";
@@ -436,6 +437,18 @@ function ReportsPageInner() {
                 )}
               </ReportCard>
             </Reveal>
+
+            {bundle.atendimento && (
+              <Reveal index={11} className="lg:col-span-2">
+                <ReportCard
+                  title="Atendimento por pessoa e por setor"
+                  hint="Quem recebeu e quem passou conversas no período, e como andaram as filas dos setores."
+                  query={query}
+                >
+                  <AtendimentoCard report={bundle.atendimento} />
+                </ReportCard>
+              </Reveal>
+            )}
           </div>
 
           {bundle.agents ? (

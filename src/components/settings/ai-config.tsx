@@ -29,14 +29,16 @@ import { AiKnowledgeCard } from './ai-knowledge';
 import { AI_PROVIDER_DEFAULT_MODEL } from '@/lib/ai/defaults';
 import type { AiProvider } from '@/lib/ai/types';
 import type { AccountMember } from '@/types';
-import { fetchAccountMembers, memberLabel } from '@/lib/account/members';
+import { fetchAccountMembers } from '@/lib/account/members';
+import { HandoffTargetField, type HandoffTargetValue } from '@/components/atendimento/handoff-target-field';
+import { useTeams } from '@/hooks/use-atendimento';
+import { isHandoffMode } from '@/lib/atendimento/destino';
 import { useTranslations } from 'next-intl';
 
 const MASKED_KEY = '••••••••••••••••';
 
 // Radix Select can't use an empty-string item value, so the "leave
 // unassigned" choice gets a sentinel that maps to null in the payload.
-const HANDOFF_QUEUE = '__queue__';
 
 const PROVIDER_LABEL: Record<AiProvider, string> = {
   openai: 'OpenAI',
@@ -73,7 +75,8 @@ export function AiConfig() {
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [maxPerConversation, setMaxPerConversation] = useState(3);
   // Empty string = leave unassigned (shared queue).
-  const [handoffAgentId, setHandoffAgentId] = useState('');
+  const [handoffTarget, setHandoffTarget] = useState<HandoffTargetValue>({ mode: null, teamId: null, userId: null });
+  const { teams } = useTeams();
   const [members, setMembers] = useState<AccountMember[]>([]);
 
   // Guard keyed on the account (not a bare boolean) so an in-place
@@ -99,7 +102,11 @@ export function AiConfig() {
         setIsActive(data.is_active);
         setAutoReplyEnabled(data.auto_reply_enabled);
         setMaxPerConversation(data.auto_reply_max_per_conversation ?? 3);
-        setHandoffAgentId(data.handoff_agent_id ?? '');
+        setHandoffTarget({
+          mode: isHandoffMode(data.handoff_mode) ? data.handoff_mode : null,
+          teamId: data.handoff_team_id ?? null,
+          userId: data.handoff_agent_id ?? null,
+        });
         setHasStoredKey(Boolean(data.has_key));
         setApiKey(data.has_key ? MASKED_KEY : '');
         setKeyEdited(false);
@@ -150,7 +157,12 @@ export function AiConfig() {
     is_active: isActive,
     auto_reply_enabled: autoReplyEnabled,
     auto_reply_max_per_conversation: maxPerConversation,
-    handoff_agent_id: handoffAgentId || null,
+    // "Quando passar para uma pessoa" (077): the mode, and the person or
+    // setor it needs. A legacy save (no mode) keeps only the person.
+    handoff_agent_id:
+      handoffTarget.mode === 'pessoa' || handoffTarget.mode === null ? handoffTarget.userId : null,
+    handoff_mode: handoffTarget.mode,
+    handoff_team_id: handoffTarget.mode === 'setor' ? handoffTarget.teamId : null,
   });
 
   const handleTest = async () => {
@@ -218,7 +230,7 @@ export function AiConfig() {
         setIsActive(false);
         setAutoReplyEnabled(false);
         setSystemPrompt('');
-        setHandoffAgentId('');
+        setHandoffTarget({ mode: null, teamId: null, userId: null });
       } else {
         const data = await res.json();
         toast.error(data.error ?? t('removeFailed'));
@@ -461,27 +473,14 @@ export function AiConfig() {
               <p className="text-xs text-muted-foreground">
                 {t('handoffToDesc')}
               </p>
-              <Select
-                value={handoffAgentId || HANDOFF_QUEUE}
-                onValueChange={(v) =>
-                  setHandoffAgentId(!v || v === HANDOFF_QUEUE ? '' : v)
-                }
+              <HandoffTargetField
+                idPrefix="ai-handoff"
+                value={handoffTarget}
+                onChange={setHandoffTarget}
+                members={members}
+                teams={teams}
                 disabled={disabled || !autoReplyEnabled}
-              >
-                <SelectTrigger id="ai-handoff">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={HANDOFF_QUEUE}>
-                    {t('handoffQueue')}
-                  </SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.user_id} value={m.user_id}>
-                      {memberLabel(m)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </CardContent>
         </Card>

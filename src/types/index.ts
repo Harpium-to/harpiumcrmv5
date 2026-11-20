@@ -75,6 +75,8 @@ export interface AccountMember {
   avatar_url: string | null;
   role: AccountRole;
   joined_at: string;
+  /** "Recebe conversas" (076): off takes the person out of every rotation. */
+  receives_conversations?: boolean;
 }
 
 /**
@@ -348,6 +350,10 @@ export interface Conversation {
    * triggers; null/absent means nobody is waiting.
    */
   needs_human_since?: string | null;
+  /** The setor it is in (077): its queue when nobody owns it. */
+  team_id?: string | null;
+  /** When the current owner got it (076). */
+  assigned_at?: string | null;
 }
 
 // ============================================================
@@ -363,7 +369,17 @@ export type NotificationType =
   /** A customer booked through an agenda's public link (067). */
   | 'agenda_booking'
   /** Google Agenda: an appointment changed there, or the connection dropped (071). */
-  | 'agenda_google';
+  | 'agenda_google'
+  /** Harpi: a routine's report, or changes waiting for an OK (074). */
+  | 'assistente'
+  /** A conversation waits in a setor's queue with nobody to take it (077). */
+  | 'team_queue'
+  /** A conversation went past its setor's reply deadline (078). */
+  | 'conversation_overdue'
+  /** A customer wrote again to a closed conversation (078). */
+  | 'conversation_returned'
+  /** Radar: new alerts, or the week's digest (080). */
+  | 'radar';
 
 export interface Notification {
   id: string;
@@ -552,6 +568,10 @@ export interface Deal {
   contact?: Contact;
   stage?: PipelineStage;
   assignee?: Profile;
+  /** Chance of closing, 0–1 (Radar, 080). Null until computed. */
+  win_probability?: number | null;
+  /** 'historico': enough closed deals to trust it; 'fraca': not yet. */
+  win_probability_basis?: 'historico' | 'fraca' | null;
 }
 
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
@@ -716,8 +736,14 @@ export interface TagStepConfig {
 }
 
 export interface AssignConversationStepConfig {
-  mode: 'specific' | 'round_robin';
+  /**
+   * round_robin — the CRM-wide rotation (online first, fair turns, 076);
+   * specific    — `agent_id`;
+   * team        — the setor `team_id`, whose own rule picks the person (077).
+   */
+  mode: 'specific' | 'round_robin' | 'team';
   agent_id?: string;
+  team_id?: string;
 }
 
 export interface UpdateContactFieldStepConfig {

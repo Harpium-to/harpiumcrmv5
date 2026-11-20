@@ -45,7 +45,8 @@
     "reports": "Relatórios",
     "help": "Ajuda",
     "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}",
-    "tools": "Ferramentas"
+    "tools": "Ferramentas",
+    "radar": "Radar"
   },
   "TopBar": {
     "openMenu": "Abrir menu",
@@ -160,7 +161,12 @@
       "waitingShowAll": "Ver todas",
       "waitingNobody": "Ninguém assumiu",
       "waitingMine": "Com você, sem resposta",
-      "waitingAssigned": "Atribuída, sem resposta"
+      "waitingAssigned": "Atribuída, sem resposta",
+      "filterMine": "Minhas",
+      "filterUnassigned": "Sem responsável",
+      "filterMyTeams": "Fila dos meus setores",
+      "team": "Setor",
+      "allTeams": "Todos os setores"
     },
     "messageThread": {
       "backToConversations": "Voltar para conversas",
@@ -1021,7 +1027,8 @@
         "modeLabel": "Modo",
         "modes": {
           "round_robin": "Rodízio",
-          "specific": "Atendente específico"
+          "specific": "Atendente específico",
+          "team": "Setor (a regra dele escolhe a pessoa)"
         },
         "agentLabel": "Atendente",
         "fieldLabel": "Campo",
@@ -1070,7 +1077,8 @@
         "agentHandoffHelp": "O agente recebe o contato com as respostas do lead e abre a conversa no WhatsApp, no horário de trabalho dele. Precisa de um agente ativo com essa função.",
         "leadOptOutHelp": "Contatos que pediram para não receber mensagens automáticas ficam de fora.",
         "insertVariable": "Inserir dado do contato:",
-        "insertVariableHelp": "Vale em qualquer gatilho. Se o contato não tiver o dado, a variável some sem deixar buraco (\"Olá, tudo bem?\" em vez de \"Olá , tudo bem?\")."
+        "insertVariableHelp": "Vale em qualquer gatilho. Se o contato não tiver o dado, a variável some sem deixar buraco (\"Olá, tudo bem?\" em vez de \"Olá , tudo bem?\").",
+        "teamLabel": "Setor"
       }
     }
   },

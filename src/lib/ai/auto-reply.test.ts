@@ -14,6 +14,8 @@ import { DEFAULT_HANDOFF_NOTICE } from './handoff'
 // Shared, hoisted mock state so the module mocks can close over it.
 const h = vi.hoisted(() => ({
   loadAiConfig: vi.fn(),
+  transferirConversa: vi.fn(),
+  loadHandoffContext: vi.fn(),
   buildConversationContext: vi.fn(),
   retrieveKnowledge: vi.fn(),
   generateReply: vi.fn(),
@@ -41,6 +43,11 @@ const h = vi.hoisted(() => ({
 }))
 
 vi.mock('./config', () => ({ loadAiConfig: h.loadAiConfig }))
+vi.mock('@/lib/atendimento/transferir', () => ({ transferirConversa: h.transferirConversa }))
+vi.mock('@/lib/atendimento/destino', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/atendimento/destino')>()),
+  loadHandoffContext: h.loadHandoffContext,
+}))
 vi.mock('./context', () => ({ buildConversationContext: h.buildConversationContext }))
 vi.mock('./knowledge', () => ({ retrieveKnowledge: h.retrieveKnowledge }))
 vi.mock('./generate', () => ({ generateReply: h.generateReply }))
@@ -232,6 +239,26 @@ beforeEach(() => {
   h.retrieveKnowledge.mockResolvedValue([])
   h.generateReply.mockResolvedValue({ text: 'Hello!', handoff: false })
   h.engineSendText.mockResolvedValue({ whatsapp_message_id: 'm1' })
+  // No setores (a database before 077): the handoff uses the old
+  // "Passar para" person, as it always did.
+  h.loadHandoffContext.mockResolvedValue(null)
+  h.transferirConversa.mockResolvedValue({ ok: true, changed: true })
+})
+
+describe('dispatchInboundToAiReply — what it tells the arrival rule', () => {
+  it('"off" when no AI answers this CRM', async () => {
+    h.loadAiConfig.mockResolvedValue(null)
+    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBe('off')
+  })
+
+  it('"off" when the single assistant is switched off', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ autoReplyEnabled: false }))
+    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBe('off')
+  })
+
+  it('"engaged" when it answered', async () => {
+    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBe('engaged')
+  })
 })
 
 describe('dispatchInboundToAiReply — eligibility gates', () => {
@@ -376,10 +403,63 @@ describe('dispatchInboundToAiReply — handoff', () => {
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
     h.generateReply.mockResolvedValue({ text: '', handoff: true })
     await dispatchInboundToAiReply(ARGS)
-    expect(h.state.updatePayload).toMatchObject({
-      ai_autoreply_disabled: true,
-      assigned_agent_id: 'agent-7',
+    // The pause and the note land first; the owner changes through the
+    // one transfer path (history + notification), never in this write.
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.state.updatePayload).not.toHaveProperty('assigned_agent_id')
+    expect(h.transferirConversa).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        conversationId: ARGS.conversationId,
+        target: { kind: 'pessoa', userId: 'agent-7' },
+        source: 'ia',
+        onlyIfUnassigned: true,
+      }),
+    )
+  })
+
+  it('sends it to the setor the AI named, when the AI may choose', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'agent-7' }))
+    h.loadHandoffContext.mockResolvedValue({
+      teams: [
+        { id: 'team-fin', code: 'financeiro', name: 'Financeiro', description: 'boletos, parcelamento', isEntry: false },
+        { id: 'team-rec', code: 'recepcao', name: 'Recepção', description: 'dúvidas gerais', isEntry: true },
+      ],
+      entryTeamId: 'team-rec',
+      account: { mode: 'ia_escolhe', teamId: null, userId: 'agent-7' },
+      agent: null,
     })
+    h.generateReply.mockResolvedValue({
+      text: 'Vou te passar para o financeiro.',
+      handoff: true,
+      handoffTeam: 'financeiro',
+    })
+    await dispatchInboundToAiReply(ARGS)
+
+    // The AI read the setores and the marker it must write.
+    const prompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(prompt).toContain('- financeiro: Financeiro — boletos, parcelamento')
+    expect(prompt).toContain('[[HANDOFF <code>]]')
+    expect(h.transferirConversa).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ target: { kind: 'setor', teamId: 'team-fin' }, source: 'ia' }),
+    )
+  })
+
+  it('falls back to the entry setor when the AI does not name one', async () => {
+    h.loadAiConfig.mockResolvedValue(aiConfig())
+    h.loadHandoffContext.mockResolvedValue({
+      teams: [{ id: 'team-rec', code: 'recepcao', name: 'Recepção', description: null, isEntry: true }],
+      entryTeamId: 'team-rec',
+      account: { mode: null, teamId: null, userId: null },
+      agent: null,
+    })
+    h.generateReply.mockResolvedValue({ text: '', handoff: true })
+    await dispatchInboundToAiReply(ARGS)
+    expect(h.transferirConversa).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ target: { kind: 'setor', teamId: 'team-rec' } }),
+    )
   })
 
   describe('in agent mode', () => {
@@ -398,7 +478,7 @@ describe('dispatchInboundToAiReply — handoff', () => {
       h.generateReply.mockResolvedValue({ text: '', handoff: true })
       const message = '(#131030) Recipient phone number not in allowed list'
       h.engineSendText.mockRejectedValue(new MetaApiError(message, 131030))
-      await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+      await expect(dispatchInboundToAiReply(ARGS)).resolves.toBe('engaged')
       // Still paused: the thread belongs to a human either way.
       expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
       expect(runOutcomes()).toEqual([
@@ -463,10 +543,15 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
     h.loadAiConfig.mockResolvedValue(aiConfig({ handoffAgentId: 'human-7' }))
     h.state.conv = conv({ ai_reply_count: 3 })
     await dispatchInboundToAiReply(ARGS)
-    expect(h.state.updatePayload).toMatchObject({
-      ai_autoreply_disabled: true,
-      assigned_agent_id: 'human-7',
-    })
+    expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+    expect(h.transferirConversa).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        target: { kind: 'pessoa', userId: 'human-7' },
+        source: 'ia',
+        note: expect.stringContaining('Limite de respostas da IA'),
+      }),
+    )
   })
 
   it('never overwrites an existing assignment', async () => {
@@ -476,6 +561,7 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
     // A human already owns it: no pause, no reassignment, no reply.
     expect(h.state.convUpdates).toHaveLength(0)
     expect(h.engineSendText).not.toHaveBeenCalled()
+    expect(h.transferirConversa).not.toHaveBeenCalled()
   })
 
   describe('in agent mode', () => {
@@ -488,10 +574,11 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
       await dispatchInboundToAiReply(ARGS)
 
       expect(h.generateReply).not.toHaveBeenCalled()
-      expect(h.state.updatePayload).toMatchObject({
-        ai_autoreply_disabled: true,
-        assigned_agent_id: 'human-2',
-      })
+      expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
+      expect(h.transferirConversa).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ target: { kind: 'pessoa', userId: 'human-2' } }),
+      )
       expect(h.state.updatePayload?.ai_handoff_summary).toContain(
         'depois de 10 respostas (limite da conversa)',
       )
@@ -505,7 +592,7 @@ describe('dispatchInboundToAiReply — reply cap hands off', () => {
       h.state.conv = conv({ ai_reply_count: 10 })
       const message = '(#131030) Recipient phone number not in allowed list'
       h.engineSendText.mockRejectedValue(new MetaApiError(message, 131030))
-      await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+      await expect(dispatchInboundToAiReply(ARGS)).resolves.toBe('engaged')
       // Still paused: the thread belongs to a human either way.
       expect(h.state.updatePayload).toMatchObject({ ai_autoreply_disabled: true })
       expect(runOutcomes()).toEqual([
@@ -760,7 +847,7 @@ describe('dispatchInboundToAiReply — failed replies', () => {
 
   /** Run one dispatch and return the failed run's parsed reason. */
   async function failedReason() {
-    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBeUndefined()
+    await expect(dispatchInboundToAiReply(ARGS)).resolves.toBe('engaged')
     const failed = h.state.runUpdates.filter((r) => r.status === 'failed')
     expect(failed).toHaveLength(1)
     return failed[0].reason as string

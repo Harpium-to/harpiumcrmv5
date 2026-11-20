@@ -88,6 +88,8 @@ describe('053 — applying a template', () => {
       automations: 2,
       // The clinic's agenda (067).
       calendars: 1,
+      // Its suggested setores, without people (078).
+      teams: 4,
       skipped: 0,
     })
     const stages = await sql<{ name: string }>(
@@ -103,6 +105,17 @@ describe('053 — applying a template', () => {
       'Retorno / tratamento',
       'Fidelizado',
       'Perdido',
+    ])
+    const teams = await sql<{ name: string; code: string; is_entry: boolean; mode: string }>(
+      w.db,
+      'SELECT name, code, is_entry, mode FROM teams WHERE account_id = $1 ORDER BY position',
+      [clinic],
+    )
+    expect(teams).toEqual([
+      { name: 'Recepção', code: 'recepcao', is_entry: true, mode: 'rodizio' },
+      { name: 'Agendamento', code: 'agendamento', is_entry: false, mode: 'rodizio' },
+      { name: 'Financeiro', code: 'financeiro', is_entry: false, mode: 'rodizio' },
+      { name: 'Orçamentos', code: 'orcamentos', is_entry: false, mode: 'menos_ocupado' },
     ])
   })
 
@@ -146,7 +159,8 @@ describe('053 — applying a template', () => {
       quick_replies: 0,
       automations: 0,
       calendars: 0,
-      skipped: 18,
+      teams: 0,
+      skipped: 22,
     })
   })
 

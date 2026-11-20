@@ -6,7 +6,8 @@ export interface LogAiUsageArgs {
   /** Null for a draft not tied to one thread, or when the row was
    *  deleted between generation and logging. */
   conversationId: string | null
-  mode: 'auto_reply' | 'draft'
+  /** 'assistant' = Harpi, the CRM assistant (migration 074). */
+  mode: 'auto_reply' | 'draft' | 'assistant'
   provider: AiProvider
   model: string
   /** Provider usage; a no-op when null (nothing worth recording). */

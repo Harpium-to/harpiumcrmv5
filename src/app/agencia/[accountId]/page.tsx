@@ -29,6 +29,8 @@ import { loadWhatsAppDetail } from '@/lib/agencia/whatsapp'
 import { WhatsAppCard } from './whatsapp-card'
 import { loadGoogleAgendaDetail } from '@/lib/agencia/google-agenda'
 import { GoogleAgendaCard } from './google-agenda-card'
+import { AtendimentoCard } from './atendimento-card'
+import { loadTeamQueues } from '@/lib/agencia/atendimento'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +58,7 @@ export default async function AgenciaAccountPage({
     applications,
     whatsapp,
     googleAgenda,
+    teamQueues,
   ] = await Promise.all([
       getAccountDetail(admin, accountId, { personal: gate.allowed }),
       getAccountMetrics(admin, accountId, windowDays),
@@ -69,6 +72,8 @@ export default async function AgenciaAccountPage({
       loadWhatsAppDetail(admin, accountId, { personal: gate.allowed }),
       // Which agendas write to Google; the account e-mail is personal (G3).
       loadGoogleAgendaDetail(admin, accountId, { personal: gate.allowed }),
+      // Setor queues and deadlines: counts only, nothing personal.
+      loadTeamQueues(admin, accountId),
     ])
   if (!detail) notFound()
   const lifecycle = lifecycleRows[0]
@@ -187,6 +192,8 @@ export default async function AgenciaAccountPage({
       />
 
       <GoogleAgendaCard detail={googleAgenda} />
+
+      <AtendimentoCard teams={teamQueues} />
 
       {usageMap?.get(account.id) && lifecycle && (
         <HealthCard

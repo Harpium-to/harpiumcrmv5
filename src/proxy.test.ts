@@ -154,3 +154,38 @@ describe("proxy — the public quiz", () => {
     expect(own.headers.get("x-middleware-rewrite")).toBeNull();
   });
 });
+
+describe("proxy — coming back after the login", () => {
+  it("sends a signed-out visitor to the login with the way back", async () => {
+    mockUser = null;
+    const res = await proxy(
+      new NextRequest("https://app.test/abrir?crm=1&ir=%2Fleads"),
+    );
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.pathname).toBe("/login");
+    expect(loc.searchParams.get("next")).toBe("/abrir?crm=1&ir=%2Fleads");
+  });
+
+  it("does not carry a way back for the plain dashboard", async () => {
+    mockUser = null;
+    const res = await proxy(new NextRequest("https://app.test/dashboard"));
+    expect(res.headers.get("location")).toBe("https://app.test/login");
+  });
+
+  it("a signed-in visitor of /login?next= goes there", async () => {
+    mockUser = { id: "user-1" };
+    const res = await proxy(
+      new NextRequest("https://app.test/login?next=%2Fpipelines%3Fdeal%3D7"),
+    );
+    expect(res.headers.get("location")).toBe("https://app.test/pipelines?deal=7");
+  });
+
+  it("an outside `next` is ignored", async () => {
+    mockUser = { id: "user-1" };
+    const res = await proxy(
+      new NextRequest("https://app.test/login?next=%2F%2Fevil.com"),
+    );
+    expect(res.headers.get("location")).toBe("https://app.test/dashboard");
+  });
+});
+

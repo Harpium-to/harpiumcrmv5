@@ -445,6 +445,31 @@ the pause and the handoff note, releases the owner and gives the bot a
 fresh reply budget here. Scope: `conversations:write`. Answers the same
 shape as `GET /api/v1/contacts/{id}/conversation`.
 
+### `POST /api/v1/conversations/{id}/transfer`
+
+Give the conversation to a person or a setor, with an optional note —
+what "Transferir" does in the inbox. Scope: `conversations:write`. Body,
+one of:
+
+```json
+{ "to_user_id": "<uuid>", "note": "quer parcelar em 10x" }
+{ "to_team_id": "<uuid>", "note": "orçamento de implante" }
+{ "to": "queue" }
+```
+
+A setor picks the person by its own rule (rodízio, menos ocupado or
+fila); with nobody available — or a setor in "fila" mode — the
+conversation waits in the setor's queue. The person who receives it is
+notified with the note, the conversation's history records it, and
+`conversation.assigned` fires. Answers:
+
+```json
+{ "data": { "conversation_id": "…", "assigned_user_id": "…", "team_id": "…", "changed": true, "status": "assigned" } }
+```
+
+`status` is `assigned`, `queued` (in a setor's queue) or
+`nobody_available`. Needs migrations `076` (people) and `077` (setores).
+
 ### `POST /api/v1/conversations/{id}/flow/pause`
 
 Stop the chatbot flow running on this conversation; the run ends as
@@ -646,6 +671,7 @@ things happen in your account. **Migration required:** apply
 | `message.received`       | An inbound message arrives from a contact         |
 | `message.status_updated` | A message you sent changed delivery status        |
 | `conversation.created`   | A new conversation is opened for a contact        |
+| `conversation.assigned`  | A conversation changed hands: a person, a setor or the queue |
 | `lead.received`          | A lead arrives at the lead URL or from Meta Lead Ads (not for a repeat of the same `id_externo`) |
 
 ### Managing endpoints
@@ -688,6 +714,8 @@ delivery uuid you can dedupe on, and `data` varies by `event`:
 { "conversation_id": "…", "contact_id": "…", "whatsapp_message_id": "wamid.…", "content_type": "text", "text": "Hi 👋" }
 // conversation.created
 { "conversation_id": "…", "contact_id": "…" }
+// conversation.assigned (to_user_id null: waiting in a queue; source: manual, ia, rodizio, fluxo, automacao, harpi, api, prazo, retorno, chegada)
+{ "conversation_id": "…", "contact_id": "…", "from_user_id": null, "to_user_id": "…", "team_id": "…", "source": "ia", "note": "“dá pra parcelar?”" }
 // message.status_updated
 { "whatsapp_message_id": "wamid.…", "conversation_id": "…", "status": "delivered" }
 // lead.received (contato_id is null when the lead had no phone and matched no contact)

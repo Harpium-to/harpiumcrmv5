@@ -14,14 +14,14 @@ import type {
   Contact,
   ConversationStatus,
   MessageTemplate,
-  Profile,
   InteractiveMessagePayload,
 } from "@/types";
 import {
   MessageSquare,
   ChevronDown,
   UserPlus,
-  Check,
+  Hand,
+  ArrowRightLeft,
   Clock,
   ArrowLeft,
   RefreshCw,
@@ -50,6 +50,9 @@ import {
 import { deleteAccountMedia } from "@/lib/storage/upload-media";
 import { TemplatePicker } from "./template-picker";
 import { AiThreadBanner } from "./ai-thread-banner";
+import { TransferDialog, type TransferOutcome } from "./transfer-dialog";
+import { useMembers, useTeams } from "@/hooks/use-atendimento";
+import { describeTransfer, type TransferEvent } from "@/lib/atendimento/historico";
 import { buildReplyPreview } from "./reply-quote";
 import { toast } from "sonner";
 
@@ -77,7 +80,11 @@ interface MessageThreadProps {
   onAssignChange: (
     conversationId: string,
     assignedAgentId: string | null,
+    /** The setor it is in after the change (077); undefined = unchanged. */
+    teamId?: string | null,
   ) => void;
+  /** Open conversations each person owns, for the "Transferir" dialog. */
+  openCountByUser?: Record<string, number>;
   /**
    * On mobile, the thread is shown full-screen with the conversation list
    * hidden. This callback lets the page deselect the active conversation
@@ -119,20 +126,30 @@ function formatDateSeparator(dateStr: string, t: ReturnType<typeof useTranslatio
   return format(date, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
 }
 
-function groupMessagesByDate(messages: Message[]) {
-  const groups: { date: string; messages: Message[] }[] = [];
-  let currentDate = "";
+/** A message, or a line of the conversation's history (who passed it to whom). */
+type ThreadItem =
+  | { kind: "message"; at: string; message: Message }
+  | { kind: "transfer"; at: string; event: TransferEvent };
 
-  for (const msg of messages) {
-    const day = format(new Date(msg.created_at), "yyyy-MM-dd");
+function groupItemsByDate(messages: Message[], transfers: TransferEvent[]) {
+  const items: ThreadItem[] = [
+    ...messages.map((message) => ({ kind: "message" as const, at: message.created_at, message })),
+    ...transfers.map((event) => ({ kind: "transfer" as const, at: event.created_at, event })),
+  ];
+  // Stable for equal timestamps: messages keep their own order.
+  items.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+
+  const groups: { date: string; items: ThreadItem[] }[] = [];
+  let currentDate = "";
+  for (const item of items) {
+    const day = format(new Date(item.at), "yyyy-MM-dd");
     if (day !== currentDate) {
       currentDate = day;
-      groups.push({ date: msg.created_at, messages: [msg] });
+      groups.push({ date: item.at, items: [item] });
     } else {
-      groups[groups.length - 1].messages.push(msg);
+      groups[groups.length - 1].items.push(item);
     }
   }
-
   return groups;
 }
 
@@ -168,6 +185,7 @@ export function MessageThread({
   onRefresh,
   contactPanelOpen,
   onToggleContactPanel,
+  openCountByUser,
 }: MessageThreadProps) {
   const t = useTranslations("Inbox.messageThread");
   const tTimer = useTranslations("Inbox.sessionTimer");
@@ -178,7 +196,10 @@ export function MessageThread({
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const { members } = useMembers();
+  const { teams } = useTeams();
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transfers, setTransfers] = useState<TransferEvent[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   // Purely visual spin state for the manual-refresh button. The actual
   // refetch is fire-and-forget through `onRefresh` (which bumps the
@@ -204,28 +225,34 @@ export function MessageThread({
   }, [isRefreshing, onRefresh]);
   const [replyTo, setReplyTo] = useState<ReplyDraft | null>(null);
 
-  // Profiles are bounded by RLS to rows the current user is allowed to
-  // see — today that's just the current user, but the dropdown keeps the
-  // shape ready for shared-team workspaces without a refactor.
+  // The conversation's history (076): who passed it to whom, shown as
+  // lines between the messages. Refetched when the owner or the setor
+  // changes (realtime brings the conversation row). A database without
+  // 076 simply has none.
+  const transferKey = `${conversation?.id ?? ""}|${conversation?.assigned_agent_id ?? ""}|${conversation?.team_id ?? ""}|${resyncToken}`;
   useEffect(() => {
+    const id = conversation?.id;
+    if (!id) {
+      setTransfers([]);
+      return;
+    }
     let cancelled = false;
     const supabase = createClient();
     supabase
-      .from("profiles")
-      .select("*")
-      .order("full_name")
+      .from("conversation_transfers")
+      .select("id, created_at, from_user_id, to_user_id, from_team_id, to_team_id, actor_user_id, source, note")
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true })
+      .limit(200)
       .then(({ data, error }) => {
         if (cancelled) return;
-        if (error) {
-          console.error("Failed to fetch profiles:", error);
-          return;
-        }
-        setProfiles((data as Profile[]) ?? []);
+        setTransfers(error ? [] : ((data ?? []) as TransferEvent[]));
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transferKey]);
 
   // 24-hour session timer
   const sessionInfo = useMemo(() => {
@@ -823,26 +850,40 @@ export function MessageThread({
     [conversation, user?.id],
   );
 
-  const handleAssignChange = useCallback(
-    async (agentId: string | null) => {
+  const handleTransferred = useCallback(
+    (outcome: TransferOutcome) => {
       if (!conversation) return;
-
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("conversations")
-        .update({ assigned_agent_id: agentId })
-        .eq("id", conversation.id);
-
-      if (error) {
-        console.error("Failed to update assignment:", error);
-        toast.error("Falha ao atualizar o responsável");
-        return;
-      }
-
-      onAssignChange(conversation.id, agentId);
+      onAssignChange(conversation.id, outcome.toUserId, outcome.teamId);
     },
     [conversation, onAssignChange],
   );
+
+  /** "Pegar": take it while nobody has it — the second of two clicks loses. */
+  const handleClaim = useCallback(async () => {
+    if (!conversation) return;
+    try {
+      const res = await fetch(`/api/conversations/${conversation.id}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ para: "mim", pegar: true }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        reason?: string | null;
+        to_user_id?: string | null;
+        team_id?: string | null;
+      };
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      if (json.reason === "already_assigned") {
+        toast.warning("Alguém pegou essa conversa antes de você");
+      } else {
+        toast.success("A conversa é sua");
+      }
+      onAssignChange(conversation.id, json.to_user_id ?? null, json.team_id ?? null);
+    } catch (err) {
+      toast.error(`Não consegui pegar: ${err instanceof Error ? err.message : "erro"}`);
+    }
+  }, [conversation, onAssignChange]);
 
   // Empty state — same WhatsApp-style doodle background as the active
   // thread below, so swapping between empty/selected doesn't change the
@@ -864,15 +905,21 @@ export function MessageThread({
   }
 
   const displayName = contact.name || contact.phone;
-  const messageGroups = groupMessagesByDate(messages);
+  const messageGroups = groupItemsByDate(messages, transfers);
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status
   );
   const assignedAgentId = conversation.assigned_agent_id ?? null;
-  const currentAssignee = profiles.find((p) => p.user_id === assignedAgentId);
+  const currentAssignee = members.find((m) => m.user_id === assignedAgentId);
+  const currentTeam = conversation.team_id
+    ? teams.find((tm) => tm.id === conversation.team_id) ?? null
+    : null;
   const assignLabel = assignedAgentId
-    ? (currentAssignee?.full_name ?? t("assigned"))
+    ? (assignedAgentId === user?.id ? t("me").replace(/[()]/g, "").trim() || t("assigned") : currentAssignee?.full_name ?? t("assigned"))
     : t("assign");
+  const nameOf = (userId: string) =>
+    userId === user?.id ? "Você" : members.find((m) => m.user_id === userId)?.full_name || null;
+  const teamNameOf = (teamId: string) => teams.find((tm) => tm.id === teamId)?.name ?? null;
 
   return (
     // `min-w-0` is load-bearing: the page already puts min-w-0 on the
@@ -996,70 +1043,58 @@ export function MessageThread({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Assign dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={cn(
-                "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-muted",
-                assignedAgentId ? "text-primary" : "text-muted-foreground"
-              )}
+          {/* Who has it: the owner (and setor), "Pegar" while nobody
+              does, and "Transferir" to a person or a setor with a note. */}
+          {!assignedAgentId && (
+            <button
+              type="button"
+              onClick={handleClaim}
+              className="inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs text-primary hover:bg-primary/10"
+              title="Ficar com esta conversa"
             >
-              <UserPlus className="h-3 w-3" />
-              <span className="hidden sm:inline">{assignLabel}</span>
-              <ChevronDown className="h-3 w-3" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="border-border bg-popover"
-            >
-              {profiles.length === 0 ? (
-                <DropdownMenuItem disabled className="text-sm text-muted-foreground">
-                  {t("noTeammates")}
-                </DropdownMenuItem>
-              ) : (
-                profiles.map((p) => {
-                  const isSelected = p.user_id === assignedAgentId;
-                  const presence = getPresence(p.user_id);
-                  return (
-                    <DropdownMenuItem
-                      key={p.id}
-                      onClick={() => handleAssignChange(p.user_id)}
-                      className={cn(
-                        "text-sm",
-                        isSelected ? "text-primary" : "text-popover-foreground"
-                      )}
-                    >
-                      <PresenceDot
-                        status={presence}
-                        label={presenceLabel(
-                          presence,
-                          getRow(p.user_id)?.last_seen_at ?? null,
-                          now
-                        )}
-                        className="mr-2"
-                      />
-                      <span className="flex-1">
-                        {p.full_name}
-                        {p.user_id === user?.id ? t("me") : ""}
-                      </span>
-                      {isSelected && <Check className="ml-2 h-3 w-3" />}
-                    </DropdownMenuItem>
-                  );
-                })
-              )}
-              {assignedAgentId && (
-                <>
-                  <DropdownMenuSeparator className="bg-border" />
-                  <DropdownMenuItem
-                    onClick={() => handleAssignChange(null)}
-                    className="text-sm text-muted-foreground"
-                  >
-                    {t("unassign")}
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <Hand className="h-3 w-3" />
+              <span className="hidden sm:inline">Pegar</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setTransferOpen(true)}
+            className={cn(
+              "inline-flex h-7 max-w-[11rem] items-center justify-center gap-1 rounded-md px-2 text-xs hover:bg-muted",
+              assignedAgentId ? "text-primary" : "text-muted-foreground",
+            )}
+            title={
+              currentTeam
+                ? `${assignedAgentId ? assignLabel : "Na fila"} · ${currentTeam.name} — transferir`
+                : "Transferir"
+            }
+          >
+            {currentTeam ? (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: currentTeam.color }}
+                aria-hidden
+              />
+            ) : assignedAgentId ? (
+              <UserPlus className="h-3 w-3 shrink-0" />
+            ) : (
+              <ArrowRightLeft className="h-3 w-3 shrink-0" />
+            )}
+            <span className="hidden truncate sm:inline">
+              {assignedAgentId ? assignLabel : currentTeam ? `Fila: ${currentTeam.name}` : "Transferir"}
+            </span>
+            <ChevronDown className="h-3 w-3 shrink-0" />
+          </button>
+          <TransferDialog
+            open={transferOpen}
+            onOpenChange={setTransferOpen}
+            conversationId={conversation.id}
+            assignedAgentId={assignedAgentId}
+            teamId={conversation.team_id ?? null}
+            currentUserId={user?.id}
+            openCountByUser={openCountByUser}
+            onTransferred={handleTransferred}
+          />
         </div>
       </div>
 
@@ -1086,9 +1121,25 @@ export function MessageThread({
                     {formatDateSeparator(group.date, t)}
                   </span>
                 </div>
-                {/* Messages */}
+                {/* Messages, and the history lines between them */}
                 <div className="space-y-2">
-                  {group.messages.map((msg) => {
+                  {group.items.map((item) => {
+                    if (item.kind === "transfer") {
+                      return (
+                        <div key={`t-${item.event.id}`} className="flex justify-center px-6">
+                          <span className="inline-flex max-w-full items-start gap-1.5 rounded-2xl border border-border/60 bg-card/80 px-3 py-1 text-left text-[11px] leading-snug text-muted-foreground">
+                            <ArrowRightLeft className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span className="min-w-0 break-words">
+                              {describeTransfer(item.event, nameOf, teamNameOf)}
+                            </span>
+                            <span className="shrink-0 opacity-70">
+                              {format(new Date(item.at), "HH:mm")}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    }
+                    const msg = item.message;
                     const parent = msg.reply_to_message_id
                       ? messagesById.get(msg.reply_to_message_id)
                       : null;

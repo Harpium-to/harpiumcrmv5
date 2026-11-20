@@ -303,6 +303,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Modelos: as mensagens aprovadas pela Meta, usadas em transmissões e fora da janela de 24 horas.",
       "Respostas rápidas, Campos e etiquetas, Negócios e moeda: o que a equipe usa no dia a dia.",
       "Membros da equipe: convide pessoas e defina o papel de cada uma (administrador, atendente ou visualizador).",
+      "Atendimento e setores: quem recebe conversas, os setores que a IA usa para passar cada conversa para quem resolve e as regras de chegada e de retorno.",
       "Chaves de API e Extensão do Chrome: para ligar o CRM a outros sistemas e ao WhatsApp Web.",
     ],
   },
@@ -323,6 +324,48 @@ export const HELP_TOPICS: HelpTopic[] = [
     tips: [
       "O token de acesso (começa com EAA) e o token de verificação são coisas diferentes. Nunca cole o token de acesso no campo de verificação.",
       "Se o CRM envia mas não recebe, a Chave Secreta do app na hospedagem (META_APP_SECRET) não é a do app da Meta ligado ao número.",
+    ],
+  },
+  {
+    id: "atendimento-setores",
+    title: "Vários atendentes: setores e transferências",
+    route: "/settings?tab=atendimento",
+    summary:
+      "Como a conversa chega em quem resolve: setores (Recepção, Financeiro, a secretária de cada profissional), a IA escolhendo o setor pelo assunto, o rodízio entre as pessoas e a transferência com nota.",
+    steps: [
+      "Em Configurações › Atendimento e setores, crie os setores. Em cada um, escreva o que ele resolve com as palavras dos clientes (ex.: boletos, parcelamento, nota fiscal): é o que a IA lê para escolher.",
+      "Coloque as pessoas em cada setor e escolha como ele distribui: Rodízio (um para cada, na vez), Quem tem menos conversas ou Fila (quem pegar primeiro).",
+      "Marque um setor de entrada: recebe o que a IA não soube classificar.",
+      "Em Configurações › IA (ou em cada agente), em Quando passar para uma pessoa, escolha A IA escolhe o setor pelo assunto.",
+      "Na conversa, use Transferir para passar para uma pessoa ou um setor, com uma nota. Quem recebe é avisado e a passagem fica no histórico da conversa.",
+      "Na caixa de entrada, use os filtros Minhas, Sem responsável e Fila dos meus setores. Numa conversa na fila, clique em Pegar.",
+      "Quem não atende o chat (o dono, uma profissional) ou está de férias: desligue Recebe conversas, ou use Pausar recebimento no menu da sua foto.",
+    ],
+    tips: [
+      "Com Só para quem está online, ninguém online deixa a conversa na fila do setor; ela vai para o primeiro que entrar.",
+      "O prazo do setor avisa a gestão ou passa a conversa para o próximo quando ninguém responde. É conferido a cada poucos minutos.",
+      "Nas Regras, escolha o que acontece com a mensagem nova que ninguém está respondendo e com o cliente que volta a escrever numa conversa encerrada.",
+      "O teste da IA mostra para onde ela passaria a conversa: use para conferir as descrições dos setores.",
+    ],
+  },
+  {
+    id: "radar",
+    title: "Radar: o que mudou, o que vem e o que fazer",
+    route: "/radar",
+    summary:
+      "O Radar compara os números do CRM com o normal dele (o mesmo dia da semana nas semanas anteriores), avisa quando algo foge, mostra a chance de fechar de cada negócio, a receita provável do mês e quem está esfriando, e manda um resumo toda semana.",
+    steps: [
+      "Abra Radar no menu. Em Agora ficam os alertas: cada um diz o número, o normal e tem um botão para ver a lista certa.",
+      "Marque Visto quando cuidar de um alerta. Administradores podem Ignorar 7 dias, para semanas atípicas como feriados e campanhas.",
+      "Em Previsão do mês, veja a faixa de receita provável dos negócios com data prevista no mês.",
+      "Em Esfriando, responda os leads quentes ou mornos que esperam e retome os negócios com boa chance que pararam.",
+      "Toda segunda (ajustável) chega o resumo da semana no sino e numa conversa da Harpi chamada Radar.",
+      "Em Configurações › Radar, escolha a sensibilidade, quem recebe, o dia do resumo e quais alertas fazem sentido.",
+    ],
+    tips: [
+      "Nas primeiras 4 semanas o Radar está aprendendo o normal do CRM e não avisa mudanças. A previsão e o Esfriando já funcionam.",
+      "Os cálculos não usam IA. A IA só escreve o resumo, sem poder inventar número: se ela errar, sai o resumo montado pelo sistema.",
+      "A chance de fechar aparece no cartão do negócio quando já há negócios fechados suficientes para calibrar.",
     ],
   },
   {

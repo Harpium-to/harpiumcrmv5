@@ -7,6 +7,7 @@ import {
 import { checkRateLimit, rateLimitResponse, RATE_LIMITS } from '@/lib/rate-limit'
 import { AGENT_COLUMNS, loadAgents, loadAgentStats, mapAgentRow } from '@/lib/agents/store'
 import { parseAgentPayload, bad } from '@/lib/agents/payload'
+import { validateHandoffRefs } from '@/lib/atendimento/destino'
 
 /**
  * GET /api/agents
@@ -44,6 +45,11 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null)
     const parsed = parseAgentPayload(body, { partial: false })
     if ('error' in parsed) return bad(parsed.error)
+    const refError = await validateHandoffRefs(supabase, accountId, {
+      teamId: parsed.values.handoff_team_id,
+      userId: parsed.values.handoff_agent_id,
+    })
+    if (refError) return bad(refError)
 
     // Only one default per account (enforced by a partial unique index
     // too). Clear the incumbent first so promoting a new default is one

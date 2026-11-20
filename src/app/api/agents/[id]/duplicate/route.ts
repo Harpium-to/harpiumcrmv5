@@ -24,6 +24,11 @@ import { AGENT_COLUMNS, mapAgentRow } from '@/lib/agents/store'
  *                 and spent nothing, and showing it mid-conversation
  *                 would be a lie about which row the runner is holding.
  *
+ * Where its handoffs go comes across too: the person (`handoff_agent_id`,
+ * 044) and, read on their own like the form does, the mode and the setor
+ * (`handoff_mode`, `handoff_team_id`, 077), so a database before 077
+ * still duplicates.
+ *
  * `keywords` *are* copied even though two agents matching the same
  * words is a routing conflict — because the copy is off, the conflict
  * cannot bite before the operator opens the form, and a clone with its
@@ -112,6 +117,17 @@ export async function POST(
     const values: Record<string, unknown> = {}
     for (const column of COPIED_COLUMNS) {
       values[column] = source[column]
+    }
+
+    const { data: handoff, error: handoffError } = await supabase
+      .from('agents')
+      .select('handoff_mode, handoff_team_id')
+      .eq('id', id)
+      .eq('account_id', accountId)
+      .maybeSingle<{ handoff_mode: string | null; handoff_team_id: string | null }>()
+    if (!handoffError && handoff) {
+      values.handoff_mode = handoff.handoff_mode
+      values.handoff_team_id = handoff.handoff_team_id
     }
 
     const { data, error } = await supabase

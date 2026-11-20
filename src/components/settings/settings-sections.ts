@@ -1,10 +1,13 @@
 import {
+  Bot,
   Coins,
   FileText,
+  Headset,
   KeyRound,
   LayoutGrid,
   Palette,
   PlugZap,
+  Radar,
   Puzzle,
   Shield,
   ShieldCheck,
@@ -35,7 +38,10 @@ export const SETTINGS_SECTIONS = [
   'fields',
   'deals',
   'members',
+  'atendimento',
+  'radar',
   'agencia',
+  'assistente',
   'api',
 ] as const;
 
@@ -63,7 +69,10 @@ export const SECTION_META: Record<SettingsSection, SectionMeta> = {
   fields: { id: 'fields', label: 'Campos e etiquetas', icon: Tags, group: 'workspace' },
   deals: { id: 'deals', label: 'Negócios e moeda', icon: Coins, group: 'workspace' },
   members: { id: 'members', label: 'Membros da equipe', icon: UsersRound, group: 'workspace' },
+  atendimento: { id: 'atendimento', label: 'Atendimento e setores', icon: Headset, group: 'workspace' },
+  radar: { id: 'radar', label: 'Radar', icon: Radar, group: 'workspace' },
   agencia: { id: 'agencia', label: 'Acesso da agência', icon: ShieldCheck, group: 'workspace' },
+  assistente: { id: 'assistente', label: 'Harpi (assistente)', icon: Bot, group: 'workspace' },
   api: { id: 'api', label: 'Chaves de API', icon: KeyRound, group: 'workspace' },
 };
 
