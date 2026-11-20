@@ -7,8 +7,10 @@
 import { detectarStep } from './alertas'
 import { chancesStep } from './chance'
 import { registerDailyStep } from './livro'
+import { resumoStep } from './resumo'
 
 registerDailyStep(detectarStep)
 registerDailyStep(chancesStep)
+registerDailyStep(resumoStep)
 
 export { processarRadar } from './livro'

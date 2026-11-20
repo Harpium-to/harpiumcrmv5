@@ -349,6 +349,26 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
   },
   {
+    id: "radar",
+    title: "Radar: o que mudou, o que vem e o que fazer",
+    route: "/radar",
+    summary:
+      "O Radar compara os números do CRM com o normal dele (o mesmo dia da semana nas semanas anteriores), avisa quando algo foge, mostra a chance de fechar de cada negócio, a receita provável do mês e quem está esfriando, e manda um resumo toda semana.",
+    steps: [
+      "Abra Radar no menu. Em Agora ficam os alertas: cada um diz o número, o normal e tem um botão para ver a lista certa.",
+      "Marque Visto quando cuidar de um alerta. Administradores podem Ignorar 7 dias, para semanas atípicas como feriados e campanhas.",
+      "Em Previsão do mês, veja a faixa de receita provável dos negócios com data prevista no mês.",
+      "Em Esfriando, responda os leads quentes ou mornos que esperam e retome os negócios com boa chance que pararam.",
+      "Toda segunda (ajustável) chega o resumo da semana no sino e numa conversa da Harpi chamada Radar.",
+      "Em Configurações › Radar, escolha a sensibilidade, quem recebe, o dia do resumo e quais alertas fazem sentido.",
+    ],
+    tips: [
+      "Nas primeiras 4 semanas o Radar está aprendendo o normal do CRM e não avisa mudanças. A previsão e o Esfriando já funcionam.",
+      "Os cálculos não usam IA. A IA só escreve o resumo, sem poder inventar número: se ela errar, sai o resumo montado pelo sistema.",
+      "A chance de fechar aparece no cartão do negócio quando já há negócios fechados suficientes para calibrar.",
+    ],
+  },
+  {
     id: "extensao",
     title: "Extensão do Chrome",
     summary:
