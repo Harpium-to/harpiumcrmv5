@@ -11,9 +11,17 @@
 // rules to that person (resolveCrmAccess). Without a login in the CRM
 // there is nothing to show — consent and the audit log are per person.
 //
+// Only the AGENCY TEAM (agencia_membros) may be spoken for. The key
+// trusts the Agency OS to say who is looking; if any e-mail were
+// accepted, whoever holds the key (or an admin of the internal system)
+// could claim to be a client's owner and read a CRM whose consent says
+// "only metrics". Restricted to the agency, the worst a key can do is
+// act as an agency member — still bound by each CRM's consent.
+//
 // Order of checks (each with its own answer, see errors.ts):
 //   key (401) → rate limit (429) → scope (403 missing_scope)
 //   → person header (400) → login in the CRM (403 no_crm_login)
+//   → agency team (403 not_agency)
 // ============================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -32,7 +40,7 @@ export interface PlatformPerson {
   userId: string;
   email: string;
   name: string | null;
-  /** The person's role in the agency team; null = not agency. */
+  /** The person's role in the agency team (always set: only the agency gets through). */
   agencyRole: AgenciaRole | null;
 }
 
@@ -122,11 +130,8 @@ export async function requirePlatformKey(
   ]);
   // A failed agency lookup fails closed: the person is treated as not agency.
   const agencyRow = agencyRes.error ? null : (agencyRes.data as { role?: unknown } | null);
-  const agencyRole: AgenciaRole | null = agencyRow
-    ? isAgenciaRole(agencyRow.role)
-      ? agencyRow.role
-      : 'support'
-    : null;
+  if (!agencyRow) throw platformErrors.notAgency(email);
+  const agencyRole: AgenciaRole = isAgenciaRole(agencyRow.role) ? agencyRow.role : 'support';
   const fullName = (profileRes.data as { full_name?: unknown } | null)?.full_name;
 
   touchPlatformKey(admin, key.id);

@@ -204,11 +204,18 @@ authedApi('crm-harpium','resumo') ─►  crm-harpium.js
 
 | A pessoa, no Harpium CRM, é... | Ela vê pelo AOS |
 |---|---|
-| membro daquele CRM (dono, admin, atendente, visualizador) | tudo, só leitura |
-| da equipe da agência, e o dono liberou **Leitura** ou **Total** | tudo, só leitura |
+| da equipe da agência, e o dono liberou **Leitura** ou **Total** (ou ela é membro daquele CRM) | tudo, só leitura |
 | da equipe da agência, e o dono liberou só **Métricas** | só números agregados (sem nome, telefone, e-mail ou texto de conversa) |
-| nada disso | nada ("seu e-mail não tem acesso a este CRM") |
-| sem login no CRM | nada ("seu e-mail não tem login no Harpium CRM; peça um convite") |
+| fora da equipe da agência (mesmo sendo membro de um CRM) | nada ("seu e-mail não é da equipe da agência no Harpium CRM") |
+| sem login no CRM | nada ("seu e-mail não tem login no Harpium CRM") |
+
+**Ajuste feito na execução (20/11/2026):** a API da plataforma só aceita
+pessoas da **equipe da agência** (`/agencia/membros`). Sem essa trava, quem
+tivesse a chave (ou um admin do AOS) poderia dizer ao CRM que é o dono do
+CRM de um cliente e ler o que o cliente não liberou. Pelo mesmo motivo, o
+"e-mail alternativo no CRM" (`m.crmEmail`) saiu: vale só o e-mail do login
+Google. Quem do AOS vai usar a integração precisa estar na equipe da
+agência no CRM (o papel Suporte basta), com o mesmo e-mail do Google.
 
 Por que pelo e-mail da pessoa, e não só pela chave: (1) o consentimento do
 dono continua valendo de verdade; (2) a auditoria registra **quem** leu, e
@@ -907,6 +914,9 @@ cartão no canto; sem SSO; só leitura; URL do CRM na configuração do AOS.
    como visualizador ou atendente (**recomendado**: vai precisar do login
    para o "Abrir no CRM" de qualquer jeito) · deixar a chave ler sem pessoa
    (não recomendado: perde a auditoria e o consentimento).
+   *Na execução virou:* adicionar a pessoa à **equipe da agência** no CRM
+   (`/agencia/membros`, papel Suporte), com o mesmo e-mail do Google. Ver o
+   ajuste no §5.2.
 4. **O funil interno do AOS:** fica como terceira visão, intacto, e a Fase
    9 se decide depois (**recomendado**) · esconder já.
 5. **Aviso de lead novo:** cartão no canto do AOS (**recomendado**) ·

@@ -14,10 +14,13 @@ X-Harpium-Pessoa: pessoa@exemplo.com         quem está olhando
 
 - A chave é gerada em **/agencia/integracoes** (só super admin), aparece
   uma vez e só o hash fica guardado. Revogar vale na próxima chamada.
-- O e-mail é o da pessoa que o Agency OS confirmou pelo login Google. O
-  CRM aplica **as regras dessa pessoa**: membro do CRM lê tudo; equipe da
-  agência lê tudo onde o dono liberou Leitura/Total e só números onde
-  liberou Métricas; os demais não leem nada.
+- O e-mail é o da pessoa que o Agency OS confirmou pelo login Google, e
+  **só a equipe da agência** (`/agencia/membros`) passa. Assim, quem tem
+  a chave não consegue se passar pelo dono do CRM de um cliente: o
+  máximo é agir como alguém da agência, e cada CRM continua valendo no
+  nível que o dono liberou (Leitura/Total: tudo, só leitura; Métricas:
+  só números). Se a pessoa também for membro de um CRM, vale o papel
+  dela ali.
 - Leituras da agência ficam em `agencia_auditoria` com
   `origem = 'agency_os'` (o resumo, o funil e as novidades no máximo uma
   vez a cada 30 min por pessoa e CRM).
@@ -40,6 +43,7 @@ ou `{ error: { code, reason?, message } }`.
 | 400 | `bad_request` | | sem `X-Harpium-Pessoa` ou parâmetro inválido |
 | 403 | `forbidden` | `missing_scope` | a chave não tem o escopo |
 | 403 | `forbidden` | `no_crm_login` | o e-mail não tem login no CRM |
+| 403 | `forbidden` | `not_agency` | o e-mail não é da equipe da agência (/agencia/membros) |
 | 403 | `forbidden` | `no_access` | sem acesso àquele CRM |
 | 403 | `forbidden` | `metrics_only` | lista pedida, mas o dono liberou só Métricas |
 | 404 | `not_found` | | CRM ou item inexistente (ou de outro CRM) |
@@ -55,7 +59,7 @@ conversa, compromisso ou tela).
 | Rota | Escopo | Nível |
 |---|---|---|
 | `GET /eu` | qualquer | |
-| `GET /crms[?status=archived]` | `crms:read` | agência: todos (agregados); outros: os seus |
+| `GET /crms[?status=archived]` | `crms:read` | todos os CRMs (agregados) |
 | `GET /crms/{id}/resumo?dias=7\|30\|90` | `crms:read` | Métricas (`lists: null`) |
 | `GET /crms/{id}/funil[?pipeline=]` | `crms:read` | Métricas (`deals: null` por etapa) |
 | `GET /crms/{id}/leads?desde=&origem=&busca=&limit=&cursor=` | `dados:read` | Leitura |

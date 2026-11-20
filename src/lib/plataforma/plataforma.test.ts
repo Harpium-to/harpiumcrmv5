@@ -99,9 +99,10 @@ describe('requirePlatformKey', () => {
     })
   })
 
-  it('a member outside the agency has no agency role', async () => {
-    const ctx = await requirePlatformKey(req(key.plaintext, 'membro@teste.dev'), undefined, db)
-    expect(ctx.person.agencyRole).toBeNull()
+  it('only the agency team may be spoken for, not a CRM member outside it', async () => {
+    expect(
+      await failure(requirePlatformKey(req(key.plaintext, 'membro@teste.dev'), undefined, db)),
+    ).toMatchObject({ code: 'forbidden', reason: 'not_agency', status: 403 })
   })
 
   it('refuses each failure with its own code and reason', async () => {

@@ -23,7 +23,12 @@ export type PlatformErrorCode =
   | 'unavailable'
   | 'internal';
 
-export type PlatformReason = 'no_crm_login' | 'no_access' | 'metrics_only' | 'missing_scope';
+export type PlatformReason =
+  | 'no_crm_login'
+  | 'not_agency'
+  | 'no_access'
+  | 'metrics_only'
+  | 'missing_scope';
 
 export class PlatformError extends Error {
   readonly code: PlatformErrorCode;
@@ -60,6 +65,13 @@ export const platformErrors = {
     new PlatformError('forbidden', `O e-mail ${email} não tem login no Harpium CRM`, 403, {
       reason: 'no_crm_login',
     }),
+  notAgency: (email: string) =>
+    new PlatformError(
+      'forbidden',
+      `O e-mail ${email} não é da equipe da agência no Harpium CRM`,
+      403,
+      { reason: 'not_agency' },
+    ),
   noAccess: () =>
     new PlatformError('forbidden', 'Esta pessoa não tem acesso a este CRM', 403, {
       reason: 'no_access',
