@@ -108,6 +108,18 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   status_active: 'Ativou o CRM',
   status_suspended: 'Suspendeu o CRM',
   status_archived: 'Arquivou o CRM',
+  // Read through the platform API, from the agency's internal system (075).
+  api_view_summary: 'Viu o resumo do CRM pelo sistema da agência',
+  api_view_funnel: 'Viu o funil pelo sistema da agência',
+  api_list_leads: 'Listou leads pelo sistema da agência',
+  api_list_contacts: 'Listou contatos pelo sistema da agência',
+  api_list_deals: 'Listou negócios pelo sistema da agência',
+  api_list_conversations: 'Listou conversas pelo sistema da agência',
+  api_view_conversation: 'Abriu uma conversa pelo sistema da agência',
+  api_list_tasks: 'Listou tarefas pelo sistema da agência',
+  api_list_agenda: 'Viu a agenda pelo sistema da agência',
+  api_view_news: 'Viu as novidades pelo sistema da agência',
+  api_register_webhook: 'Ligou o aviso de lead novo no sistema da agência',
 }
 
 /**
