@@ -20,6 +20,11 @@ import {
   fetchWhatsAppPathInfo,
   unofficialConnection,
 } from "@/lib/channels/whatsapp-connection";
+import type { WindowRule } from "@/lib/inbox/session-window";
+import {
+  NewConversationButton,
+  type StartedConversationInfo,
+} from "@/components/inbox/new-conversation-dialog";
 
 // Remembers the agent's show/hide choice for the desktop contact panel
 // across reloads and sessions (device-scoped, like the theme prefs).
@@ -44,6 +49,10 @@ export default function InboxPage() {
   const [whatsappConnected, setWhatsappConnected] = useState<boolean | null>(
     null
   );
+  /** Meta's 24h rule, or none on the QR-code path (lib/inbox/session-window.ts). */
+  const [windowRule, setWindowRule] = useState<WindowRule>("meta");
+  /** A conversation just opened by "Nova conversa" on the official API. */
+  const [autoTemplatesFor, setAutoTemplatesFor] = useState<string | null>(null);
   /**
    * Bumped whenever we want children (ConversationList, MessageThread)
    * to refetch from the DB — used as a safety net against missed
@@ -181,6 +190,8 @@ export default function InboxPage() {
       const unofficial = unofficialConnection(await fetchWhatsAppPathInfo());
       if (unofficial) {
         setWhatsappConnected(unofficial.connected);
+        // QR code sends like a phone: no 24h rule there.
+        setWindowRule("none");
         return;
       }
 
@@ -489,6 +500,34 @@ export default function InboxPage() {
     [activeConversation?.id, router]
   );
 
+  // "Nova conversa": the API answered with the conversation (new or
+  // existing). Read it with its contact, put it in the list and open it.
+  const handleConversationStarted = useCallback(
+    async ({ conversationId, provider }: StartedConversationInfo) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("conversations")
+        .select(CONVERSATION_SELECT)
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (error || !data) {
+        toast.error(t("openFailed"));
+        return;
+      }
+      const conv = normalizeConversation(data);
+      setConversations((prev) =>
+        prev.some((c) => c.id === conv.id)
+          ? prev.map((c) => (c.id === conv.id ? { ...c, ...conv } : c))
+          : [conv, ...prev],
+      );
+      if (provider === "meta") setAutoTemplatesFor(conv.id);
+      handleSelectConversation(conv);
+    },
+    [handleSelectConversation, t],
+  );
+
+  const clearAutoTemplates = useCallback(() => setAutoTemplatesFor(null), []);
+
   // Mobile "back" — deselect the conversation so the list pane comes
   // back. Also clears the ?c= param so a refresh lands on the list
   // instead of re-opening the thread the user just backed out of.
@@ -597,6 +636,7 @@ export default function InboxPage() {
             conversations={conversations}
             onConversationsLoaded={handleConversationsLoaded}
             resyncToken={resyncToken}
+            headerAction={<NewConversationButton onStarted={handleConversationStarted} />}
           />
         </div>
 
@@ -631,6 +671,9 @@ export default function InboxPage() {
             onRefresh={handleManualRefresh}
             contactPanelOpen={contactPanelOpen}
             onToggleContactPanel={handleToggleContactPanel}
+            windowRule={windowRule}
+            autoOpenTemplatesFor={autoTemplatesFor}
+            onTemplatesAutoOpened={clearAutoTemplates}
           />
         </div>
 

@@ -138,7 +138,8 @@
   },
   "Inbox": {
     "page": {
-      "whatsappNotConnected": "O WhatsApp® não está conectado. Vá em Configurações para conectar sua conta."
+      "whatsappNotConnected": "O WhatsApp® não está conectado. Vá em Configurações para conectar sua conta.",
+      "openFailed": "A conversa foi criada, mas não abriu. Recarregue a página."
     },
     "conversationList": {
       "searchPlaceholder": "Buscar conversas...",
@@ -333,6 +334,23 @@
       "aiError": "Não foi possível preencher com a IA. Preencha à mão ou tente de novo.",
       "noPipelines": "Crie um funil em Funis antes de criar negócios.",
       "noStages": "Esse funil não tem etapas. Crie as etapas em Funis."
+    },
+    "newConversation": {
+      "button": "Nova conversa",
+      "title": "Nova conversa",
+      "description": "Comece uma conversa com um número que ainda não está na caixa de entrada.",
+      "phoneLabel": "WhatsApp",
+      "phonePlaceholder": "(63) 99999-9999",
+      "phoneHint": "Com DDD. Para outro país, comece com + e o código do país.",
+      "phoneRequired": "Digite o número do WhatsApp.",
+      "nameLabel": "Nome (opcional)",
+      "namePlaceholder": "Como o contato vai aparecer",
+      "existing": "Já está nos contatos",
+      "submit": "Abrir conversa",
+      "opening": "Abrindo…",
+      "cancel": "Cancelar",
+      "created": "Contato criado.",
+      "failed": "Não foi possível abrir a conversa."
     }
   },
   "Contacts": {

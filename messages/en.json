@@ -138,7 +138,8 @@
   },
   "Inbox": {
     "page": {
-      "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account."
+      "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account.",
+      "openFailed": "The conversation was created but didn't open. Reload the page."
     },
     "conversationList": {
       "searchPlaceholder": "Search conversations...",
@@ -333,6 +334,23 @@
       "aiError": "Couldn't fill in with the AI. Fill it in by hand or try again.",
       "noPipelines": "Create a pipeline in Pipelines before creating deals.",
       "noStages": "This pipeline has no stages. Create them in Pipelines."
+    },
+    "newConversation": {
+      "button": "New conversation",
+      "title": "New conversation",
+      "description": "Start a conversation with a number that isn't in the inbox yet.",
+      "phoneLabel": "WhatsApp",
+      "phonePlaceholder": "+1 555 123 4567",
+      "phoneHint": "Include the area code. For another country, start with + and the country code.",
+      "phoneRequired": "Type the WhatsApp number.",
+      "nameLabel": "Name (optional)",
+      "namePlaceholder": "How the contact will show up",
+      "existing": "Already in contacts",
+      "submit": "Open conversation",
+      "opening": "Opening…",
+      "cancel": "Cancel",
+      "created": "Contact created.",
+      "failed": "Couldn't open the conversation."
     }
   },
   "Contacts": {
