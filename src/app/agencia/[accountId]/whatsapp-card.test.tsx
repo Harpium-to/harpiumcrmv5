@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { NextIntlClientProvider } from 'next-intl'
+
+import pt from '../../../../messages/pt.json'
 
 import { WhatsAppCard } from './whatsapp-card'
 import type { WhatsAppDetail } from '@/lib/agencia/whatsapp'
@@ -13,9 +16,17 @@ const connected: WhatsAppDetail = {
   coexistence: false,
 }
 
-function render(detail: WhatsAppDetail, canSendLink = true) {
+function render(detail: WhatsAppDetail, canSendLink = true, canManageLink?: boolean) {
   return renderToStaticMarkup(
-    <WhatsAppCard accountId="acc-1" crmName="Clínica Sol" detail={detail} canSendLink={canSendLink} />,
+    <NextIntlClientProvider locale="pt" messages={pt}>
+      <WhatsAppCard
+        accountId="acc-1"
+        crmName="Clínica Sol"
+        detail={detail}
+        canSendLink={canSendLink}
+        canManageLink={canManageLink}
+      />
+    </NextIntlClientProvider>,
   )
 }
 
@@ -63,6 +74,25 @@ describe('WhatsAppCard', () => {
     })
     expect(html).toContain('Precisa de atenção')
     expect(html).toContain('Error validating access token')
+    expect(html).toContain('Enviar link pelo WhatsApp')
+  })
+
+  it('official path: the link works without login', () => {
+    const html = render({ ...connected, state: 'none', reason: 'x', phone: null })
+    expect(html).toContain('não precisa de login')
+    expect(html).toContain('vale por 7 dias')
+  })
+
+  it('official path: only whoever edits the CRM can send the link', () => {
+    const html = render({ ...connected, state: 'none', reason: 'x', phone: null }, true, false)
+    expect(html).not.toContain('Enviar link pelo WhatsApp')
+    expect(html).toContain('Só quem gerencia este CRM')
+    expect(render(connected, true, false)).not.toContain('Precisa trocar o número?')
+  })
+
+  it('QR code path keeps the link with login', () => {
+    const html = render({ ...connected, state: 'none', reason: 'x', phone: null, path: 'nao_oficial' })
+    expect(html).toContain('entra com o login dele')
     expect(html).toContain('Enviar link pelo WhatsApp')
   })
 

@@ -34,6 +34,7 @@ import {
 import type { ConnectionMode } from '@/lib/whatsapp/connect';
 import { CONNECT_CRM_PARAM, readConnectIntent } from '@/lib/agencia/connect-link';
 import { useAuth } from '@/hooks/use-auth';
+import { ConnectLinkPanel } from '@/components/whatsapp/connect-link-panel';
 
 // ============================================================
 // Settings › WhatsApp, with Embedded Signup.
@@ -153,6 +154,7 @@ export function WhatsAppSettings() {
         canManage={info.can_manage}
         highlight={intent.highlight && !intent.switchTo}
       />
+      {info.can_manage && <ConnectLinkCard />}
       {info.can_manage && (
         <Accordion className="rounded-xl border border-border px-4">
           <AccordionItem value="manual" className="border-none">
@@ -169,6 +171,22 @@ export function WhatsAppSettings() {
         </Accordion>
       )}
     </section>
+  );
+}
+
+/** "Mandar link para outra pessoa conectar" (Fase A, migration 081). */
+function ConnectLinkCard() {
+  const t = useTranslations('ConnectLink');
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{t('settingsTitle')}</CardTitle>
+        <CardDescription>{t('settingsDesc')}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ConnectLinkPanel endpoint="/api/whatsapp/connect-link" />
+      </CardContent>
+    </Card>
   );
 }
 
