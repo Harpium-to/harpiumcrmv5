@@ -2312,5 +2312,21 @@
     "alertOldestNow": "{name} acabou de ser passado para a equipe",
     "late": "atrasada",
     "answer": "Atender"
+  },
+  "ConnectLink": {
+    "send": "Enviar link pelo WhatsApp",
+    "copy": "Copiar link de conexão",
+    "copied": "Link copiado",
+    "copyPrompt": "Copie o link:",
+    "linkLabel": "Link de conexão",
+    "failed": "Não foi possível gerar o link.",
+    "cancel": "Cancelar link",
+    "cancelConfirm": "Cancelar o link de conexão? Quem recebeu não vai mais conseguir conectar por ele.",
+    "cancelled": "Link cancelado.",
+    "activeUntil": "Link ativo até {until}.",
+    "replaceHint": "Gerar de novo cancela o anterior.",
+    "rules": "Funciona sem login, vale por 7 dias e para uma conexão só. Só liga o WhatsApp oficial: não dá acesso a conversas nem a contatos.",
+    "settingsTitle": "Mandar link para outra pessoa conectar",
+    "settingsDesc": "Para quem cuida do Facebook da empresa e não tem login no CRM: ela abre o link, clica em Conectar com o Facebook e pronto."
   }
 }
