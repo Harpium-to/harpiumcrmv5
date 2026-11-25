@@ -18,7 +18,7 @@ Data: 25/11/2026. A Meta aprovou o app Harpium CRM, então a troca de domínio q
 
 Por isso a troca pode ser feita **sem mexer em nenhuma integração já existente**. O que muda é o endereço que as pessoas abrem no navegador.
 
-## Fase 1 — LP em harpium.com.br/crm (sem tocar no CRM)
+## Fase 1 — LP em harpium.com.br/crm (sem tocar no CRM; site publicado em 25/11, PR #52)
 
 1. No `_redirects` do site da agência (`harpiumgroup-site`), adicionar um proxy:
    ```
@@ -35,7 +35,7 @@ Por isso a troca pode ser feita **sem mexer em nenhuma integração já existent
 
 Nessa fase o `crm.harpium.com.br` continua mostrando a LP. Nada quebra.
 
-## Fase 2 — preparar o CRM (código, PR)
+## Fase 2 — preparar o CRM (código, PR #53)
 
 Um ajuste em `src/proxy.ts`: quem abrir **páginas** do CRM em `harpium-crm.netlify.app` é levado para `crm.harpium.com.br`, no mesmo caminho (redirecionamento 308).
 - Vale só para GET de páginas, só nesse host exato. Ficam de fora:
@@ -55,6 +55,7 @@ Na ordem:
 2. **Cloudflare (você):** o CNAME `crm` passa a apontar para `harpium-crm.netlify.app`, com o proxy desligado. Depois é esperar o Netlify emitir o certificado HTTPS. Durante esses poucos minutos, só o `crm.harpium.com.br` fica fora; o CRM segue no ar pelo endereço antigo.
 3. **Netlify, variáveis do `harpium-crm`:**
    - `NEXT_PUBLIC_SITE_URL=https://crm.harpium.com.br`;
+   - `NEXT_PUBLIC_APP_URL=https://crm.harpium.com.br` (é usada no link do contato que vai para o Google Agenda e no endereço de webhook mostrado na tela do Instagram);
    - se `ALLOWED_INVITE_HOSTS` estiver preenchida, incluir o host novo e manter o antigo.
    Depois, um novo deploy de produção (cerca de 15 créditos).
 4. **Supabase → Auth → URL Configuration:**
@@ -76,7 +77,7 @@ Na ordem:
 ## Fase 4 — avisos e limpeza
 
 - **Agency OS (APP Harpium):** trocar o endereço do CRM usado no "Abrir no CRM" e nos links para o domínio novo. A API continua funcionando no antigo, então não tem pressa.
-- **Extensão do Chrome:** o endereço padrão nas opções passa a ser o novo. Quem já configurou o antigo segue funcionando.
+- **Extensão do Chrome:** não tem endereço padrão no código (cada pessoa digita o do CRM). Quem já configurou o antigo segue funcionando; vale avisar os usuários para trocar quando quiserem.
 - **Documentação:** atualizar os docs (`passo-a-passo-implantacao`, `plano-whatsapp-conexao-simples` etc.) e a memória do projeto.
 - **Opcional, mais tarde:** passar o webhook da Meta e os das instâncias UAZAPI para o domínio novo.
 
