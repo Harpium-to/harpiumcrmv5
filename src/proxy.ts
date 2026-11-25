@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { canonicalHostRedirect } from '@/lib/http/canonical-host'
 import { LOGIN_NEXT_PREFIXES, safeNextPath } from '@/lib/http/next-path'
 import { isValidSlug, quizHostUrl } from '@/lib/quiz/slug'
 
@@ -40,6 +41,15 @@ function publicQuizResponse(request: NextRequest): NextResponse | null {
 }
 
 export async function proxy(request: NextRequest) {
+  // Old Netlify address → the CRM's own domain (pages only; /api stays).
+  const moved = canonicalHostRedirect({
+    method: request.method,
+    host: request.headers.get('x-forwarded-host') ?? request.headers.get('host'),
+    pathname: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+  })
+  if (moved) return NextResponse.redirect(moved, 308)
+
   const quiz = publicQuizResponse(request)
   if (quiz) return quiz
 
