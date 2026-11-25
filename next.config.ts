@@ -126,7 +126,14 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
-        source: "/:path((?!_next/static|_next/image|api).*)",
+        // Links that carry a secret and change state (expire, get used
+        // or cancelled): never from a shared cache, or a dead link
+        // keeps showing as valid (and a valid one as dead) for hours.
+        source: "/:prefix(conectar-whatsapp|conectar-google)/:path*",
+        headers: [{ key: "Cache-Control", value: "private, no-store" }],
+      },
+      {
+        source: "/:path((?!_next/static|_next/image|api|conectar-whatsapp|conectar-google).*)",
         headers: [
           {
             key: "Cache-Control",
