@@ -28,7 +28,8 @@ import {
   PanelRightOpen,
   PanelRightClose,
 } from "lucide-react";
-import { format, isToday, isYesterday, differenceInHours } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
+import { sessionWindow, type WindowRule } from "@/lib/inbox/session-window";
 import { ptBR } from "date-fns/locale";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
@@ -117,6 +118,14 @@ interface MessageThreadProps {
    */
   contactPanelOpen?: boolean;
   onToggleContactPanel?: () => void;
+  /**
+   * Whose 24h rule applies: 'meta' (official API, the default) or
+   * 'none' (QR code, where the window never closes).
+   */
+  windowRule?: WindowRule;
+  /** Open the template picker once when this conversation shows up ("Nova conversa"). */
+  autoOpenTemplatesFor?: string | null;
+  onTemplatesAutoOpened?: () => void;
 }
 
 function formatDateSeparator(dateStr: string, t: ReturnType<typeof useTranslations>): string {
@@ -186,6 +195,9 @@ export function MessageThread({
   contactPanelOpen,
   onToggleContactPanel,
   openCountByUser,
+  windowRule = "meta",
+  autoOpenTemplatesFor = null,
+  onTemplatesAutoOpened,
 }: MessageThreadProps) {
   const t = useTranslations("Inbox.messageThread");
   const tTimer = useTranslations("Inbox.sessionTimer");
@@ -194,6 +206,8 @@ export function MessageThread({
   const { user } = useAuth();
   const { getPresence, getRow, now } = usePresence();
   const [loading, setLoading] = useState(false);
+  /** The conversation whose messages are in `messages` (set when its fetch ends). */
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const { members } = useMembers();
@@ -255,31 +269,36 @@ export function MessageThread({
   }, [transferKey]);
 
   // 24-hour session timer
+  // Meta's rule only (lib/inbox/session-window.ts): on the QR-code path
+  // the window never closes. While the thread loads, `messages` is
+  // empty for a moment — don't flash "closed" over it.
+  const messagesReady = !loading && !!conversation && loadedFor === conversation.id;
   const sessionInfo = useMemo(() => {
-    if (!messages.length) return { expired: false, remaining: "" };
-
-    // Find last customer message
-    const lastCustomerMsg = [...messages]
-      .reverse()
-      .find((m) => m.sender_type === "customer");
-
-    if (!lastCustomerMsg) return { expired: true, remaining: "Nenhuma mensagem do cliente" };
-
-    const hoursSince = differenceInHours(new Date(), new Date(lastCustomerMsg.created_at));
-    const expired = hoursSince >= 24;
-
-    if (expired) {
-      return { expired: true, remaining: tTimer("expired") };
+    if (!messagesReady) return { expired: false, remaining: "" };
+    const w = sessionWindow(messages, windowRule);
+    if (w.state === "no_customer_message") {
+      return { expired: true, remaining: "Nenhuma mensagem do cliente" };
     }
-
-    const hoursLeft = 24 - hoursSince;
+    if (w.state === "expired") return { expired: true, remaining: tTimer("expired") };
+    if (w.minutesLeft === null) return { expired: false, remaining: "" };
     const remaining =
-      hoursLeft >= 1
-        ? tTimer("xhRemaining", { hours: Math.floor(hoursLeft) })
-        : tTimer("xmRemaining", { minutes: Math.floor(hoursLeft * 60) });
+      w.minutesLeft >= 60
+        ? tTimer("xhRemaining", { hours: Math.floor(w.minutesLeft / 60) })
+        : tTimer("xmRemaining", { minutes: w.minutesLeft });
+    return { expired: false, remaining };
+  }, [messagesReady, messages, tTimer, windowRule]);
 
-    return { expired, remaining };
-  }, [messages, tTimer]);
+  // "Nova conversa" on the official API: the contact never wrote, so
+  // only a template can start it — open the picker once, by itself.
+  const autoOpenedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!conversation || !autoOpenTemplatesFor) return;
+    if (conversation.id !== autoOpenTemplatesFor) return;
+    if (!messagesReady || autoOpenedForRef.current === conversation.id) return;
+    autoOpenedForRef.current = conversation.id;
+    onTemplatesAutoOpened?.();
+    if (sessionInfo.expired) setTemplateModalOpen(true);
+  }, [conversation, autoOpenTemplatesFor, messagesReady, sessionInfo.expired, onTemplatesAutoOpened]);
 
   // Store latest callback in a ref so fetchMessages doesn't need to
   // depend on `onMessagesLoaded` — otherwise parent re-renders cause
@@ -323,7 +342,10 @@ export function MessageThread({
         onMessagesLoadedRef.current(data ?? []);
       }
 
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoadedFor(conversationId);
+        setLoading(false);
+      }
     })();
 
     return () => {
