@@ -82,6 +82,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     summary:
       "Avisos do sistema para você: conversas atribuídas, aprovações pendentes dos agentes, pedidos de acesso e outros eventos.",
     steps: [
+      "O sino na barra de cima mostra quantas você ainda não leu. Clique nele para ver as últimas; Ver todas abre esta tela.",
       "Clique numa notificação para ir direto à tela relacionada.",
       "Use Marcar todas como lidas para limpar a lista.",
     ],

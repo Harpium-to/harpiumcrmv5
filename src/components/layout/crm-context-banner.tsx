@@ -1,18 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Headset, Loader2, LogOut, PauseCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { useCrmContext, type CrmContext } from '@/hooks/use-crm-context'
 
-export interface CrmContext {
-  accountName: string
-  role: string
-  status: string
-  viaAgency: boolean
-}
+export type { CrmContext }
 
 /**
  * Banners about the CRM that is open, from the server's view of it
@@ -24,22 +20,7 @@ export interface CrmContext {
  *   - suspended (Fase 2): read-only, with why.
  */
 export function CrmContextBanner({ accountId }: { accountId: string | null }) {
-  const [ctx, setCtx] = useState<CrmContext | null>(null)
-
-  useEffect(() => {
-    if (!accountId) return
-    let cancelled = false
-    fetch('/api/account/context', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => {
-        if (!cancelled) setCtx(json)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [accountId])
-
+  const ctx = useCrmContext(accountId)
   return <CrmContextBannerView ctx={ctx} />
 }
 
