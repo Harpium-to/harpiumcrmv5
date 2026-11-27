@@ -1,20 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
 import { LifeBuoy, LogOut, Menu, Puzzle, Settings as SettingsIcon, User, Wrench } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/hooks/use-brand";
 import { activeNavItem, NAV_SECTIONS } from "@/lib/nav";
-import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 import { AgentPulseChip } from "@/components/agents/agent-pulse-chip";
 import { ModeToggle } from "@/components/layout/mode-toggle";
 import { PageHelp } from "@/components/help/page-help";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
+import { SectionTrack } from "@/components/layout/section-track";
 import { CrmMenuItems } from "@/components/layout/crm-menu-items";
 import { ReceivingMenuItem } from "@/components/layout/receiving-menu-item";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -103,7 +102,6 @@ export function TopBar({ onOpenNav }: TopBarProps) {
               }
             >
               <SectionTrack
-                href={current.href}
                 items={sections.map((s) => ({
                   value: s.value,
                   label: tb(s.labelKey),
@@ -241,33 +239,5 @@ export function TopBar({ onOpenNav }: TopBarProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * The pill track itself. Split out so the `useSearchParams` read sits
- * behind the Suspense boundary Next requires for it, rather than
- * forcing the whole bar to suspend.
- */
-function SectionTrack({
-  items,
-  fallbackValue,
-  className,
-}: {
-  href: string;
-  items: PillItem[];
-  fallbackValue: string;
-  className?: string;
-}) {
-  const params = useSearchParams();
-  const tab = params.get("tab");
-  const value = items.some((i) => i.value === tab) ? tab! : fallbackValue;
-
-  return (
-    <PillNav
-      items={items}
-      value={value}
-      className={cn("max-w-full overflow-x-auto", className)}
-    />
   );
 }

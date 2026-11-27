@@ -73,6 +73,7 @@
     "agentsNetwork": "Network",
     "agentsRondas": "Rounds",
     "agentsMemory": "Memory",
+    "agentsSettings": "Settings",
     "notifications": "Notifications",
     "notificationsEmpty": "No notifications yet",
     "notificationsSeeAll": "See all",

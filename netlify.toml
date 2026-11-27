@@ -21,6 +21,10 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  # Pula o deploy quando o commit só mexe em docs/, LP/, supabase/ ou
+  # arquivos .md — cada deploy de produção custa 15 créditos do
+  # Netlify. A regra e o porquê estão em scripts/netlify-ignore.sh.
+  ignore = "bash scripts/netlify-ignore.sh"
 
 [build.environment]
   NODE_VERSION = "22"

@@ -38,7 +38,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Crie as etiquetas e os campos personalizados que sua empresa usa em Configurações › Campos e etiquetas.",
       "Monte o funil de vendas em Funis, com as etapas do seu processo.",
       "Cadastre respostas rápidas em Configurações › Respostas rápidas para as mensagens que vocês repetem todo dia.",
-      "Se for usar agentes de IA, cole a chave da OpenAI ou da Anthropic em Agentes › Chave e modelo.",
+      "Se for usar agentes de IA, cole a chave da OpenAI ou da Anthropic em Agentes de IA › Ajustes.",
       "Mande uma mensagem de teste de outro celular para o número conectado e veja se ela aparece na Caixa de entrada.",
     ],
     tips: [
@@ -198,11 +198,13 @@ export const HELP_TOPICS: HelpTopic[] = [
     summary:
       "Assistentes de inteligência artificial que respondem clientes, qualificam leads e fazem tarefas, com o nível de autonomia que você escolher.",
     steps: [
-      "Em Chave e modelo, cole uma chave da OpenAI ou da Anthropic. Sem ela, os agentes ficam parados.",
+      "Em Ajustes, cole uma chave da OpenAI ou da Anthropic e escolha o modelo. Sem ela, os agentes ficam parados.",
       "Em Equipe, crie um agente a partir da biblioteca de modelos, ou do zero, e escreva as instruções dele.",
       "Defina a autonomia: só sugerir, pedir aprovação ou agir sozinho.",
-      "Teste o agente na aba Teste antes de ativar.",
+      "Teste o agente em Ajustes, na parte Testar a IA, antes de ativar.",
+      "Em Rondas, diga o que cada agente procura sozinho e quando: lead sem contato, orçamento parado, compromisso sem confirmação.",
       "Acompanhe o que os agentes fazem em Trabalhando e aprove as ações pendentes em Aprovações.",
+      "Em Memória, veja e corrija o que os agentes aprenderam sobre os clientes.",
     ],
     tips: [
       "O custo da IA é cobrado pela OpenAI ou pela Anthropic, na conta da chave que você colou.",

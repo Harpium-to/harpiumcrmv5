@@ -59,7 +59,7 @@ export async function PATCH(request: Request) {
     if (error) throw error
     if (!data) {
       return NextResponse.json(
-        { error: 'Cadastre primeiro a chave de IA em Agentes › Chave e modelo.' },
+        { error: 'Cadastre primeiro a chave de IA em Agentes de IA › Ajustes.' },
         { status: 409 },
       )
     }
