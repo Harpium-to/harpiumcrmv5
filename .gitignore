@@ -57,3 +57,6 @@ deno.lock
 
 # pacote da extensão, gerado no build (scripts/build-extension-zip.mjs)
 /public/downloads/
+
+# Receita Federal files downloaded by scripts/cnpj-base/importar.mjs
+.cnpj-cache/

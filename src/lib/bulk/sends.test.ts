@@ -273,3 +273,67 @@ describe('listBulkSends and stopBulkSend', () => {
     expect(t.bulk_sends[0].stopped_at).toBeTruthy();
   });
 });
+
+describe('the prospecting mode', () => {
+  const variations = [
+    'Oi, {{primeiro_nome}}! Aqui é a Bia, da Harmonia. Posso te mostrar uma ideia? Se não quiser, responda SAIR.',
+    'Olá! Bia da Harmonia aqui. Faz sentido conversarmos? Responda SAIR para não receber.',
+    'Bom dia, {{primeiro_nome}}! Tem interesse em saber mais? Caso não, responda SAIR.',
+  ];
+  const prospect = (over: Partial<BulkInput> = {}) =>
+    input({ mode: 'prospeccao', variations, text: variations[0], ...over });
+  const checked = (yes: string[]) => ({
+    ...deps,
+    checker: async () => ({ available: true as const, server: { baseUrl: 'https://x', token: 't' } }),
+    check: async (_s: unknown, numbers: string[]) => new Map(numbers.map((n) => [n, yes.includes(n)])),
+  });
+
+  it('reads the mode and checks the texts', () => {
+    const parsed = parseBulkInput({ name: 'P', tag_id: TAG, mode: 'prospeccao', variations, quick_reply_id: QR });
+    expect(parsed).toMatchObject({ mode: 'prospeccao', variations, quickReplyId: null, text: variations[0] });
+    expect(() => parseBulkInput({ name: 'P', tag_id: TAG, mode: 'prospeccao', variations: variations.slice(0, 2) })).toThrow(
+      BulkError,
+    );
+  });
+
+  it('sends only to numbers on WhatsApp, one text drawn per contact, inside working hours', async () => {
+    const t = world();
+    const out = await createBulkSend(
+      fakeDb(t),
+      fakeDb(t),
+      ACC,
+      'u1',
+      prospect(),
+      { dryRun: false },
+      checked(['5531999998888']),
+    );
+    expect(out).toMatchObject({ total: 1, no_whatsapp: 1, mode: 'prospeccao', already_prospected: 0, days: 1 });
+    expect(t.bulk_sends[0]).toMatchObject({ mode: 'prospeccao', variations });
+    const [msg] = t.scheduled_messages;
+    expect(msg.contact_id).toBe('c1');
+    expect(variations.map((v) => v.replace('{{primeiro_nome}}', 'Ana'))).toContain(msg.content_text);
+    // 10h + a minute + 2 minutes (random 0.5): inside working hours.
+    expect(msg.send_at).toBe(new Date(NOW + 60_000 + 120_000).toISOString());
+  });
+
+  it('never reaches the same cold contact twice', async () => {
+    const t = world();
+    const both = checked(['5531999998888', '5511987654321']);
+    await createBulkSend(fakeDb(t), fakeDb(t), ACC, 'u1', prospect(), { dryRun: false }, both);
+    expect(t.scheduled_messages).toHaveLength(2);
+    expect(await fails(createBulkSend(fakeDb(t), fakeDb(t), ACC, 'u1', prospect(), { dryRun: true }, both))).toBe(
+      '400 empty',
+    );
+  });
+
+  it('needs the number connected by QR code to check the numbers', async () => {
+    const t = world();
+    const out = await fails(
+      createBulkSend(fakeDb(t), fakeDb(t), ACC, 'u1', prospect(), { dryRun: true }, {
+        ...deps,
+        checker: async () => ({ available: false as const, reason: 'Conecte pelo QR code.' }),
+      }),
+    );
+    expect(out).toBe('409 unavailable');
+  });
+});

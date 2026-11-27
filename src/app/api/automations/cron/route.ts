@@ -9,6 +9,9 @@ import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import { resolvePublicOrigin } from '@/lib/http/base-url'
 import { sweepQuizVisits } from '@/lib/quiz/sweep'
+import { applyProspectingBrakes } from '@/lib/bulk/prospect-brake'
+import { runPendingExtractions } from '@/lib/extractor/run'
+import { cleanUpUnusedResults } from '@/lib/extractor/store'
 import { processRoutines } from '@/lib/assistente/routines'
 import { processarAtendimento } from '@/lib/atendimento/chegada'
 import { processarRadar } from '@/lib/radar'
@@ -26,6 +29,11 @@ export const maxDuration = 60
 const ROUTINES_DEADLINE_MS = 25_000
 /** The Radar's share of the tick (the rest is the routines'). */
 const RADAR_BUDGET_MS = 8_000
+/**
+ * The lead extractor's share: no new slice starts after it (the one
+ * running finishes); the jobs left go on next tick.
+ */
+const EXTRACTOR_BUDGET_MS = 5_000
 /**
  * The AI agents' engine (rounds + work queue), counted from the start
  * of the request. Before the routines: agents talk to customers, the
@@ -69,6 +77,8 @@ export async function GET(request: Request) {
   const startedAt = Date.now()
   const admin = supabaseAdmin()
   const task_reminders = await emitTaskReminders(admin)
+  // Prospecting sends that tripped the brake stop before anything goes (073).
+  const prospect_brakes = await applyProspectingBrakes(admin)
   const scheduled_messages = await processScheduledMessages(admin)
   const agenda_messages = await processCalendarNotifications(admin)
   const google_agenda = await processGoogleCalendarSync(admin, {
@@ -78,6 +88,9 @@ export async function GET(request: Request) {
   const google_busy = await refreshGoogleBusy(admin)
   // Quiz visits that left a contact and stopped, and leads to retry (072).
   const quiz_visits = await sweepQuizVisits(admin)
+  // Lead extractions nobody is watching, and old unused results (073).
+  const lead_extractions = await runPendingExtractions(admin, { deadline: Date.now() + EXTRACTOR_BUDGET_MS })
+  const extractor_cleanup = await cleanUpUnusedResults(admin)
   // Setor deadlines and queues (078): warn or pass on what is late,
   // hand queued conversations to whoever of the setor came online.
   const atendimento = await processarAtendimento(admin).catch((err) => {
@@ -104,7 +117,7 @@ export async function GET(request: Request) {
     // The agents (082), then Harpi's routines last: nothing above waits on the AI (074).
     const agentes = await processarAgentes(admin, { deadline: startedAt + AGENTS_DEADLINE_MS })
     const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, atendimento, radar, agentes, routines })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup, atendimento, radar, agentes, routines })
   }
 
   let processed = 0
@@ -137,5 +150,5 @@ export async function GET(request: Request) {
 
   const agentes = await processarAgentes(admin, { deadline: startedAt + AGENTS_DEADLINE_MS })
   const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, atendimento, radar, agentes, routines })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup, atendimento, radar, agentes, routines })
 }

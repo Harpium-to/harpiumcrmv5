@@ -16,6 +16,9 @@ export default defineConfig({
       // RLS and SECURITY DEFINER functions, run on the real migrations
       // in PGlite (Postgres in WASM) — see supabase/tests/harness.ts.
       "supabase/tests/**/*.test.ts",
+      // The loader of the CNPJ base runs outside the app, straight in
+      // Node; how it reads the Receita's files is tested here.
+      "scripts/**/*.test.mjs",
     ],
     // Dummy secrets — encryption.ts / webhook-signature.ts read these
     // at module load. Tests never hit a real Meta/Supabase service, so

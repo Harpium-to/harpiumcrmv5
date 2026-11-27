@@ -2,9 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, ListChecks, Sparkles } from "lucide-react";
+import { ArrowUpRight, ListChecks, ScanSearch, Sparkles } from "lucide-react";
 
 import { DisplayHeading } from "@/components/ui/display-heading";
+
+interface ExtractorNumbers {
+  count: number;
+  used: number;
+  limit: number;
+}
 
 interface QuizNumbers {
   count: number;
@@ -19,6 +25,7 @@ interface QuizNumbers {
  */
 export default function ToolsPage() {
   const [numbers, setNumbers] = useState<QuizNumbers | null>(null);
+  const [extractor, setExtractor] = useState<ExtractorNumbers | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +38,17 @@ export default function ToolsPage() {
           count: quizzes.length,
           published: quizzes.filter((q) => q.status === "published").length,
           leads: quizzes.reduce((sum, q) => sum + q.totals.leads, 0),
+        });
+      })
+      .catch(() => {});
+    fetch("/api/extrator")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.available) return;
+        setExtractor({
+          count: (json.extractions ?? []).length,
+          used: json.usage?.used ?? 0,
+          limit: json.usage?.limit ?? 0,
         });
       })
       .catch(() => {});
@@ -65,6 +83,30 @@ export default function ToolsPage() {
               : numbers.count === 0
                 ? "Nenhum quiz ainda"
                 : `${numbers.count} ${numbers.count === 1 ? "quiz" : "quizzes"} · ${numbers.published} no ar · ${numbers.leads} ${numbers.leads === 1 ? "lead" : "leads"}`}
+          </p>
+        </Link>
+
+        <Link
+          href="/ferramentas/extrator"
+          className="surface fx-lift group flex flex-col rounded-3xl p-6 transition-colors"
+        >
+          <div className="flex items-start justify-between">
+            <span className="flex size-11 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+              <ScanSearch className="size-5" />
+            </span>
+            <ArrowUpRight className="size-5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground" />
+          </div>
+          <h2 className="mt-5 text-lg font-medium text-foreground">Extrator de leads</h2>
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            Listas de empresas para prospectar, pela base de CNPJ e pelo Google Maps: filtre por atividade,
+            cidade e porte, leve para o CRM e prospecte no ritmo certo.
+          </p>
+          <p className="mt-5 text-xs text-muted-foreground tabular-nums">
+            {extractor === null
+              ? " "
+              : extractor.count === 0
+                ? "Nenhuma extração ainda"
+                : `${extractor.count} ${extractor.count === 1 ? "extração" : "extrações"} · ${extractor.used} de ${extractor.limit} leads no mês`}
           </p>
         </Link>
 
