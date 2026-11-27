@@ -2,6 +2,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 import type { WhatsAppDetail, WhatsAppState } from '@/lib/agencia/whatsapp'
+import { ConnectLinkPanel } from '@/components/whatsapp/connect-link-panel'
 import { ConnectLinkActions } from './connect-link-actions'
 
 const STATE_LABEL: Record<WhatsAppState, string> = {
@@ -32,15 +33,19 @@ export function WhatsAppCard({
   crmName,
   detail,
   canSendLink,
+  canManageLink = canSendLink,
 }: {
   accountId: string
   crmName: string
   detail: WhatsAppDetail
   /** Archived CRMs don't get new connections. */
   canSendLink: boolean
+  /** The link without login (081) is for whoever edits this CRM. */
+  canManageLink?: boolean
 }) {
   const { state, reason, phone, lastInboundAt, detailsAllowed, coexistence } = detail
   const unofficial = detail.path === 'nao_oficial'
+  const linkEndpoint = `/api/agencia/crms/${accountId}/link-whatsapp`
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
@@ -109,27 +114,41 @@ export function WhatsAppCard({
         {canSendLink && state !== 'connected' && (
           <div className="space-y-2">
             {unofficial ? (
-              <p className="text-sm">
-                Mande para o cliente o link de conexão: ele entra com o login dele e lê o{' '}
-                <strong>QR code</strong> com o celular do número.
-              </p>
+              <>
+                <p className="text-sm">
+                  Mande para o cliente o link de conexão: ele entra com o login dele e lê o{' '}
+                  <strong>QR code</strong> com o celular do número.
+                </p>
+                <ConnectLinkActions accountId={accountId} crmName={crmName} emphasize />
+              </>
+            ) : canManageLink ? (
+              <>
+                <p className="text-sm">
+                  Mande o link para quem cuida do Facebook da empresa:{' '}
+                  <strong>não precisa de login</strong>. A pessoa clica em{' '}
+                  <strong>Conectar com o Facebook</strong> e escolhe o número.
+                </p>
+                <ConnectLinkPanel endpoint={linkEndpoint} emphasize />
+              </>
             ) : (
-              <p className="text-sm">
-                Mande para o cliente o link de conexão: ele entra com o login dele, clica em{' '}
-                <strong>Conectar com o Facebook</strong> e escolhe o número.
+              <p className="text-sm text-muted-foreground">
+                Só quem gerencia este CRM pode mandar o link de conexão.
               </p>
             )}
-            <ConnectLinkActions accountId={accountId} crmName={crmName} emphasize />
           </div>
         )}
 
-        {canSendLink && state === 'connected' && (
+        {canSendLink && state === 'connected' && (unofficial || canManageLink) && (
           <details className="text-sm">
             <summary className="cursor-pointer text-muted-foreground">
               Precisa trocar o número? Enviar link de conexão
             </summary>
             <div className="mt-2">
-              <ConnectLinkActions accountId={accountId} crmName={crmName} emphasize={false} />
+              {unofficial ? (
+                <ConnectLinkActions accountId={accountId} crmName={crmName} emphasize={false} />
+              ) : (
+                <ConnectLinkPanel endpoint={linkEndpoint} />
+              )}
             </div>
           </details>
         )}

@@ -46,7 +46,12 @@
     "help": "Ajuda",
     "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}",
     "tools": "Ferramentas",
-    "radar": "Radar"
+    "radar": "Radar",
+    "groupWork": "Dia a dia",
+    "groupTrack": "Acompanhar",
+    "groupBuild": "Automatizar",
+    "groupSystem": "Ajustes",
+    "approvalsBadge": "{count, plural, one {# aprovação esperando você} other {# aprovações esperando você}}"
   },
   "TopBar": {
     "openMenu": "Abrir menu",
@@ -65,7 +70,14 @@
     "agentsIdle": "Agentes parados",
     "agentsWorking2": "Trabalhando",
     "agentsApprovals": "Aprovações",
-    "agentsNetwork": "Rede"
+    "agentsNetwork": "Rede",
+    "agentsRondas": "Rondas",
+    "agentsMemory": "Memória",
+    "notifications": "Notificações",
+    "notificationsEmpty": "Nenhuma notificação ainda",
+    "notificationsSeeAll": "Ver todas",
+    "notificationsUnread": "Não lida",
+    "menuHelp": "Ajuda"
   },
   "ModeToggle": {
     "switchMode": "Mudar para o modo {mode}"
@@ -138,7 +150,8 @@
   },
   "Inbox": {
     "page": {
-      "whatsappNotConnected": "O WhatsApp® não está conectado. Vá em Configurações para conectar sua conta."
+      "whatsappNotConnected": "O WhatsApp® não está conectado. Vá em Configurações para conectar sua conta.",
+      "openFailed": "A conversa foi criada, mas não abriu. Recarregue a página."
     },
     "conversationList": {
       "searchPlaceholder": "Buscar conversas...",
@@ -333,6 +346,23 @@
       "aiError": "Não foi possível preencher com a IA. Preencha à mão ou tente de novo.",
       "noPipelines": "Crie um funil em Funis antes de criar negócios.",
       "noStages": "Esse funil não tem etapas. Crie as etapas em Funis."
+    },
+    "newConversation": {
+      "button": "Nova conversa",
+      "title": "Nova conversa",
+      "description": "Comece uma conversa com um número que ainda não está na caixa de entrada.",
+      "phoneLabel": "WhatsApp",
+      "phonePlaceholder": "(63) 99999-9999",
+      "phoneHint": "Com DDD. Para outro país, comece com + e o código do país.",
+      "phoneRequired": "Digite o número do WhatsApp.",
+      "nameLabel": "Nome (opcional)",
+      "namePlaceholder": "Como o contato vai aparecer",
+      "existing": "Já está nos contatos",
+      "submit": "Abrir conversa",
+      "opening": "Abrindo…",
+      "cancel": "Cancelar",
+      "created": "Contato criado.",
+      "failed": "Não foi possível abrir a conversa."
     }
   },
   "Contacts": {
@@ -2131,6 +2161,9 @@
     "approvalApproved": "Aprovada",
     "approvalRejected": "Rejeitada",
     "approvalDecided": "Decidido",
+    "kindUpdateCrm": "Atualizar o cliente",
+    "kindMoveStage": "Mover no funil",
+    "kindLogActivity": "Nota ou tarefa",
     "kindSendMessage": "Enviar mensagem",
     "kindScheduleMeeting": "Marcar horário",
     "kindDiscount": "Conceder desconto",
@@ -2294,5 +2327,21 @@
     "alertOldestNow": "{name} acabou de ser passado para a equipe",
     "late": "atrasada",
     "answer": "Atender"
+  },
+  "ConnectLink": {
+    "send": "Enviar link pelo WhatsApp",
+    "copy": "Copiar link de conexão",
+    "copied": "Link copiado",
+    "copyPrompt": "Copie o link:",
+    "linkLabel": "Link de conexão",
+    "failed": "Não foi possível gerar o link.",
+    "cancel": "Cancelar link",
+    "cancelConfirm": "Cancelar o link de conexão? Quem recebeu não vai mais conseguir conectar por ele.",
+    "cancelled": "Link cancelado.",
+    "activeUntil": "Link ativo até {until}.",
+    "replaceHint": "Gerar de novo cancela o anterior.",
+    "rules": "Funciona sem login, vale por 7 dias e para uma conexão só. Só liga o WhatsApp oficial: não dá acesso a conversas nem a contatos.",
+    "settingsTitle": "Mandar link para outra pessoa conectar",
+    "settingsDesc": "Para quem cuida do Facebook da empresa e não tem login no CRM: ela abre o link, clica em Conectar com o Facebook e pronto."
   }
 }

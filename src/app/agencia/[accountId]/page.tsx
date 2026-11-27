@@ -189,6 +189,7 @@ export default async function AgenciaAccountPage({
         crmName={account.name}
         detail={whatsapp}
         canSendLink={lifecycle?.status !== 'archived'}
+        canManageLink={canEdit}
       />
 
       <GoogleAgendaCard detail={googleAgenda} />

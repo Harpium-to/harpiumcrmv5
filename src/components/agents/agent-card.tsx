@@ -232,53 +232,53 @@ export function AgentCard({
       >
         <span className="tabular-nums">{t("handledCount", { count: handled })}</span>
         <span aria-hidden>·</span>
-        <span className="truncate">
+        <span className="min-w-0 truncate">
           {lastRun ? t("lastRun", { when: compactAgo(lastRun) }) : t("neverRan")}
         </span>
-      </div>
 
-      {/* Edit and copy, in the corner the reference puts its expand
-          control. They appear on hover/focus so a wall of cards stays
-          calm, but stay reachable by keyboard at all times.
-          Deliberately not next to the on/off pair: copying is a build
-          action, switching is an operational one, and a clone button
-          one pixel from the control that points an agent at live
-          customers is a misclick waiting to happen. */}
-      {canEdit ? (
-        <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-          <button
-            type="button"
-            onClick={onDuplicate}
-            disabled={duplicating}
-            aria-label={`${t("duplicate")} — ${agent.name}`}
-            className={cn(
-              "flex size-7 items-center justify-center rounded-full transition-colors",
-              on
-                ? "text-primary-foreground/60 hover:bg-primary-foreground/12"
-                : "text-muted-foreground hover:bg-foreground/8",
-            )}
-          >
-            {duplicating ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Copy className="size-3.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label={`${t("edit")} — ${agent.name}`}
-            className={cn(
-              "flex size-7 items-center justify-center rounded-full transition-colors",
-              on
-                ? "text-primary-foreground/60 hover:bg-primary-foreground/12"
-                : "text-muted-foreground hover:bg-foreground/8",
-            )}
-          >
-            <Maximize2 className="size-3.5" />
-          </button>
-        </div>
-      ) : null}
+        {/* Edit and copy, at the end of the footer row. They appear on
+            hover/focus so a wall of cards stays calm, but stay reachable
+            by keyboard at all times.
+            Deliberately in the opposite corner from the on/off pair:
+            copying is a build action, switching is an operational one,
+            and a clone button one pixel from the control that points an
+            agent at live customers is a misclick waiting to happen. */}
+        {canEdit ? (
+          <div className="-my-1.5 ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <button
+              type="button"
+              onClick={onDuplicate}
+              disabled={duplicating}
+              aria-label={`${t("duplicate")} — ${agent.name}`}
+              className={cn(
+                "flex size-7 items-center justify-center rounded-full transition-colors",
+                on
+                  ? "text-primary-foreground/60 hover:bg-primary-foreground/12"
+                  : "text-muted-foreground hover:bg-foreground/8",
+              )}
+            >
+              {duplicating ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onEdit}
+              aria-label={`${t("edit")} — ${agent.name}`}
+              className={cn(
+                "flex size-7 items-center justify-center rounded-full transition-colors",
+                on
+                  ? "text-primary-foreground/60 hover:bg-primary-foreground/12"
+                  : "text-muted-foreground hover:bg-foreground/8",
+              )}
+            >
+              <Maximize2 className="size-3.5" />
+            </button>
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 }

@@ -15,6 +15,7 @@ import { cleanUpUnusedResults } from '@/lib/extractor/store'
 import { processRoutines } from '@/lib/assistente/routines'
 import { processarAtendimento } from '@/lib/atendimento/chegada'
 import { processarRadar } from '@/lib/radar'
+import { processarAgentes } from '@/lib/agents/motor'
 
 // Harpi's routines call the AI from here (one model call per step), so
 // this tick may take longer than the bookkeeping above.
@@ -33,6 +34,12 @@ const RADAR_BUDGET_MS = 8_000
  * running finishes); the jobs left go on next tick.
  */
 const EXTRACTOR_BUDGET_MS = 5_000
+/**
+ * The AI agents' engine (rounds + work queue), counted from the start
+ * of the request. Before the routines: agents talk to customers, the
+ * routines only report to the team. What doesn't fit runs next tick.
+ */
+const AGENTS_DEADLINE_MS = 22_000
 
 /**
  * Drain due `automation_pending_executions` rows. Meant to be hit
@@ -107,9 +114,10 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!due || due.length === 0) {
-    // Harpi's routines last: nothing above waits on the AI (074).
+    // The agents (082), then Harpi's routines last: nothing above waits on the AI (074).
+    const agentes = await processarAgentes(admin, { deadline: startedAt + AGENTS_DEADLINE_MS })
     const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
-    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup, atendimento, radar, routines })
+    return NextResponse.json({ processed: 0, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup, atendimento, radar, agentes, routines })
   }
 
   let processed = 0
@@ -140,6 +148,7 @@ export async function GET(request: Request) {
     processed++
   }
 
+  const agentes = await processarAgentes(admin, { deadline: startedAt + AGENTS_DEADLINE_MS })
   const routines = await processRoutines(admin, { deadline: startedAt + ROUTINES_DEADLINE_MS })
-  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup, atendimento, radar, routines })
+  return NextResponse.json({ processed, task_reminders, scheduled_messages, agenda_messages, google_agenda, google_busy, quiz_visits, prospect_brakes, lead_extractions, extractor_cleanup, atendimento, radar, agentes, routines })
 }

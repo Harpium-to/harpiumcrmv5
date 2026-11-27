@@ -2,6 +2,7 @@ import {
   Activity,
   Bell,
   Bot,
+  Brain,
   CalendarDays,
   ChartColumn,
   GitBranch,
@@ -12,6 +13,7 @@ import {
   Plug,
   Radar as RadarIcon,
   Radio,
+  Repeat,
   Settings,
   Share2,
   ShieldCheck,
@@ -22,6 +24,8 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+
+import type { AccountRole } from "@/lib/auth/roles";
 
 // ============================================================
 // The app's navigation registry.
@@ -37,24 +41,35 @@ import {
 // falls back to them for its page title.
 // ============================================================
 
+/**
+ * The menu's blocks, ordered by how often a client reaches for them
+ * rather than by how the app was built:
+ *   work   — the day's work, in the order a lead travels: inbox →
+ *            leads → pipelines → agenda, with contacts (the address
+ *            book) last
+ *   track  — reading the numbers: reports and the radar
+ *   build  — what you set up to run on its own
+ *   system — what you set once: channels and settings
+ */
+export type NavGroup = "work" | "track" | "build" | "system";
+
 export interface NavItem {
   href: string;
   labelKey: string;
   icon: LucideIcon;
   /**
-   * The rail draws a hairline between groups. Purely visual
-   * rhythm — 12 identical icons in one column is a wall.
-   *   work   — the day-to-day: inbox, contacts, pipelines
-   *   build  — things you configure once and leave running
-   *   system — settings
+   * The rail draws a hairline between groups (with the group's name
+   * while it is open), and the phone drawer titles them. Sixteen
+   * identical icons in one column is a wall.
    */
-  group: "work" | "build" | "system";
+  group: NavGroup;
   /** Renders a small "Beta" chip in the drawer / tooltip. */
   beta?: boolean;
   /**
-   * Reached from a button in the top bar rather than the desktop rail
-   * (Ferramentas sits beside the agents chip). The mobile drawer still
-   * lists it, since the top bar's chips do not fit on a phone.
+   * Reached from a button in the top bar rather than the desktop rail:
+   * Ferramentas beside the agents chip, Notificações as the bell, Ajuda
+   * as the "?". The mobile drawer still lists them, since the top bar's
+   * chips do not all fit on a phone.
    */
   topbar?: boolean;
 }
@@ -62,24 +77,57 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: LayoutDashboard, group: "work" },
   { href: "/inbox", labelKey: "inbox", icon: MessageSquare, group: "work" },
-  { href: "/notifications", labelKey: "notifications", icon: Bell, group: "work" },
-  { href: "/contacts", labelKey: "contacts", icon: Users, group: "work" },
+  { href: "/notifications", labelKey: "notifications", icon: Bell, group: "work", topbar: true },
   { href: "/leads", labelKey: "leads", icon: Magnet, group: "work" },
   { href: "/pipelines", labelKey: "pipelines", icon: GitBranch, group: "work" },
   { href: "/agenda", labelKey: "agenda", icon: CalendarDays, group: "work" },
-  { href: "/relatorios", labelKey: "reports", icon: ChartColumn, group: "work" },
-  { href: "/radar", labelKey: "radar", icon: RadarIcon, group: "work" },
+  { href: "/contacts", labelKey: "contacts", icon: Users, group: "work" },
+  { href: "/relatorios", labelKey: "reports", icon: ChartColumn, group: "track" },
+  { href: "/radar", labelKey: "radar", icon: RadarIcon, group: "track" },
   { href: "/agents", labelKey: "aiAgents", icon: Bot, group: "build" },
   { href: "/automations", labelKey: "automations", icon: Zap, group: "build" },
   { href: "/flows", labelKey: "flows", icon: Workflow, group: "build", beta: true },
   { href: "/broadcasts", labelKey: "broadcasts", icon: Radio, group: "build" },
-  { href: "/canais", labelKey: "channels", icon: Plug, group: "build" },
   { href: "/ferramentas", labelKey: "tools", icon: Wrench, group: "build", topbar: true },
+  { href: "/canais", labelKey: "channels", icon: Plug, group: "system" },
   { href: "/settings", labelKey: "settings", icon: Settings, group: "system" },
-  { href: "/ajuda", labelKey: "help", icon: LifeBuoy, group: "system" },
+  { href: "/ajuda", labelKey: "help", icon: LifeBuoy, group: "system", topbar: true },
 ];
 
-export const NAV_GROUPS: NavItem["group"][] = ["work", "build", "system"];
+export const NAV_GROUPS: NavGroup[] = ["work", "track", "build", "system"];
+
+/** Each group's name, in the `Sidebar` namespace. */
+export const NAV_GROUP_LABEL_KEYS: Record<NavGroup, string> = {
+  work: "groupWork",
+  track: "groupTrack",
+  build: "groupBuild",
+  system: "groupSystem",
+};
+
+/**
+ * Which groups this person's menu shows.
+ *
+ * Attendants and viewers work the day; they cannot change agents,
+ * automations, channels or settings, so those groups only make their
+ * menu longer. This shortens the menu, it does not guard anything: the
+ * pages still open from a link and enforce the role themselves.
+ *
+ * Two cases keep the whole menu:
+ *   - the agency inside a client CRM (`viaAgency`): read-only consent
+ *     makes it a viewer there, but checking that CRM's setup is the
+ *     reason for the visit;
+ *   - a role not loaded yet, so an owner's menu never loses half of
+ *     its items for a moment on load.
+ */
+export function visibleNavGroups(
+  role: AccountRole | null,
+  viaAgency: boolean,
+): NavGroup[] {
+  if (viaAgency || role === null || role === "owner" || role === "admin") {
+    return NAV_GROUPS;
+  }
+  return ["work", "track"];
+}
 
 /**
  * Which nav item owns a given pathname. `/dashboard` must match
@@ -116,8 +164,10 @@ export const NAV_SECTIONS: Record<string, NavSection[]> = {
   "/agents": [
     { value: "team", labelKey: "agentsTeam", icon: Bot },
     { value: "working", labelKey: "agentsWorking2", icon: Activity },
-    { value: "network", labelKey: "agentsNetwork", icon: Share2 },
+    { value: "rondas", labelKey: "agentsRondas", icon: Repeat },
     { value: "approvals", labelKey: "agentsApprovals", icon: ShieldCheck },
+    { value: "network", labelKey: "agentsNetwork", icon: Share2 },
+    { value: "memory", labelKey: "agentsMemory", icon: Brain },
     { value: "playground", labelKey: "agentsPlayground", icon: Sparkles },
     { value: "setup", labelKey: "agentsSetup", icon: Settings },
   ],

@@ -46,7 +46,12 @@
     "help": "Help",
     "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}",
     "tools": "Tools",
-    "radar": "Radar"
+    "radar": "Radar",
+    "groupWork": "Day to day",
+    "groupTrack": "Track",
+    "groupBuild": "Automate",
+    "groupSystem": "Setup",
+    "approvalsBadge": "{count, plural, one {# approval waiting for you} other {# approvals waiting for you}}"
   },
   "TopBar": {
     "openMenu": "Open menu",
@@ -65,7 +70,14 @@
     "agentsIdle": "Agents idle",
     "agentsWorking2": "At work",
     "agentsApprovals": "Approvals",
-    "agentsNetwork": "Network"
+    "agentsNetwork": "Network",
+    "agentsRondas": "Rounds",
+    "agentsMemory": "Memory",
+    "notifications": "Notifications",
+    "notificationsEmpty": "No notifications yet",
+    "notificationsSeeAll": "See all",
+    "notificationsUnread": "Unread",
+    "menuHelp": "Help"
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"
@@ -138,7 +150,8 @@
   },
   "Inbox": {
     "page": {
-      "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account."
+      "whatsappNotConnected": "WhatsApp® is not connected. Go to Settings to connect your account.",
+      "openFailed": "The conversation was created but didn't open. Reload the page."
     },
     "conversationList": {
       "searchPlaceholder": "Search conversations...",
@@ -333,6 +346,23 @@
       "aiError": "Couldn't fill in with the AI. Fill it in by hand or try again.",
       "noPipelines": "Create a pipeline in Pipelines before creating deals.",
       "noStages": "This pipeline has no stages. Create them in Pipelines."
+    },
+    "newConversation": {
+      "button": "New conversation",
+      "title": "New conversation",
+      "description": "Start a conversation with a number that isn't in the inbox yet.",
+      "phoneLabel": "WhatsApp",
+      "phonePlaceholder": "+1 555 123 4567",
+      "phoneHint": "Include the area code. For another country, start with + and the country code.",
+      "phoneRequired": "Type the WhatsApp number.",
+      "nameLabel": "Name (optional)",
+      "namePlaceholder": "How the contact will show up",
+      "existing": "Already in contacts",
+      "submit": "Open conversation",
+      "opening": "Opening…",
+      "cancel": "Cancel",
+      "created": "Contact created.",
+      "failed": "Couldn't open the conversation."
     }
   },
   "Contacts": {
@@ -2131,6 +2161,9 @@
     "approvalApproved": "Approved",
     "approvalRejected": "Rejected",
     "approvalDecided": "Decided",
+    "kindUpdateCrm": "Update the contact",
+    "kindMoveStage": "Move in the pipeline",
+    "kindLogActivity": "Note or task",
     "kindSendMessage": "Send a message",
     "kindScheduleMeeting": "Book an appointment",
     "kindDiscount": "Grant a discount",
@@ -2294,5 +2327,21 @@
     "alertOldestNow": "{name} was just handed to the team",
     "late": "late",
     "answer": "Answer"
+  },
+  "ConnectLink": {
+    "send": "Send link via WhatsApp",
+    "copy": "Copy connection link",
+    "copied": "Link copied",
+    "copyPrompt": "Copy the link:",
+    "linkLabel": "Connection link",
+    "failed": "Could not create the link.",
+    "cancel": "Cancel link",
+    "cancelConfirm": "Cancel the connection link? Whoever received it will no longer be able to connect with it.",
+    "cancelled": "Link cancelled.",
+    "activeUntil": "Link active until {until}.",
+    "replaceHint": "Creating it again cancels the previous one.",
+    "rules": "Works without login, is valid for 7 days and for one connection only. It only connects the official WhatsApp: no access to conversations or contacts.",
+    "settingsTitle": "Send a link for someone else to connect",
+    "settingsDesc": "For whoever manages the company's Facebook and has no CRM login: they open the link, click Connect with Facebook and that's it."
   }
 }

@@ -176,6 +176,48 @@ async function postSend(
   return { externalId }
 }
 
+/**
+ * Does this number have WhatsApp? `phone` is digits only.
+ *
+ * true / false when the gateway says so; null when it can't tell (the
+ * call failed, or the answer came in a shape we don't know). Callers
+ * treat null as "don't block": the check is a courtesy before opening
+ * a conversation, not a gate on sending.
+ */
+export async function checkUazapiNumber(
+  srv: UazapiServer,
+  phone: string,
+): Promise<boolean | null> {
+  try {
+    const res = await fetch(endpoint(srv.baseUrl, 'chat/check'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', token: srv.token },
+      body: JSON.stringify({ numbers: [phone] }),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return null
+    return readNumberCheck(await res.json().catch(() => null))
+  } catch {
+    return null
+  }
+}
+
+/** Pull the yes/no out of a /chat/check answer (exported for tests). */
+export function readNumberCheck(body: unknown): boolean | null {
+  const list = Array.isArray(body)
+    ? body
+    : body && typeof body === 'object' && Array.isArray((body as { numbers?: unknown }).numbers)
+      ? (body as { numbers: unknown[] }).numbers
+      : null
+  const first = list?.[0]
+  if (!first || typeof first !== 'object') return null
+  const r = first as Record<string, unknown>
+  for (const key of ['isInWhatsapp', 'isInWhatsApp', 'exists', 'onWhatsapp']) {
+    if (typeof r[key] === 'boolean') return r[key] as boolean
+  }
+  return null
+}
+
 /** Send a plain text message. `toPhone` should be digits only. */
 export async function sendUazapiText(
   srv: UazapiServer,

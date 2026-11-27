@@ -7,9 +7,16 @@ import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { NAV_GROUPS, NAV_ITEMS, type NavItem } from "@/lib/nav";
+import {
+  NAV_GROUP_LABEL_KEYS,
+  NAV_ITEMS,
+  visibleNavGroups,
+  type NavItem,
+} from "@/lib/nav";
+import { useAuth } from "@/hooks/use-auth";
+import { useCrmContext } from "@/hooks/use-crm-context";
+import { usePendingApprovals } from "@/hooks/use-pending-approvals";
 import { useTotalUnread } from "@/hooks/use-total-unread";
-import { useUnreadNotifications } from "@/hooks/use-unread-notifications";
 import { useWaitingConversations } from "@/hooks/use-waiting-conversations";
 
 interface RailProps {
@@ -35,6 +42,17 @@ interface RailProps {
  * a mouse click leaves focus on the link, and the rail must still
  * close when the pointer leaves.
  *
+ * Groups (see `NavGroup`): a hairline between them at rest, the
+ * group's name in the same slot while the rail is open — the slot
+ * keeps its height either way, so opening never makes the rail jump.
+ * Attendants and viewers get the first two groups only
+ * (`visibleNavGroups`).
+ *
+ * Height budget: 14 items at rest is about 740px, which fits a laptop
+ * window (the rail caps itself at the viewport and scrolls past that,
+ * with the scrollbar hidden — so an item past the fold is simply
+ * invisible). Count before adding a 15th.
+ *
  * Mobile: the same list as a labelled drawer — hover doesn't exist on
  * touch, so an icon-only rail there would be a guessing game.
  */
@@ -47,8 +65,16 @@ const RAIL_OPEN_HIDE =
 export function Rail({ open = false, onClose }: RailProps) {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
+  const { accountId, accountRole } = useAuth();
+  // Whether the agency is the one inside this CRM: a read-only grant
+  // makes it a viewer here, but it still gets the whole menu.
+  const crm = useCrmContext(accountId);
+  const groups = visibleNavGroups(accountRole, crm?.viaAgency ?? false);
   const totalUnread = useTotalUnread();
-  const unreadNotifications = useUnreadNotifications();
+  const pendingApprovals = usePendingApprovals(
+    accountId,
+    groups.includes("build"),
+  );
   // Conversations the AI handed off that nobody answered: louder than
   // unread (amber, red once late) and shown even on the inbox itself.
   const { items: waiting, lateCount } = useWaitingConversations();
@@ -90,11 +116,30 @@ export function Rail({ open = false, onClose }: RailProps) {
       : pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
 
-  /** Unread signal for the two routes that carry one. */
+  /**
+   * The count beside a route: unread conversations on the inbox, agent
+   * actions waiting for an OK on the agents. Notificações carries its
+   * count on the bell in the top bar.
+   */
   function badgeFor(item: NavItem): number {
     if (item.href === "/inbox") return totalUnread;
-    if (item.href === "/notifications") return unreadNotifications;
+    if (item.href === "/agents") return pendingApprovals;
     return 0;
+  }
+
+  /** What a screen reader hears for the route, counts included. */
+  function ariaLabelFor(item: NavItem): string {
+    const parts = [t(item.labelKey)];
+    const waitingCount = waitingFor(item);
+    if (waitingCount > 0) parts.push(t("waitingBadge", { count: waitingCount }));
+    const badge = badgeFor(item);
+    if (badge > 0 && item.href === "/inbox") {
+      parts.push(t("unreadConversations", { count: badge }));
+    }
+    if (badge > 0 && item.href === "/agents") {
+      parts.push(t("approvalsBadge", { count: badge }));
+    }
+    return parts.join(" · ");
   }
 
   return (
@@ -114,17 +159,38 @@ export function Rail({ open = false, onClose }: RailProps) {
             "group-hover/rail:w-56 group-has-[:focus-visible]/rail:w-56",
           )}
         >
-          {NAV_GROUPS.map((group, groupIndex) => {
-            // Top-bar items (Ferramentas) have their own button up there.
+          {groups.map((group, groupIndex) => {
+            // Top-bar items (Ferramentas, Notificações, Ajuda) have
+            // their own buttons up there.
             const items = NAV_ITEMS.filter((i) => i.group === group && !i.topbar);
             if (items.length === 0) return null;
+            const groupLabel = t(NAV_GROUP_LABEL_KEYS[group]);
             return (
-              <div key={group} className="flex flex-col gap-1">
+              <div
+                key={group}
+                role="group"
+                aria-label={groupLabel}
+                className="flex flex-col gap-1"
+              >
                 {groupIndex > 0 ? (
-                  <span
-                    aria-hidden
-                    className="mx-3 my-1 h-px shrink-0 bg-foreground/10"
-                  />
+                  // One slot, two looks: the hairline at rest, the
+                  // group's name once the rail is open.
+                  <div aria-hidden className="relative mx-3 h-3 shrink-0">
+                    <span
+                      className={cn(
+                        "absolute inset-x-0 top-1/2 h-px bg-foreground/10 transition-opacity duration-150",
+                        RAIL_OPEN_HIDE,
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "absolute inset-0 flex items-center text-[10px] leading-none font-semibold tracking-wider whitespace-nowrap text-muted-foreground uppercase opacity-0 transition-opacity duration-150",
+                        RAIL_OPEN_SHOW,
+                      )}
+                    >
+                      {groupLabel}
+                    </span>
+                  </div>
                 ) : null}
                 {items.map((item) => {
                   const active = isActive(item);
@@ -134,11 +200,7 @@ export function Rail({ open = false, onClose }: RailProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      aria-label={
-                        waitingCount > 0
-                          ? `${t(item.labelKey)} · ${t("waitingBadge", { count: waitingCount })}`
-                          : t(item.labelKey)
-                      }
+                      aria-label={ariaLabelFor(item)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
                         "flex h-11 shrink-0 items-center rounded-full transition-colors",
@@ -197,6 +259,11 @@ export function Rail({ open = false, onClose }: RailProps) {
                         ) : null}
                         {badge > 0 ? (
                           <span
+                            title={
+                              item.href === "/agents"
+                                ? t("approvalsBadge", { count: badge })
+                                : undefined
+                            }
                             className={cn(
                               "rounded-full px-1.5 text-[11px] font-medium tabular-nums",
                               active
@@ -248,54 +315,78 @@ export function Rail({ open = false, onClose }: RailProps) {
             <X className="size-5" />
           </button>
         </div>
-        <ul className="mt-1 flex flex-1 flex-col gap-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item);
-            const badge = badgeFor(item);
+        <div className="mt-1 flex flex-1 flex-col gap-2 overflow-y-auto">
+          {groups.map((group) => {
+            // The phone has no room for the top bar's chips, so the
+            // drawer lists every route, top-bar ones included.
+            const items = NAV_ITEMS.filter((i) => i.group === group);
+            if (items.length === 0) return null;
+            const groupLabel = t(NAV_GROUP_LABEL_KEYS[group]);
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-3 rounded-full px-4 py-3 text-sm transition-colors",
-                    active
-                      ? "surface-on"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
+              <section key={group} aria-label={groupLabel}>
+                <p
+                  aria-hidden
+                  className="px-4 pt-1 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase"
                 >
-                  <item.icon className="size-[1.15rem]" />
-                  <span className="flex-1">{t(item.labelKey)}</span>
-                  {item.beta ? (
-                    <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
-                      {t("beta")}
-                    </span>
-                  ) : null}
-                  {waitingFor(item) > 0 ? (
-                    <span
-                      title={t("waitingBadge", { count: waitingFor(item) })}
-                      className={waitingPill}
-                    >
-                      {waitingFor(item) > 99 ? "99+" : waitingFor(item)}
-                    </span>
-                  ) : null}
-                  {badge > 0 ? (
-                    <span
-                      className={cn(
-                        "rounded-full px-1.5 text-[11px] font-medium tabular-nums",
-                        active
-                          ? "bg-primary-foreground/15"
-                          : "bg-primary text-primary-foreground",
-                      )}
-                    >
-                      {badge > 99 ? "99+" : badge}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
+                  {groupLabel}
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {items.map((item) => {
+                    const active = isActive(item);
+                    const badge = badgeFor(item);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          aria-current={active ? "page" : undefined}
+                          className={cn(
+                            "flex items-center gap-3 rounded-full px-4 py-3 text-sm transition-colors",
+                            active
+                              ? "surface-on"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )}
+                        >
+                          <item.icon className="size-[1.15rem]" />
+                          <span className="flex-1">{t(item.labelKey)}</span>
+                          {item.beta ? (
+                            <span className="rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase">
+                              {t("beta")}
+                            </span>
+                          ) : null}
+                          {waitingFor(item) > 0 ? (
+                            <span
+                              title={t("waitingBadge", { count: waitingFor(item) })}
+                              className={waitingPill}
+                            >
+                              {waitingFor(item) > 99 ? "99+" : waitingFor(item)}
+                            </span>
+                          ) : null}
+                          {badge > 0 ? (
+                            <span
+                              title={
+                                item.href === "/agents"
+                                  ? t("approvalsBadge", { count: badge })
+                                  : undefined
+                              }
+                              className={cn(
+                                "rounded-full px-1.5 text-[11px] font-medium tabular-nums",
+                                active
+                                  ? "bg-primary-foreground/15"
+                                  : "bg-primary text-primary-foreground",
+                              )}
+                            >
+                              {badge > 99 ? "99+" : badge}
+                            </span>
+                          ) : null}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             );
           })}
-        </ul>
+        </div>
       </aside>
     </>
   );

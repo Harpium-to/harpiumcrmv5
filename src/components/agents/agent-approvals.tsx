@@ -17,6 +17,9 @@ import type { AgentApproval } from "@/lib/agents/types";
 const KIND_LABEL: Record<string, string> = {
   send_message: "kindSendMessage",
   schedule_meeting: "kindScheduleMeeting",
+  update_crm: "kindUpdateCrm",
+  move_stage: "kindMoveStage",
+  log_activity: "kindLogActivity",
   discount: "kindDiscount",
   give_discount: "kindDiscount",
   proposal: "kindProposal",
@@ -210,6 +213,14 @@ function ApprovalRow({
             disabled={!canDecide || pending}
           />
         </div>
+      ) : Array.isArray(approval.payload.detalhes) ? (
+        // An agent tool's card (082): the lines its code built from the
+        // exact input, so approving runs what is read here.
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          {(approval.payload.detalhes as unknown[]).map((line, i) => (
+            <li key={i}>{String(line)}</li>
+          ))}
+        </ul>
       ) : approval.kind === "schedule_meeting" ? null : (
         // A booking's summary already says who, with whom and when, and
         // its payload is only ids. Anything else with no message body
