@@ -70,7 +70,7 @@ export async function checkReadiness(db: SupabaseClient, accountId: string): Pro
     return {
       ready: false,
       reason: 'no_key',
-      message: 'Para o Harpi funcionar, cole a chave da OpenAI ou da Anthropic em Agentes › Chave e modelo.',
+      message: 'Para o Harpi funcionar, cole a chave da OpenAI ou da Anthropic em Agentes de IA › Ajustes.',
     }
   }
   const settings = await loadAssistantSettings(db, accountId)

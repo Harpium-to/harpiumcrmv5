@@ -85,3 +85,15 @@ describe("visibleNavGroups", () => {
     expect(visibleNavGroups(null, false)).toEqual(NAV_GROUPS);
   });
 });
+
+describe("agents sections", () => {
+  it("keeps the agents screen to seven sections, with Ajustes holding the key and the test", async () => {
+    const { NAV_SECTIONS } = await import("./nav");
+    const values = NAV_SECTIONS["/agents"].map((s) => s.value);
+    expect(values).toEqual(["team", "working", "rondas", "approvals", "network", "memory", "setup"]);
+    for (const s of NAV_SECTIONS["/agents"]) {
+      expect(pt.TopBar, `pt ${s.labelKey}`).toHaveProperty(s.labelKey);
+      expect(en.TopBar, `en ${s.labelKey}`).toHaveProperty(s.labelKey);
+    }
+  });
+});

@@ -45,7 +45,6 @@ type Tab =
   | "network"
   | "approvals"
   | "memory"
-  | "playground"
   | "setup";
 
 const EMPTY_STATS: AgentStats = {
@@ -80,16 +79,24 @@ function AgentsPageInner() {
   const canDecide = accountRole ? hasMinRole(accountRole, "agent") : false;
 
   const tabParam = params.get("tab");
+  // "Teste" became part of Ajustes; an old ?tab=playground link opens
+  // Ajustes scrolled to the test.
   const tab: Tab =
-    tabParam === "working" ||
-    tabParam === "rondas" ||
-    tabParam === "memory" ||
-    tabParam === "network" ||
-    tabParam === "approvals" ||
-    tabParam === "playground" ||
-    tabParam === "setup"
-      ? tabParam
-      : "team";
+    tabParam === "playground"
+      ? "setup"
+      : tabParam === "working" ||
+          tabParam === "rondas" ||
+          tabParam === "memory" ||
+          tabParam === "network" ||
+          tabParam === "approvals" ||
+          tabParam === "setup"
+        ? tabParam
+        : "team";
+
+  useEffect(() => {
+    if (tabParam !== "playground") return;
+    document.getElementById("testar-ia")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [tabParam]);
 
   const [agents, setAgents] = useState<Agent[] | null>(null);
   const [stats, setStats] = useState<AgentStats>(EMPTY_STATS);
@@ -372,11 +379,18 @@ function AgentsPageInner() {
 
       {tab === "memory" ? <AgentMemory agents={agents} canEdit={canEdit} /> : null}
 
-      {tab === "playground" ? <AiPlayground /> : null}
-
       {tab === "setup" ? (
         <div className="space-y-6">
           <AiConfig />
+          <section id="testar-ia" className="scroll-mt-24 space-y-3">
+            <div>
+              <h2 className="text-base font-medium text-foreground">Testar a IA</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Escreva como se fosse um cliente e veja o que os agentes responderiam. Nada é enviado a ninguém.
+              </p>
+            </div>
+            <AiPlayground />
+          </section>
           {canEdit ? <AiUsageCard /> : null}
         </div>
       ) : null}

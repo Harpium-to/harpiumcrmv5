@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ComponentType } from "react";
+import type { ComponentType, Ref } from "react";
 import { cn } from "@/lib/utils";
 
 export interface PillItem {
@@ -24,6 +24,8 @@ interface PillNavProps {
   /** Visually hidden label for the surrounding nav/tablist. */
   ariaLabel?: string;
   className?: string;
+  /** The track element, for callers that scroll it (the top bar). */
+  ref?: Ref<HTMLDivElement>;
 }
 
 /**
@@ -43,9 +45,11 @@ export function PillNav({
   onChange,
   ariaLabel,
   className,
+  ref,
 }: PillNavProps) {
   return (
     <div
+      ref={ref}
       className={cn("pill-track", className)}
       role={onChange ? "tablist" : undefined}
       aria-label={ariaLabel}

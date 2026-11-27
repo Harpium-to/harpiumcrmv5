@@ -196,7 +196,7 @@ export function AssistenteSettings() {
 
       {!config.hasKey && (
         <p className="rounded-lg bg-amber-400/15 px-3 py-2 text-sm text-foreground">
-          Cadastre a chave da OpenAI ou da Anthropic em Agentes › Chave e modelo para o Harpi funcionar.
+          Cadastre a chave da OpenAI ou da Anthropic em Agentes de IA › Ajustes para o Harpi funcionar.
         </p>
       )}
 

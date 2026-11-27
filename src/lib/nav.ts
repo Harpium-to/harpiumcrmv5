@@ -17,7 +17,6 @@ import {
   Settings,
   Share2,
   ShieldCheck,
-  Sparkles,
   Users,
   Workflow,
   Wrench,
@@ -168,7 +167,9 @@ export const NAV_SECTIONS: Record<string, NavSection[]> = {
     { value: "approvals", labelKey: "agentsApprovals", icon: ShieldCheck },
     { value: "network", labelKey: "agentsNetwork", icon: Share2 },
     { value: "memory", labelKey: "agentsMemory", icon: Brain },
-    { value: "playground", labelKey: "agentsPlayground", icon: Sparkles },
-    { value: "setup", labelKey: "agentsSetup", icon: Settings },
+    // Key and model, the AI test and usage live together: testing is
+    // what you do right after pasting a key. `?tab=playground` (old
+    // links) still lands here, on the test.
+    { value: "setup", labelKey: "agentsSettings", icon: Settings },
   ],
 };
