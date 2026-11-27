@@ -46,7 +46,12 @@
     "help": "Help",
     "waitingBadge": "{count, plural, one {# waiting for a person} other {# waiting for a person}}",
     "tools": "Tools",
-    "radar": "Radar"
+    "radar": "Radar",
+    "groupWork": "Day to day",
+    "groupTrack": "Track",
+    "groupBuild": "Automate",
+    "groupSystem": "Setup",
+    "approvalsBadge": "{count, plural, one {# approval waiting for you} other {# approvals waiting for you}}"
   },
   "TopBar": {
     "openMenu": "Open menu",
@@ -65,7 +70,12 @@
     "agentsIdle": "Agents idle",
     "agentsWorking2": "At work",
     "agentsApprovals": "Approvals",
-    "agentsNetwork": "Network"
+    "agentsNetwork": "Network",
+    "notifications": "Notifications",
+    "notificationsEmpty": "No notifications yet",
+    "notificationsSeeAll": "See all",
+    "notificationsUnread": "Unread",
+    "menuHelp": "Help"
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"

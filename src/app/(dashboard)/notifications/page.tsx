@@ -5,27 +5,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import type { Notification } from "@/types";
-import { AlarmClock, Bell, Bot, CalendarCheck, CalendarDays, CheckCheck, ListTodo, Loader2, Radar, ShieldCheck, Undo2, UserPlus, Users } from "lucide-react";
+import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { openHarpi } from "@/components/assistente/harpi";
+import { notificationIcon } from "@/components/notifications/notification-icon";
+import { notificationTarget } from "@/lib/notifications/target";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-// Icon per notification type.
-const TYPE_ICON: Record<Notification["type"], typeof Bell> = {
-  conversation_assigned: UserPlus,
-  agency_access_request: ShieldCheck,
-  task_due: ListTodo,
-  agenda_booking: CalendarDays,
-  agenda_google: CalendarCheck,
-  assistente: Bot,
-  team_queue: Users,
-  conversation_overdue: AlarmClock,
-  conversation_returned: Undo2,
-  radar: Radar,
-};
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -124,23 +112,9 @@ export default function NotificationsPage() {
   const handleClick = useCallback(
     (n: Notification) => {
       if (!n.read_at) markRead(n.id);
-      if (n.type === "assistente") {
-        // A routine's report lives in its Harpi conversation.
-        openHarpi({ view: "history" });
-      } else if (n.type === "radar") {
-        // New alerts and the week's digest both live on the Radar.
-        router.push("/radar");
-      } else if (n.type === "agency_access_request") {
-        router.push("/settings?tab=agencia");
-      } else if (n.type === "agenda_booking" || n.type === "agenda_google") {
-        // The agenda lists what is waiting for approval at the top.
-        router.push("/agenda");
-      } else if (n.type === "task_due" && n.contact_id) {
-        // Straight to the contact the task is about.
-        router.push(`/contacts?contact=${n.contact_id}`);
-      } else if (n.conversation_id) {
-        router.push(`/inbox?c=${n.conversation_id}`);
-      }
+      const target = notificationTarget(n);
+      if (target?.kind === "harpi") openHarpi({ view: "history" });
+      else if (target) router.push(target.href);
     },
     [markRead, router],
   );
@@ -225,7 +199,7 @@ export default function NotificationsPage() {
       ) : (
         <ul className="space-y-2">
           {notifications.map((n) => {
-            const Icon = TYPE_ICON[n.type] ?? Bell;
+            const Icon = notificationIcon(n.type);
             const isUnread = !n.read_at;
             return (
               <li key={n.id}>
