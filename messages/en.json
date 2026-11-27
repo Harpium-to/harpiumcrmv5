@@ -65,7 +65,9 @@
     "agentsIdle": "Agents idle",
     "agentsWorking2": "At work",
     "agentsApprovals": "Approvals",
-    "agentsNetwork": "Network"
+    "agentsNetwork": "Network",
+    "agentsRondas": "Rounds",
+    "agentsMemory": "Memory"
   },
   "ModeToggle": {
     "switchMode": "Switch to {mode} mode"
@@ -2149,6 +2151,9 @@
     "approvalApproved": "Approved",
     "approvalRejected": "Rejected",
     "approvalDecided": "Decided",
+    "kindUpdateCrm": "Update the contact",
+    "kindMoveStage": "Move in the pipeline",
+    "kindLogActivity": "Note or task",
     "kindSendMessage": "Send a message",
     "kindScheduleMeeting": "Book an appointment",
     "kindDiscount": "Grant a discount",

@@ -190,7 +190,7 @@ avançam. O app não se chama sozinho.
 
 | Endpoint | Frequência |
 |---|---|
-| `GET https://SEU-DOMINIO/api/agents/cron` | a cada 1 min |
+| `GET https://SEU-DOMINIO/api/agents/cron` | opcional: desde a migration 082 o `automations/cron` já roda os agentes (rondas e fila) |
 | `GET https://SEU-DOMINIO/api/automations/cron` | a cada 1–5 min |
 | `GET https://SEU-DOMINIO/api/flows/cron` | a cada 1–5 min |
 

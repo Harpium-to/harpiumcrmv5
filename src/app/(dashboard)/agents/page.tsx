@@ -26,6 +26,9 @@ import { AgentLiveFeed } from "@/components/agents/agent-live-feed";
 import { AgentsWorking } from "@/components/agents/agents-working";
 import { AgentNetwork } from "@/components/agents/agent-network";
 import { AgentApprovals } from "@/components/agents/agent-approvals";
+import { AgentRondas } from "@/components/agents/agent-rondas";
+import { AgentMemory } from "@/components/agents/agent-memory";
+import { EngineStatus } from "@/components/agents/engine-status";
 import { useAgentOperation } from "@/hooks/use-agent-operation";
 import {
   AGENT_ICONS,
@@ -38,8 +41,10 @@ import { AiConfig } from "@/components/settings/ai-config";
 type Tab =
   | "team"
   | "working"
+  | "rondas"
   | "network"
   | "approvals"
+  | "memory"
   | "playground"
   | "setup";
 
@@ -77,6 +82,8 @@ function AgentsPageInner() {
   const tabParam = params.get("tab");
   const tab: Tab =
     tabParam === "working" ||
+    tabParam === "rondas" ||
+    tabParam === "memory" ||
     tabParam === "network" ||
     tabParam === "approvals" ||
     tabParam === "playground" ||
@@ -353,9 +360,17 @@ function AgentsPageInner() {
         </div>
       ) : null}
 
+      {/* Rounds, the queue and approved actions all wait for the
+          engine: say so where people look for them (082). */}
+      {tab === "working" || tab === "rondas" || tab === "approvals" ? <EngineStatus /> : null}
+
+      {tab === "rondas" ? <AgentRondas agents={agents} canEdit={canEdit} /> : null}
+
       {tab === "network" ? <AgentNetwork agents={agents} /> : null}
 
       {tab === "approvals" ? <AgentApprovals canDecide={canDecide} /> : null}
+
+      {tab === "memory" ? <AgentMemory agents={agents} canEdit={canEdit} /> : null}
 
       {tab === "playground" ? <AiPlayground /> : null}
 
