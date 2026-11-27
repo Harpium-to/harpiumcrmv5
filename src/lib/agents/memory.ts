@@ -156,3 +156,34 @@ export async function recallMemory(
     return []
   }
 }
+
+/**
+ * Rewrite one memory (the Memória tab). The embedding is recomputed so
+ * semantic recall finds the new wording; without an embeddings key the
+ * old vector is dropped and full-text search covers it.
+ */
+export async function updateMemoryContent(
+  db: SupabaseClient,
+  args: { accountId: string; id: string; content: string },
+): Promise<boolean> {
+  const content = args.content.trim().slice(0, 2000)
+  if (!content) return false
+  let embedding: string | null = null
+  try {
+    const { key } = await loadEmbeddingsKey(db, args.accountId)
+    if (key) {
+      const [vector] = await embedTexts(key, [content])
+      embedding = vector ? toVectorLiteral(vector) : null
+    }
+  } catch {
+    // Lexical only.
+  }
+  const { data, error } = await db
+    .from('agent_memory')
+    .update({ content, embedding })
+    .eq('id', args.id)
+    .eq('account_id', args.accountId)
+    .select('id')
+  if (error) throw error
+  return (data ?? []).length > 0
+}

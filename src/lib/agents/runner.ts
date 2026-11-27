@@ -28,6 +28,7 @@ import {
 } from './tasks'
 import { claimApprovedAction, effectivePayload, isExpired, requestApproval } from './approvals'
 import { recallMemory, rememberFact } from './memory'
+import { LOOP_KINDS, MIN_STEP_MS, hasLegacyApproval, runLoopTask } from './loop'
 import type { Agent, AgentTask } from './types'
 
 // ============================================================
@@ -82,6 +83,12 @@ export interface QueueSummary {
 export async function runAccountQueue(
   accountId: string,
   maxTasks = 5,
+  /**
+   * When the caller's time is up (epoch ms). Tasks that call the AI
+   * are only claimed with enough time left for one model call, and a
+   * task that runs out mid-way continues on the next tick.
+   */
+  deadline: number = Date.now() + 50_000,
 ): Promise<QueueSummary> {
   const summary: QueueSummary = {
     claimed: 0,
@@ -93,6 +100,7 @@ export async function runAccountQueue(
   const db = supabaseAdmin()
 
   for (let i = 0; i < maxTasks; i++) {
+    if (deadline - Date.now() < MIN_STEP_MS) break
     let task: AgentTask | null = null
     try {
       task = await claimTask(db, accountId)
@@ -104,7 +112,7 @@ export async function runAccountQueue(
     summary.claimed += 1
 
     try {
-      const outcome = await runTask(db, accountId, task)
+      const outcome = await runTask(db, accountId, task, deadline)
       summary[outcome] += 1
     } catch (err) {
       console.error('[agents runner] task failed:', err)
@@ -126,6 +134,7 @@ async function runTask(
   db: SupabaseClient,
   accountId: string,
   task: AgentTask,
+  deadline: number,
 ): Promise<Outcome> {
   const agents = await loadActiveAgents(db, accountId)
   const agent = resolveAgent(agents, task)
@@ -164,12 +173,21 @@ async function runTask(
 
   await setAgentStatus(db, agent.id, statusForKind(task.kind), task.title)
 
+  let outcome: Outcome = 'failed'
   try {
+    // Fase 1: work with tools (loop.ts). A message parked before it
+    // finishes the old way, sent exactly as it was approved.
+    if (LOOP_KINDS.has(task.kind) && !(await hasLegacyApproval(db, task))) {
+      outcome = await runLoopTask(db, accountId, agent, task, config, deadline)
+      return outcome
+    }
     if (MESSAGE_KINDS.has(task.kind)) {
-      return await runMessageTask(db, accountId, agent, task, config)
+      outcome = await runMessageTask(db, accountId, agent, task, config)
+      return outcome
     }
     if (ANALYSIS_KINDS.has(task.kind)) {
-      return await runAnalysisTask(db, accountId, agent, task, config)
+      outcome = await runAnalysisTask(db, accountId, agent, task, config)
+      return outcome
     }
     // `prospect` lands here: finding new companies needs a web-search
     // tool this build does not have. Failing loudly with the reason
@@ -181,7 +199,10 @@ async function runTask(
     )
     return 'failed'
   } finally {
-    await setAgentStatus(db, agent.id, 'idle', null)
+    // A parked or paused agent keeps the status that says why.
+    if (outcome === 'completed' || outcome === 'failed') {
+      await setAgentStatus(db, agent.id, 'idle', null)
+    }
   }
 }
 

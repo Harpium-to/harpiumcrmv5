@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useTranslations } from "next-intl";
-import { LogOut, Menu, Puzzle, Settings as SettingsIcon, User, Wrench } from "lucide-react";
+import { LifeBuoy, LogOut, Menu, Puzzle, Settings as SettingsIcon, User, Wrench } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,6 +14,7 @@ import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 import { AgentPulseChip } from "@/components/agents/agent-pulse-chip";
 import { ModeToggle } from "@/components/layout/mode-toggle";
 import { PageHelp } from "@/components/help/page-help";
+import { NotificationsBell } from "@/components/layout/notifications-bell";
 import { CrmMenuItems } from "@/components/layout/crm-menu-items";
 import { ReceivingMenuItem } from "@/components/layout/receiving-menu-item";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -120,7 +121,9 @@ export function TopBar({ onOpenNav }: TopBarProps) {
         </div>
 
         {/* ---- Right: live status + account ---- */}
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Tighter on a phone: with the bell here too, the screen's
+            name needs the room. */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <AgentPulseChip className="hidden sm:inline-flex" />
           {/* Ferramentas: the extra tools of the CRM (quiz e formulários
               first). Beside the agents chip; on a phone it is in the
@@ -134,6 +137,7 @@ export function TopBar({ onOpenNav }: TopBarProps) {
             <Wrench className="size-4" />
             <span className="hidden xl:inline">{t("tools")}</span>
           </Link>
+          <NotificationsBell />
           <PageHelp />
           <ModeToggle />
 
@@ -210,6 +214,19 @@ export function TopBar({ onOpenNav }: TopBarProps) {
               >
                 <SettingsIcon className="size-4" />
                 {tb("menuSettings")}
+              </DropdownMenuItem>
+              {/* Ajuda left the menu rail; besides the "?" beside the
+                  bell, it is here, where people look for "how do I". */}
+              <DropdownMenuItem
+                render={
+                  <Link
+                    href="/ajuda"
+                    className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+                  />
+                }
+              >
+                <LifeBuoy className="size-4" />
+                {tb("menuHelp")}
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem

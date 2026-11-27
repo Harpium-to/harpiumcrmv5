@@ -46,7 +46,12 @@
     "help": "Ajuda",
     "waitingBadge": "{count, plural, one {# aguardando atendente} other {# aguardando atendente}}",
     "tools": "Ferramentas",
-    "radar": "Radar"
+    "radar": "Radar",
+    "groupWork": "Dia a dia",
+    "groupTrack": "Acompanhar",
+    "groupBuild": "Automatizar",
+    "groupSystem": "Ajustes",
+    "approvalsBadge": "{count, plural, one {# aprovação esperando você} other {# aprovações esperando você}}"
   },
   "TopBar": {
     "openMenu": "Abrir menu",
@@ -65,7 +70,14 @@
     "agentsIdle": "Agentes parados",
     "agentsWorking2": "Trabalhando",
     "agentsApprovals": "Aprovações",
-    "agentsNetwork": "Rede"
+    "agentsNetwork": "Rede",
+    "agentsRondas": "Rondas",
+    "agentsMemory": "Memória",
+    "notifications": "Notificações",
+    "notificationsEmpty": "Nenhuma notificação ainda",
+    "notificationsSeeAll": "Ver todas",
+    "notificationsUnread": "Não lida",
+    "menuHelp": "Ajuda"
   },
   "ModeToggle": {
     "switchMode": "Mudar para o modo {mode}"
@@ -2149,6 +2161,9 @@
     "approvalApproved": "Aprovada",
     "approvalRejected": "Rejeitada",
     "approvalDecided": "Decidido",
+    "kindUpdateCrm": "Atualizar o cliente",
+    "kindMoveStage": "Mover no funil",
+    "kindLogActivity": "Nota ou tarefa",
     "kindSendMessage": "Enviar mensagem",
     "kindScheduleMeeting": "Marcar horário",
     "kindDiscount": "Conceder desconto",

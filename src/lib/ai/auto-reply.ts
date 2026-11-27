@@ -40,6 +40,12 @@ import { channelOf, sendChannelText } from '@/lib/channels/send-text'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import { decide, toAutonomy, type ApprovalReason } from '@/lib/agents/autonomy'
 import { requestApproval } from '@/lib/agents/approvals'
+import { recallMemory, rememberFact } from '@/lib/agents/memory'
+import {
+  MEMORY_MARKER_PROMPT,
+  extractMemoryMarkers,
+  memoryPromptBlock,
+} from '@/lib/agents/memory-marker'
 import { refreshGoogleBusy } from '@/lib/agenda/google-busy'
 import { processGoogleCalendarSync } from '@/lib/agenda/google-sync'
 import {
@@ -538,11 +544,27 @@ async function runAutoReply(
         if (settings.mode === 'ia_escolhe') teamsBlock = teamsPrompt(handoffCtx.teams)
       }
 
+      // What the agents learned about this customer and the operation
+      // (082, Fase 0): read before replying, and the agent may ask to
+      // remember more with a marker (memory-marker.ts). Best-effort.
+      let memoryBlock: string | null = null
+      if (agent) {
+        try {
+          memoryBlock = memoryPromptBlock(
+            await recallMemory(db, { accountId, agentId: agent.id, contactId, query: inbound, limit: 6 }),
+          )
+        } catch (err) {
+          console.error('[ai auto-reply] could not recall memory:', err)
+        }
+      }
+
       const capabilities = [
         scheduling
           ? agendaPrompt(scheduling.agenda, { needsApproval: scheduling.needsApproval })
           : null,
         teamsBlock,
+        memoryBlock,
+        agent ? MEMORY_MARKER_PROMPT : null,
       ].filter((c): c is string => !!c)
 
       const systemPrompt = buildSystemPrompt({
@@ -567,9 +589,24 @@ async function runAutoReply(
         messages,
       })
       const { handoff, usage } = generated
+      // Memory markers never reach the customer; what they hold is kept
+      // for the next conversation (any agent of this CRM reads it).
+      const remembered = extractMemoryMarkers(generated.text)
+      if (agent && remembered.facts.length > 0) {
+        for (const fact of remembered.facts) {
+          await rememberFact(db, {
+            accountId,
+            agentId: agent.id,
+            contactId,
+            scope: 'contact',
+            kind: 'fact',
+            content: fact,
+          })
+        }
+      }
       // A booking marker never reaches the customer, whether or not
       // this agent may book.
-      const { text, booking } = parseBookingMarker(generated.text)
+      const { text, booking } = parseBookingMarker(remembered.text)
 
       /**
        * Act on the agent's request to book, and return what the
