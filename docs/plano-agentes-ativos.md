@@ -270,6 +270,7 @@ Em 27/11/2026 você pediu as Fases 0 a 2 de uma vez ("Fazer 0 a 2 direto"), com 
   - Ordem: pulso, aprovações vencidas, rondas e fila.
   - `/api/agents/cron` continua funcionando e chama o mesmo motor.
   - Uma aprovação que vence agora encerra a tarefa. Antes, a tarefa ficava parada para sempre.
+  - Tarefa parada na fila há mais de 3 dias é cancelada, não executada. Se o motor nunca rodou em produção, ligar ele não dispara mensagens atrasadas de dias.
 - **Aviso de motor parado** nas abas Trabalhando, Rondas e Aprovações, quando ele não roda há mais de 10 minutos.
 - **Memória no WhatsApp** (`src/lib/ai/auto-reply.ts`):
   - antes de responder, o agente lê o que a equipe sabe do cliente;

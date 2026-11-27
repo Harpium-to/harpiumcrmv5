@@ -25,6 +25,8 @@ import { runAccountQueue, type QueueSummary } from './runner'
 export interface AgentesSummary extends QueueSummary {
   accounts: number
   expired: number
+  /** Tasks too old to run: the engine was not running when they were due. */
+  stale: number
   rondas: RondasSummary | null
 }
 
@@ -34,6 +36,13 @@ const RONDAS_BUDGET_MS = 4_000
 const MAX_ACCOUNTS = 20
 /** Tasks claimed per account per tick. */
 const MAX_TASKS_PER_ACCOUNT = 5
+/**
+ * A task due longer ago than this sat in a queue nobody was running
+ * (before 082 the queue needed a second scheduler most CRMs never set
+ * up). Running it now would message a customer days late about
+ * something that has moved on, so it is cancelled instead.
+ */
+const STALE_AFTER_MS = 3 * 86_400_000
 
 export async function processarAgentes(
   db: SupabaseClient,
@@ -42,6 +51,7 @@ export async function processarAgentes(
   const summary: AgentesSummary = {
     accounts: 0,
     expired: 0,
+    stale: 0,
     rondas: null,
     claimed: 0,
     completed: 0,
@@ -81,6 +91,22 @@ export async function processarAgentes(
     }
   } catch (err) {
     console.error('[agentes] expiring approvals failed:', err)
+  }
+
+  try {
+    const { data: stale } = await db
+      .from('agent_tasks')
+      .update({
+        status: 'cancelled',
+        last_error: 'ficou mais de 3 dias parada na fila (o motor não estava rodando)',
+        finished_at: nowIso(),
+      })
+      .in('status', ['queued', 'blocked'])
+      .lt('scheduled_for', new Date(Date.now() - STALE_AFTER_MS).toISOString())
+      .select('id')
+    summary.stale = (stale ?? []).length
+  } catch (err) {
+    console.error('[agentes] stale sweep failed:', err)
   }
 
   try {
