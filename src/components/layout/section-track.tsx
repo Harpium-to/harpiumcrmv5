@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { scrollEdges } from "@/lib/scroll-edges";
+import { revealDelta, scrollEdges } from "@/lib/scroll-edges";
 import { PillNav, type PillItem } from "@/components/ui/pill-nav";
 
 /** Old `?tab=` values that now live inside another section. */
@@ -49,13 +49,28 @@ export function SectionTrack({
     setEdges((prev) => (prev.left === next.left && prev.right === next.right ? prev : next));
   }, []);
 
+  // Bring the selected section fully into view (room left for the arrow).
+  const revealActive = useCallback(() => {
+    const el = trackRef.current;
+    const active = el?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!el || !active) return;
+    const delta = revealDelta(el.getBoundingClientRect(), active.getBoundingClientRect());
+    if (delta !== 0) el.scrollLeft += delta;
+  }, []);
+
   // Watch for anything that changes what is cut off: scrolling, the
   // bar resizing (window, account name loading), the items changing.
+  // A resize also re-reveals the selected section: the bar narrows
+  // after the first paint, when the account's name arrives, and a
+  // section revealed before that ends up half under the arrow.
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
     const frame = requestAnimationFrame(measure);
-    const observer = new ResizeObserver(() => measure());
+    const observer = new ResizeObserver(() => {
+      revealActive();
+      measure();
+    });
     observer.observe(el);
     el.addEventListener("scroll", measure, { passive: true });
     return () => {
@@ -63,19 +78,12 @@ export function SectionTrack({
       observer.disconnect();
       el.removeEventListener("scroll", measure);
     };
-  }, [measure, items.length]);
+  }, [measure, revealActive, items.length]);
 
-  // Keep the selected section in view (with a little room for the arrow).
+  // And whenever the selection changes.
   useEffect(() => {
-    const el = trackRef.current;
-    const active = el?.querySelector<HTMLElement>('[data-active="true"]');
-    if (!el || !active) return;
-    const track = el.getBoundingClientRect();
-    const pill = active.getBoundingClientRect();
-    const room = 40;
-    if (pill.left < track.left) el.scrollLeft -= track.left - pill.left + room;
-    else if (pill.right > track.right) el.scrollLeft += pill.right - track.right + room;
-  }, [value]);
+    revealActive();
+  }, [value, revealActive]);
 
   const scroll = (direction: 1 | -1) => {
     const el = trackRef.current;
