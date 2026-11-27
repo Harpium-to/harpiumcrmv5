@@ -15,3 +15,17 @@ export function scrollEdges(
     right: scrollLeft + clientWidth < scrollWidth - slack,
   };
 }
+
+/**
+ * How far to scroll a strip so an item is fully in view, leaving
+ * `room` px for the arrow on that side. 0 when it already is.
+ */
+export function revealDelta(
+  track: { left: number; right: number },
+  item: { left: number; right: number },
+  room = 40,
+): number {
+  if (item.left < track.left) return item.left - track.left - room;
+  if (item.right > track.right) return item.right - track.right + room;
+  return 0;
+}
